@@ -9,7 +9,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | App | Folder | What it is |
 | --- | --- | --- |
 | 🍬 Beadie | [`candy-beads/`](candy-beads/) | Candy-bead whiteboard — place beads on a hex board, lace the thread bead by bead, tie knots, preview the finished piece in 3D, and get a shopping list of beads + cord length. |
-| 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. |
+| 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 
 ## How it's laid out
 
@@ -25,6 +25,25 @@ Every app is a single `index.html` with its CSS and JS inline. No build step, no
 dependencies to install — the repo root *is* the website. An app may pull a
 library off a CDN (three.js, React) but nothing is compiled ahead of time; edit
 the file, push, done.
+
+### What Yaniv remembers
+
+The scorekeeper keeps four things in the browser's `localStorage`, all of them
+local to that browser profile and never uploaded:
+
+| Key | What's in it |
+| --- | --- |
+| `yaniv_settings` | House rules — Yaniv threshold, Asaf penalty, halving toggles. |
+| `yaniv_roster` | The last table's line-up, so **Same players →** deals the same game again. |
+| `yaniv_games` | The last 50 finished games, round by round — this is what **Stats** reads. |
+| `yaniv_api_key` | Your Anthropic key for the commentator (see below). |
+
+**Stats** in the header is the all-time page: a leaderboard (games, wins, win
+rate, average and best finishes, Yanivs, Asafs, busts), a handful of records,
+and the game archive — tap any game to replay its scoreboard and chart. Clear a
+single game from the list, clear the whole history from that page, or wipe any
+of the stored items individually under **Settings → Saved on this device**.
+Every clear takes two taps and can't be undone.
 
 ### Yaniv and the AI commentator
 
