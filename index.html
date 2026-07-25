@@ -176,6 +176,40 @@ const APPS = [
           `<circle cx="${x.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.2" fill="#000" fill-opacity=".13"/>`);
       }));
     }
+  },
+  {
+    slug: 'yaniv',
+    name: 'Yaniv Scorekeeper',
+    emoji: '🃏',
+    desc: 'Score the card game Yaniv. Cut the deck for the deal, log every hand, mark a clean Yaniv or an Asaf catch, and watch the totals creep toward 200 — with a loud commentator roasting the table after every round.',
+    tags: ['cards', 'game night', 'scoring', 'AI'],
+    thumb: `
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Three playing cards fanned over a dark table">
+        <defs>
+          <linearGradient id="yzBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2b2339"/><stop offset="100%" stop-color="#17131f"/>
+          </linearGradient>
+          <linearGradient id="yzCard" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fbf5e9"/><stop offset="100%" stop-color="#e4d7bd"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#yzBg)"/>
+        <g stroke="rgba(23,19,31,.18)" stroke-width="1">
+          <g transform="rotate(-16 52 58)">
+            <rect x="34" y="26" width="38" height="54" rx="6" fill="url(#yzCard)"/>
+            <text x="53" y="60" font-size="24" text-anchor="middle" fill="#17131f" stroke="none">♠</text>
+          </g>
+          <g transform="rotate(-2 80 54)">
+            <rect x="61" y="20" width="38" height="54" rx="6" fill="url(#yzCard)"/>
+            <text x="80" y="54" font-size="24" text-anchor="middle" fill="#b3271f" stroke="none">♥</text>
+          </g>
+          <g transform="rotate(13 108 58)">
+            <rect x="89" y="26" width="38" height="54" rx="6" fill="url(#yzCard)"/>
+            <text x="108" y="60" font-size="24" text-anchor="middle" fill="#17131f" stroke="none">♣</text>
+          </g>
+        </g>
+        <text x="139" y="79" font-size="11" text-anchor="middle" fill="#e8b24c" font-family="monospace">200</text>
+      </svg>`,
   }
 ];
 

@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Yaniv Scorekeeper</title>
+<meta name="description" content="Keep score for Yaniv: cut for the deal, log every hand, catch an Asaf, and let a loud commentator roast the table after each round." />
+<meta name="theme-color" content="#17131f" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2317131f'/><text x='16' y='24' font-size='22' text-anchor='middle' fill='%23dd4b43'>%E2%99%A0</text></svg>" />
+<style>
+  html, body { margin: 0; padding: 0; min-height: 100%; background: #17131f; }
+  /* Shown until React mounts (or if the CDN is unreachable). */
+  #boot { color: #b6a988; font-family: system-ui, sans-serif; font-size: 14px; padding: 40px 20px; text-align: center; }
+  #boot a { color: #e8b24c; }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot">Dealing…<br><br><a href="../">← back to all apps</a></div></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js" crossorigin></script>
+<script>
+  /* The react preset now defaults to the automatic JSX runtime, which compiles to
+     `import ... from "react/jsx-runtime"` — no good against a UMD global. Force the
+     classic runtime so JSX becomes React.createElement calls. */
+  Babel.registerPreset('react-classic', {
+    presets: [[Babel.availablePresets.react, { runtime: 'classic' }]],
+  });
+</script>
+
+<script type="text/babel" data-presets="react-classic">
+const { useState, useEffect, useRef } = React;
+
+/* ------------------------------------------------------------------ */
+/*  Yaniv Scorekeeper                                                  */
+/*  Verified rules (Wikipedia / Pagat):                                */
+/*   - Round winner (lowest hand) scores 0; everyone else adds hand.   */
+/*   - Caller who gets Asaf'd scores hand + 30; the catcher wins (0).  */
+/*   - Exactly 100 -> 50, exactly 200 -> 100.                          */
+/*   - Over 200 ends the game; lowest total wins.                      */
+/*   - Previous round's winner deals next; first dealer is random.     */
+/* ------------------------------------------------------------------ */
+
+const SUITS = ["♠", "♥", "♦", "♣"];
+const PALETTE = ["#dd4b43", "#e8b24c", "#54c2a0", "#6aa7e0", "#c77dff", "#f0905d", "#9ccc65", "#ef6f9c"];
+const isRed = (s) => s === "♥" || s === "♦";
+
+const DEFAULT_SETTINGS = {
+  yanivThreshold: 5,
+  penalty: 30,
+  half100_200: true,
+  halfEvery50: false,
+};
+
+function applyHalving(score, s) {
+  const hit =
+    (s.half100_200 && (score === 100 || score === 200)) ||
+    (s.halfEvery50 && score > 0 && score % 50 === 0);
+  return hit ? score / 2 : score;
+}
+function meterColor(score) {
+  if (score > 200) return "var(--red-deep)";
+  const r = Math.min(score, 200) / 200;
+  if (r < 0.5) return "var(--mint)";
+  if (r < 0.8) return "var(--gold)";
+  return "var(--red)";
+}
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// role of a player in the round, given who called / who caught
+function roleOf(id, callerId, catcherId) {
+  if (callerId && id === callerId) return catcherId ? "caller_asaf" : "caller_win";
+  if (catcherId && id === catcherId) return "catcher";
+  return "normal";
+}
+function addedFor(hand, role, penalty) {
+  if (role === "caller_win") return 0; // clean Yaniv: caller scores nothing
+  if (role === "caller_asaf") return hand + penalty; // got Asaf'd
+  return hand; // everyone else — including the catcher — scores their own hand
+}
+
+/* --------------------------- the roast AI -------------------------- */
+const ROAST_SYSTEM = `You're the loud, quick-witted commentator for an ongoing game of Yaniv (a Rummy-style card game where the LOWEST total wins and crossing 200 knocks you out). After each round you deliver a short, funny roast of the table.
+
+Rules for your commentary:
+- 1 to 3 sentences. Punchy. No preamble, no "Round X:" label, no wrapping quotation marks — just the roast.
+- Roast playfully, like a friend ribbing friends at game night. Be savage about their GAMEPLAY (huge hands, blowing a Yaniv call, creeping toward 200, getting Asaf'd, a clean Yaniv) — never about real personal traits, appearance, or anything identity-based.
+- Use the players' real names and the actual events of the round.
+- You are given the STORY SO FAR and YOUR OWN PREVIOUS CALLS. Use them: call back to earlier disasters, escalate running gags, track who keeps choking. Continuity is what makes it land.
+- If someone called Yaniv and got Asaf'd, rub in the 30-point penalty. If someone nailed a clean Yaniv, give grudging respect then a dig. Mock monster hands; warn whoever's about to bust.
+- Keep it light and genuinely funny. No slurs, nothing actually hurtful. Vary the jokes round to round.
+Output ONLY the commentary text.`;
+
+/* The commentator calls the Claude API straight from the browser, so it needs
+   the player's own API key (stored locally, never sent anywhere else) and the
+   anthropic-dangerous-direct-browser-access header that opts into CORS. With
+   no key the app falls back to the canned roasts below — the game still works
+   end to end, it's just less mean. */
+const KEY_STORE = "yaniv_api_key";
+const getApiKey = () => { try { return localStorage.getItem(KEY_STORE) || ""; } catch (e) { return ""; } };
+const setApiKey = (k) => { try { k ? localStorage.setItem(KEY_STORE, k) : localStorage.removeItem(KEY_STORE); } catch (e) {} };
+
+async function generateRoast(prompt) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("no-key");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: ROAST_SYSTEM,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) throw new Error("api " + res.status);
+  const data = await res.json();
+  const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join(" ").trim();
+  if (!text) throw new Error("empty");
+  return text;
+}
+
+const FALLBACKS = {
+  asaf: [
+    "{caller} called Yaniv and got Asaf'd by {catcher}. Bold call, brutal math, +30. Read the room next time.",
+    "Nothing humbles a soul like shouting Yaniv and watching {catcher} flip a lower hand. Enjoy the 30, {caller}.",
+  ],
+  yaniv: [
+    "{caller} slips out a clean Yaniv and zero points while the rest of you fund the scoreboard.",
+    "Textbook Yaniv from {caller}. Annoying. Effective. Zero points.",
+  ],
+  big: [
+    "{big} just inhaled {bigpts} points in one round. The deck has chosen violence.",
+    "Somebody check on {big} — that's not a hand, that's a small mortgage.",
+  ],
+  generic: [
+    "Points were exchanged, egos were bruised, and {leader} is quietly winning while everyone argues.",
+    "Another round of questionable decisions. {leader} leads; the rest of you are decorating the table.",
+  ],
+};
+function fill(t, v) {
+  return t.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "someone");
+}
+function pickFallback(ctx) {
+  let pool = FALLBACKS.generic;
+  if (ctx.catcher && ctx.caller) pool = FALLBACKS.asaf;
+  else if (ctx.caller) pool = FALLBACKS.yaniv;
+  else if (ctx.bigpts >= 25 && ctx.big) pool = FALLBACKS.big;
+  return fill(pool[Math.floor(Math.random() * pool.length)], ctx);
+}
+
+function YanivScorekeeper() {
+  const [phase, setPhase] = useState("setup"); // setup | cut | playing | over
+  const [showStats, setShowStats] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [players, setPlayers] = useState([]);
+  const [nameDraft, setNameDraft] = useState("");
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [inputs, setInputs] = useState({});
+  const [history, setHistory] = useState([]); // undo snapshots
+  const [rounds, setRounds] = useState([]); // full round log for stats/roast
+
+  // round resolution
+  const [yanivCallerId, setYanivCallerId] = useState(null);
+  const [catcherId, setCatcherId] = useState(null);
+
+  // commentary
+  const [commentary, setCommentary] = useState([]);
+  const [finalRoast, setFinalRoast] = useState(null);
+
+  // cut-the-deck
+  const [cutIndex, setCutIndex] = useState(null);
+  const [cutting, setCutting] = useState(false);
+  const [starterId, setStarterId] = useState(null);
+  const cutTimer = useRef(null);
+
+  const minScore = players.length ? Math.min(...players.map((p) => p.score)) : 0;
+
+  /* ----------------------------- setup ---------------------------- */
+  function addPlayer() {
+    const name = nameDraft.trim();
+    if (!name || players.length >= 8) return;
+    setPlayers((ps) => [
+      ...ps,
+      {
+        id: crypto.randomUUID(),
+        name,
+        suit: SUITS[ps.length % SUITS.length],
+        color: PALETTE[ps.length % PALETTE.length],
+        score: 0,
+      },
+    ]);
+    setNameDraft("");
+  }
+  function removePlayer(id) {
+    setPlayers((ps) =>
+      ps
+        .filter((p) => p.id !== id)
+        .map((p, i) => ({ ...p, suit: SUITS[i % SUITS.length], color: PALETTE[i % PALETTE.length] }))
+    );
+  }
+
+  /* --------------------------- cut deck --------------------------- */
+  function runCut(list) {
+    const n = list.length;
+    if (!n) return;
+    setStarterId(null);
+    if (prefersReducedMotion()) {
+      const f = Math.floor(Math.random() * n);
+      setCutIndex(f);
+      setStarterId(list[f].id);
+      return;
+    }
+    setCutting(true);
+    let step = 0;
+    const totalSteps = 16 + Math.floor(Math.random() * 6);
+    const tick = () => {
+      setCutIndex(Math.floor(Math.random() * n));
+      step++;
+      if (step >= totalSteps) {
+        const f = Math.floor(Math.random() * n);
+        setCutIndex(f);
+        setStarterId(list[f].id);
+        setCutting(false);
+        return;
+      }
+      cutTimer.current = setTimeout(tick, 55 + step * step * 1.25);
+    };
+    tick();
+  }
+  function goToCut() {
+    if (players.length >= 2) setPhase("cut");
+  }
+  useEffect(() => {
+    if (phase === "cut") runCut(players);
+    return () => clearTimeout(cutTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  /* --------------------------- gameplay --------------------------- */
+  function updateCommentary(id, status, text) {
+    setCommentary((c) => c.map((e) => (e.id === id ? { ...e, status, text } : e)));
+  }
+
+  function endRound() {
+    const snapshot = players.map((p) => ({ ...p }));
+    const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+
+    const rows = players.map((p) => {
+      const parsed = parseInt(inputs[p.id] ?? "", 10);
+      const hand = Number.isFinite(parsed) ? parsed : 0;
+      const role = roleOf(p.id, yanivCallerId, catcherId);
+      const added = addedFor(hand, role, settings.penalty);
+      const raw = p.score + added;
+      const total = applyHalving(raw, settings);
+      return {
+        id: p.id,
+        name: p.name,
+        suit: p.suit,
+        color: p.color,
+        hand,
+        added,
+        raw,
+        total,
+        role,
+        isCaller: p.id === yanivCallerId,
+        isCatcher: p.id === catcherId,
+        halved: total !== raw,
+        bust: total > 200,
+      };
+    });
+
+    const updated = players.map((p) => {
+      const r = rows.find((x) => x.id === p.id);
+      return { ...p, score: r.total };
+    });
+
+    // round winner (scores 0 / deals next): catcher, else caller, else lowest hand
+    let winnerId = catcherId || yanivCallerId;
+    if (!winnerId) {
+      const low = [...rows].sort((a, b) => a.hand - b.hand)[0];
+      winnerId = low ? low.id : null;
+    }
+
+    const recap = buildRecap(rows, byId, yanivCallerId, catcherId);
+    const roundEntry = { round: roundNumber, callerId: yanivCallerId, catcherId, winnerId, rows, recap };
+
+    // roast context from full history + previous roasts
+    const priorRoasts = commentary.filter((c) => c.status !== "loading").map((c) => c.text);
+    const big = [...rows].sort((a, b) => b.added - a.added)[0];
+    const rankedNow = [...updated].sort((a, b) => a.score - b.score);
+    const ctx = {
+      caller: yanivCallerId ? byId[yanivCallerId].name : "",
+      catcher: catcherId ? byId[catcherId].name : "",
+      big: big ? byId[big.id].name : "",
+      bigpts: big ? big.added : 0,
+      leader: rankedNow[0]?.name || "",
+    };
+
+    const busted = updated.some((p) => p.score > 200);
+    const prompt = buildPrompt(rounds, priorRoasts, roundEntry, updated, busted);
+
+    setHistory((h) => [...h, { players: snapshot, roundNumber, starterId }]);
+    setRounds((rs) => [...rs, roundEntry]);
+    setPlayers(updated);
+    setInputs({});
+    setStarterId(winnerId);
+    setYanivCallerId(null);
+    setCatcherId(null);
+
+    if (busted) {
+      setPhase("over");
+      const fb = pickFallback(ctx);
+      setFinalRoast({ status: "loading", text: "", prompt, fallback: fb });
+      generateRoast(prompt)
+        .then((t) => setFinalRoast({ status: "done", text: t, prompt, fallback: fb }))
+        .catch(() => setFinalRoast({ status: "error", text: fb, prompt, fallback: fb }));
+    } else {
+      const id = crypto.randomUUID();
+      const fb = pickFallback(ctx);
+      setCommentary((c) => [...c, { id, round: roundNumber, status: "loading", text: "", prompt, fallback: fb }]);
+      generateRoast(prompt)
+        .then((t) => updateCommentary(id, "done", t))
+        .catch(() => updateCommentary(id, "error", fb));
+      setRoundNumber((r) => r + 1);
+    }
+  }
+
+  function rerollLatest() {
+    const e = commentary[commentary.length - 1];
+    if (!e) return;
+    updateCommentary(e.id, "loading", "");
+    generateRoast(e.prompt)
+      .then((t) => updateCommentary(e.id, "done", t))
+      .catch(() => updateCommentary(e.id, "error", e.fallback));
+  }
+  function rerollFinal() {
+    if (!finalRoast) return;
+    setFinalRoast({ ...finalRoast, status: "loading" });
+    generateRoast(finalRoast.prompt)
+      .then((t) => setFinalRoast({ ...finalRoast, status: "done", text: t }))
+      .catch(() => setFinalRoast({ ...finalRoast, status: "error", text: finalRoast.fallback }));
+  }
+
+  function undo() {
+    if (!history.length) return;
+    const last = history[history.length - 1];
+    setPlayers(last.players.map((p) => ({ ...p })));
+    setRoundNumber(last.roundNumber);
+    setStarterId(last.starterId);
+    setHistory((h) => h.slice(0, -1));
+    setRounds((rs) => rs.slice(0, -1));
+    setCommentary((c) => c.slice(0, -1));
+    setFinalRoast(null);
+    setYanivCallerId(null);
+    setCatcherId(null);
+    setPhase("playing");
+  }
+
+  function resetRound() {
+    setRoundNumber(1);
+    setInputs({});
+    setHistory([]);
+    setRounds([]);
+    setCommentary([]);
+    setFinalRoast(null);
+    setYanivCallerId(null);
+    setCatcherId(null);
+    setShowStats(false);
+  }
+  function rematch() {
+    setPlayers((ps) => ps.map((p) => ({ ...p, score: 0 })));
+    resetRound();
+    setPhase("cut");
+  }
+  function newGame() {
+    setPlayers([]);
+    setNameDraft("");
+    resetRound();
+    setStarterId(null);
+    setCutIndex(null);
+    setPhase("setup");
+  }
+
+  /* -------------------------- derived ----------------------------- */
+  const starter = players.find((p) => p.id === starterId);
+  const ranked = [...players].sort((a, b) => a.score - b.score);
+  const lowest = ranked.length ? ranked[0].score : 0;
+  const winners = ranked.filter((p) => p.score === lowest);
+  const buster = players.find((p) => p.score > 200);
+  const latest = commentary[commentary.length - 1];
+
+  // Asaf hint: a non-caller looks <= caller's hand but no catcher chosen
+  let asafHint = null;
+  if (yanivCallerId && !catcherId) {
+    const ch = parseInt(inputs[yanivCallerId] ?? "", 10);
+    if (Number.isFinite(ch)) {
+      const low = players.find((p) => {
+        if (p.id === yanivCallerId) return false;
+        const h = parseInt(inputs[p.id] ?? "", 10);
+        return Number.isFinite(h) && h <= ch;
+      });
+      if (low) asafHint = low.name;
+    }
+  }
+
+  // Threshold hint: caller's recorded hand is above the Yaniv threshold
+  let thresholdHint = null;
+  if (yanivCallerId) {
+    const ch = parseInt(inputs[yanivCallerId] ?? "", 10);
+    if (Number.isFinite(ch) && ch > settings.yanivThreshold) {
+      thresholdHint = settings.yanivThreshold;
+    }
+  }
+
+  /* ============================ RENDER ============================ */
+  if (showSettings) {
+    return (
+      <div className="yz-root">
+        <style>{CSS}</style>
+        <div className="yz-wrap">
+          <SettingsPanel settings={settings} setSettings={setSettings} onBack={() => setShowSettings(false)} />
+        </div>
+      </div>
+    );
+  }
+  if (showRules) {
+    return (
+      <div className="yz-root">
+        <style>{CSS}</style>
+        <div className="yz-wrap">
+          <RulesPanel settings={settings} onBack={() => setShowRules(false)} />
+        </div>
+      </div>
+    );
+  }
+  if (showStats) {
+    return (
+      <div className="yz-root">
+        <style>{CSS}</style>
+        <div className="yz-wrap">
+          <StatsPanel players={players} rounds={rounds} onBack={() => setShowStats(false)} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="yz-root">
+      <style>{CSS}</style>
+      <div className="yz-wrap">
+        <header className="yz-head">
+          <a className="btn btn--ghost" href="../" title="All apps">← Apps</a>
+          <span className="eyebrow mono">YANIV</span>
+          <div className="yz-head__nav">
+            <button className="btn btn--ghost" onClick={() => setShowSettings(true)}>Settings</button>
+            <button className="btn btn--ghost" onClick={() => setShowRules(true)}>Rules</button>
+          </div>
+        </header>
+
+        {/* ---------------------- SETUP ---------------------- */}
+        {phase === "setup" && (
+          <section className="panel">
+            <h1 className="display">New table</h1>
+            <p className="lede">Lowest score wins. Add two to eight players.</p>
+
+            <div className="addbar">
+              <span className="addbar__pip mono">{SUITS[players.length % SUITS.length]}</span>
+              <input
+                className="addbar__input"
+                placeholder="Player name"
+                value={nameDraft}
+                maxLength={18}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addPlayer()}
+                aria-label="Player name"
+              />
+              <button className="btn btn--solid" onClick={addPlayer} disabled={!nameDraft.trim() || players.length >= 8}>
+                Add
+              </button>
+            </div>
+
+            <ul className="roster">
+              {players.length === 0 && <li className="roster__empty">No players yet. Add at least two to deal.</li>}
+              {players.map((p, i) => (
+                <li className="chip" key={p.id}>
+                  <span className="chip__dot" style={{ background: p.color }} />
+                  <span className={"chip__pip " + (isRed(p.suit) ? "red" : "")}>{p.suit}</span>
+                  <span className="chip__name">{p.name}</span>
+                  <span className="chip__seat mono">seat {i + 1}</span>
+                  <button className="chip__x" onClick={() => removePlayer(p.id)} aria-label={`Remove ${p.name}`}>×</button>
+                </li>
+              ))}
+            </ul>
+
+            <button className="btn btn--big" onClick={goToCut} disabled={players.length < 2}>
+              Cut for the deal →
+            </button>
+            {players.length >= 8 && <p className="fineprint mono">Table's full at 8 players.</p>}
+          </section>
+        )}
+
+        {/* ----------------------- CUT ----------------------- */}
+        {phase === "cut" && (
+          <section className="panel cut">
+            <h1 className="display">Cut for the deal</h1>
+            <p className="lede">The cards pick who starts.</p>
+            <div className={"cutcard " + (starter ? "settled" : "")}>
+              <span className={"cutcard__pip " + (cutIndex != null && isRed(players[cutIndex]?.suit) ? "red" : "")}>
+                {cutIndex != null ? players[cutIndex]?.suit : "?"}
+              </span>
+              <span className="cutcard__name">{cutIndex != null ? players[cutIndex]?.name : "…"}</span>
+            </div>
+            <p className="cutresult">
+              {starter ? (<><strong>{starter.name}</strong> deals first.</>) : (<span className="mono dim">cutting the deck…</span>)}
+            </p>
+            <div className="btnrow">
+              <button className="btn" onClick={() => runCut(players)} disabled={cutting}>Cut again</button>
+              <button className="btn btn--solid" onClick={() => { setPhase("playing"); setRoundNumber(1); }} disabled={!starter}>
+                Start game →
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* --------------------- PLAYING --------------------- */}
+        {phase === "playing" && (
+          <section className="panel">
+            <div className="roundbar">
+              <span className="round mono">ROUND {roundNumber}</span>
+              <div className="roundbar__tools">
+                <button className="btn btn--ghost" onClick={() => setShowStats(true)} disabled={!rounds.length}>Stats</button>
+                <button className="btn btn--ghost" onClick={undo} disabled={!history.length}>Undo</button>
+                <button className="btn btn--ghost" onClick={newGame}>New</button>
+              </div>
+            </div>
+
+            {starter && <p className="dealnote mono">{starter.suit} {starter.name} deals this round</p>}
+
+            {latest && <Commentary entry={latest} onReroll={rerollLatest} />}
+
+            <div className="cards">
+              {players.map((p) => {
+                const role = roleOf(p.id, yanivCallerId, catcherId);
+                const handVal = parseInt(inputs[p.id] ?? "", 10);
+                const hand = Number.isFinite(handVal) ? handVal : 0;
+                return (
+                  <ScoreCard
+                    key={p.id}
+                    p={p}
+                    leader={p.score === minScore}
+                    isDealer={p.id === starterId}
+                    hasCaller={!!yanivCallerId}
+                    isCaller={p.id === yanivCallerId}
+                    isCatcher={p.id === catcherId}
+                    role={role}
+                    added={addedFor(hand, role, settings.penalty)}
+                    value={inputs[p.id] ?? ""}
+                    onChange={(v) => setInputs((m) => ({ ...m, [p.id]: v }))}
+                    onEnter={endRound}
+                    onYaniv={() => {
+                      if (yanivCallerId === p.id) {
+                        setYanivCallerId(null);
+                        setCatcherId(null);
+                      } else {
+                        setYanivCallerId(p.id);
+                        if (catcherId === p.id) setCatcherId(null);
+                      }
+                    }}
+                    onAsaf={() => setCatcherId((cur) => (cur === p.id ? null : p.id))}
+                  />
+                );
+              })}
+            </div>
+
+            {thresholdHint != null && (
+              <p className="hint mono">Heads up — Yaniv is usually called at {thresholdHint} or less.</p>
+            )}
+            {asafHint && (
+              <p className="hint mono">
+                {asafHint}'s hand looks ≤ the caller's — tap <b>Asaf</b> on {asafHint} if they caught it.
+              </p>
+            )}
+
+            <button className="btn btn--big" onClick={endRound}>End round {roundNumber}</button>
+          </section>
+        )}
+
+        {/* ---------------------- OVER ----------------------- */}
+        {phase === "over" && (
+          <section className="panel over">
+            {buster && <p className="bust mono">{buster.suit} {buster.name} crossed 200 — out.</p>}
+            <div className="crown">👑</div>
+            <h1 className="display win">{winners.length > 1 ? "It's a tie!" : `${winners[0].name} wins`}</h1>
+            <p className="lede center">
+              {winners.length > 1
+                ? `${winners.map((w) => w.name).join(" & ")} share the lowest hand — ${lowest}.`
+                : `Lowest hand at the table — just ${lowest}.`}
+            </p>
+
+            {finalRoast && <Commentary entry={finalRoast} onReroll={rerollFinal} final />}
+
+            <ol className="standings">
+              {ranked.map((p, i) => (
+                <li className={"stand " + (p.score === lowest ? "stand--win" : "")} key={p.id}>
+                  <span className="stand__rank mono">{i + 1}</span>
+                  <span className="chip__dot" style={{ background: p.color }} />
+                  <span className={"stand__pip " + (isRed(p.suit) ? "red" : "")}>{p.suit}</span>
+                  <span className="stand__name">{p.name}</span>
+                  <span className="stand__score mono">{p.score > 200 ? "BUST" : p.score}</span>
+                </li>
+              ))}
+            </ol>
+
+            <div className="btnrow">
+              <button className="btn" onClick={() => setShowStats(true)} disabled={!rounds.length}>View stats</button>
+              <button className="btn btn--solid" onClick={rematch}>Rematch</button>
+            </div>
+            <button className="btn" style={{ width: "100%", marginTop: 12 }} onClick={newGame}>New table</button>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------- roast prompt builders -------------------- */
+function buildRecap(rows, byId, callerId, catcherId) {
+  const bits = rows.map((r) => {
+    let t = `${r.name} ${r.added === 0 ? "0" : "+" + r.added}`;
+    if (r.isCaller) t += catcherId ? " (Yaniv, ASAF'd)" : " (Yaniv, clean)";
+    else if (r.isCatcher) t += " (Asaf!)";
+    if (r.halved) t += " [halved]";
+    if (r.bust) t += " [BUST]";
+    return t;
+  });
+  const totals = [...rows].sort((a, b) => a.total - b.total).map((r) => `${r.name} ${r.total}`);
+  return `${bits.join("; ")}. Totals: ${totals.join(", ")}.`;
+}
+
+function roundDetailBlock(entry, updated, gameOver) {
+  const byId = Object.fromEntries(entry.rows.map((r) => [r.id, r]));
+  let s = gameOver
+    ? `THE GAME JUST ENDED — someone crossed 200. Deliver the closing roast: crown the winner (lowest total) and bury whoever busted.\n\nFinal round (round ${entry.round}):\n`
+    : `THIS ROUND (round ${entry.round}):\n`;
+  entry.rows.forEach((r) => {
+    let line = `- ${r.name}: hand ${r.hand}, scored ${r.added === 0 ? "0" : "+" + r.added} -> ${r.total} total`;
+    const tags = [];
+    if (r.isCaller) tags.push(entry.catcherId ? "called YANIV and got ASAF'd (+30)" : "called YANIV cleanly (0)");
+    if (r.isCatcher) tags.push("ASAF'd the caller — scores their own hand, no penalty");
+    if (r.halved) tags.push("hit an exact number and got HALVED");
+    if (r.bust) tags.push("BUSTED over 200");
+    if (tags.length) line += ` [${tags.join("; ")}]`;
+    s += line + "\n";
+  });
+  const standings = [...updated].sort((a, b) => a.score - b.score).map((p) => `${p.name} ${p.score > 200 ? "(BUST)" : p.score}`);
+  s += `\nStandings, low to high: ${standings.join(", ")}.`;
+  return s;
+}
+
+function buildPrompt(priorRounds, priorRoasts, entry, updated, gameOver) {
+  let s = "";
+  if (priorRounds.length) {
+    s += "STORY SO FAR (earlier rounds):\n";
+    priorRounds.slice(-8).forEach((r) => (s += `  R${r.round}: ${r.recap}\n`));
+    s += "\n";
+  }
+  if (priorRoasts.length) {
+    s += "YOUR PREVIOUS CALLS (build on these — callbacks welcome):\n";
+    priorRoasts.slice(-3).forEach((t) => (s += `  - ${t}\n`));
+    s += "\n";
+  }
+  s += roundDetailBlock(entry, updated, gameOver);
+  return s;
+}
+
+/* --------------------------- Commentary --------------------------- */
+function Commentary({ entry, onReroll, final }) {
+  return (
+    <div className={"comment " + (final ? "comment--final" : "")}>
+      <span className="comment__mic" aria-hidden="true">🎙️</span>
+      <div className="comment__body">
+        {entry.status === "loading" ? (
+          <span className="comment__think mono">
+            the commentator is sizing everyone up<span className="dots"><i>.</i><i>.</i><i>.</i></span>
+          </span>
+        ) : (
+          <p className="comment__text">{entry.text}</p>
+        )}
+      </div>
+      {entry.status !== "loading" && (
+        <button className="comment__reroll" onClick={onReroll} aria-label="New take" title="New take">↻</button>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------- Score card --------------------------- */
+function ScoreCard({ p, leader, isDealer, hasCaller, isCaller, isCatcher, role, added, value, onChange, onEnter, onYaniv, onAsaf }) {
+  const over = p.score > 200;
+  const pct = Math.min(p.score, 200) / 2;
+  let preview;
+  if (role === "caller_win") preview = "scores 0 · Yaniv";
+  else if (role === "catcher") preview = `+${added} · Asaf`;
+  else if (role === "caller_asaf") preview = `+${added} · incl. +30`;
+  else preview = `+${added}`;
+
+  return (
+    <div className={"pcard " + (over ? "pcard--bust" : "") + (isCaller ? " pcard--caller" : "") + (isCatcher ? " pcard--catcher" : "")}>
+      <span className="pcard__watermark" style={{ color: p.color, opacity: 0.08 }}>{p.suit}</span>
+
+      <div className="pcard__top">
+        <span className="pcard__dot" style={{ background: p.color }} />
+        <span className={"pcard__pip " + (isRed(p.suit) ? "red" : "")}>{p.suit}</span>
+        <span className="pcard__name">{p.name}</span>
+        {isDealer && <span className="tag tag--deal mono">deals</span>}
+
+        <span className="pcard__btns">
+          <button className={"rolebtn rolebtn--yaniv " + (isCaller ? "on" : "")} onClick={onYaniv}>
+            {isCaller ? "Yaniv ✓" : "Yaniv"}
+          </button>
+          {hasCaller && !isCaller && (
+            <button className={"rolebtn rolebtn--asaf " + (isCatcher ? "on" : "")} onClick={onAsaf}>
+              {isCatcher ? "Asaf ✓" : "Asaf"}
+            </button>
+          )}
+        </span>
+      </div>
+
+      <div className="pcard__scorerow">
+        <span className="pcard__scorewrap">
+          <span className="pcard__score" key={p.score}>{over ? "BUST" : p.score}</span>
+          {leader && !over && <span className="pcard__crown" title="lowest score">👑</span>}
+        </span>
+        <div className="addwrap">
+          <span className={"preview mono " + (role === "caller_asaf" ? "preview--pen" : role === "caller_win" ? "preview--zero" : role === "catcher" ? "preview--asaf" : "")}>{preview}</span>
+          <div className="adder">
+            <span className="adder__label mono">hand</span>
+            <input
+              className="adder__input mono"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="0"
+              value={value}
+              onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+              onKeyDown={(e) => e.key === "Enter" && onEnter()}
+              aria-label={`Hand value for ${p.name} this round`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="meter" aria-hidden="true">
+        <div className="meter__fill" style={{ width: pct + "%", background: meterColor(p.score) }} />
+        <span className="meter__tick" style={{ left: "50%" }}><span className="meter__ticklabel mono">100</span></span>
+        <span className="meter__tick meter__tick--end" style={{ left: "100%" }}><span className="meter__ticklabel mono">200</span></span>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Rules ------------------------------ */
+function RulesPanel({ settings, onBack }) {
+  const milestone = settings.halfEvery50
+    ? "Land on any exact multiple of 50 → your score is halved (50→25, 100→50, 150→75, 200→100)."
+    : settings.half100_200
+    ? "Land on exactly 100 → halved to 50. Exactly 200 → halved to 100."
+    : "No score halving.";
+  return (
+    <section className="panel">
+      <div className="roundbar">
+        <span className="round mono">RULES</span>
+        <button className="btn btn--ghost" onClick={onBack}>← Back</button>
+      </div>
+
+      <div className="rules">
+        <h3>Goal</h3>
+        <p>Hold the lowest-value hand. Keep your running total down — cross 200 and you're out. Lowest total at the end wins.</p>
+
+        <h3>Card values</h3>
+        <p className="rules__vals mono">A 1 · 2–10 face value · J Q K 10 · Joker 0</p>
+
+        <h3>A round</h3>
+        <p>Everyone is dealt 5 cards. On your turn, discard a card or a set, then draw one — from the deck or the last discard — and try to lower your hand.</p>
+
+        <h3>Calling Yaniv</h3>
+        <p>At the start of your turn, if your hand totals {settings.yanivThreshold} or less, you may call <b>Yaniv</b> to end the round and reveal hands.</p>
+
+        <h3>Scoring the round</h3>
+        <p><b>Clean Yaniv</b> — the caller has the strictly lowest hand: caller scores 0, everyone else adds their hand.</p>
+        <p><b>Asaf</b> — another player ties or beats the caller and calls <b>Asaf</b>: the caller adds their hand + {settings.penalty}. Everyone else, including the Asaf-er, adds their own hand.</p>
+
+        <h3>Milestones</h3>
+        <p>{milestone}</p>
+
+        <h3>Dealer &amp; elimination</h3>
+        <p>First dealer is chosen at random; afterward the round's lowest hand deals next. Anyone over 200 is out, and the lowest total wins.</p>
+
+        <p className="rules__src">
+          Summarized from{" "}
+          <a href="https://en.wikipedia.org/wiki/Yaniv_(card_game)" target="_blank" rel="noreferrer">Wikipedia: Yaniv</a>.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------- Settings ----------------------------- */
+function Stepper({ value, onChange, min = 0, max = 99, step = 1 }) {
+  return (
+    <div className="stepper">
+      <button className="stepper__b" onClick={() => onChange(Math.max(min, value - step))} disabled={value <= min} aria-label="decrease">−</button>
+      <span className="stepper__v mono">{value}</span>
+      <button className="stepper__b" onClick={() => onChange(Math.min(max, value + step))} disabled={value >= max} aria-label="increase">+</button>
+    </div>
+  );
+}
+function Toggle({ on, onChange, label, sub }) {
+  return (
+    <button className={"toggle " + (on ? "on" : "")} onClick={() => onChange(!on)} role="switch" aria-checked={on}>
+      <span className="toggle__txt">
+        <span className="toggle__label">{label}</span>
+        {sub && <span className="toggle__sub mono">{sub}</span>}
+      </span>
+      <span className="toggle__track"><span className="toggle__knob" /></span>
+    </button>
+  );
+}
+function SettingsPanel({ settings, setSettings, onBack }) {
+  const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
+  const [key, setKey] = useState(getApiKey());
+  const [saved, setSaved] = useState(false);
+  return (
+    <section className="panel">
+      <div className="roundbar">
+        <span className="round mono">SETTINGS</span>
+        <button className="btn btn--ghost" onClick={onBack}>← Back</button>
+      </div>
+
+      <div className="settings">
+        <div className="setrow">
+          <div className="setrow__txt">
+            <h3>Yaniv threshold</h3>
+            <p>Call Yaniv at this hand total or less.</p>
+          </div>
+          <Stepper value={settings.yanivThreshold} min={1} max={20} onChange={(v) => set("yanivThreshold", v)} />
+        </div>
+
+        <div className="setrow">
+          <div className="setrow__txt">
+            <h3>Asaf penalty</h3>
+            <p>Added to a caller who gets caught.</p>
+          </div>
+          <Stepper value={settings.penalty} min={0} max={100} step={5} onChange={(v) => set("penalty", v)} />
+        </div>
+
+        <div className="setdiv" />
+
+        <Toggle on={settings.half100_200} onChange={(v) => set("half100_200", v)} label="Halve at exactly 100 & 200" sub="100 → 50 · 200 → 100" />
+        <Toggle on={settings.halfEvery50} onChange={(v) => set("halfEvery50", v)} label="Halve at every multiple of 50" sub="50 · 100 · 150 · 200 …" />
+
+        <div className="setdiv" />
+
+        <div className="setrow__txt">
+          <h3>Live commentator</h3>
+          <p>
+            The roasts are written by Claude, called straight from this page. Paste an
+            Anthropic API key to switch it on — it's stored in this browser only and sent
+            nowhere but api.anthropic.com. Without a key you get canned roasts instead.
+          </p>
+        </div>
+        <div className="keyrow">
+          <input
+            className="addbar__input mono"
+            type="password"
+            placeholder="sk-ant-..."
+            value={key}
+            autoComplete="off"
+            spellCheck="false"
+            onChange={(e) => { setKey(e.target.value); setSaved(false); }}
+            aria-label="Anthropic API key"
+          />
+          <button
+            className="btn btn--solid"
+            onClick={() => { setApiKey(key.trim()); setSaved(true); }}
+          >
+            {saved ? "Saved ✓" : "Save"}
+          </button>
+        </div>
+        <p className="fineprint mono" style={{ textAlign: "left" }}>
+          Anyone with access to this browser profile can read the key. Use a scoped key you
+          can rotate, and clear the field to remove it.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ----------------------------- Stats ------------------------------ */
+function StatsPanel({ players, rounds, onBack }) {
+  return (
+    <section className="panel">
+      <div className="roundbar">
+        <span className="round mono">GAME STATS · {rounds.length} ROUND{rounds.length === 1 ? "" : "S"}</span>
+        <button className="btn btn--ghost" onClick={onBack}>← Back</button>
+      </div>
+
+      <ScoreChart players={players} rounds={rounds} />
+
+      <div className="legend">
+        {players.map((p) => (
+          <span className="legend__item" key={p.id}>
+            <span className="legend__dot" style={{ background: p.color }} /> {p.name}
+          </span>
+        ))}
+      </div>
+      <p className="chartkey mono">Y = yaniv · A = asaf · ◌ = halved · ✕ = bust</p>
+
+      <div className="tablewrap">
+        <table className="stattable">
+          <thead>
+            <tr>
+              <th className="mono">RD</th>
+              {players.map((p) => (
+                <th key={p.id}>
+                  <span className="th__dot" style={{ background: p.color }} /> {p.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rounds.map((r) => (
+              <tr key={r.round}>
+                <td className="mono rdcell">{r.round}</td>
+                {players.map((p) => {
+                  const row = r.rows.find((x) => x.id === p.id);
+                  if (!row) return <td key={p.id} className="dim">–</td>;
+                  const evt = row.bust ? "✕" : row.isCaller ? "Y" : row.isCatcher ? "A" : row.halved ? "◌" : "";
+                  const win = row.isCaller && row.added === 0;
+                  return (
+                    <td key={p.id} className={win ? "cell--win" : ""}>
+                      <span className="cell__add">{row.added === 0 ? "0" : "+" + row.added}</span>
+                      {evt && <span className={"cell__evt evt-" + evt}>{evt}</span>}
+                      <span className="cell__total mono">{row.total}</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="totalrow">
+              <td className="mono">Σ</td>
+              {players.map((p) => (
+                <td key={p.id} className="mono">{p.score > 200 ? "BUST" : p.score}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function ScoreChart({ players, rounds }) {
+  const W = 520, H = 270, padL = 30, padR = 12, padT = 14, padB = 24;
+  const N = rounds.length;
+
+  // Per player, build a list of nodes across the game.
+  // A halving round contributes TWO nodes: the peak (pre-halve, e.g. 100/200)
+  // placed mid-round, then the halved total at the round mark.
+  const series = players.map((p) => {
+    const nodes = [{ x: 0, y: 0 }];
+    rounds.forEach((r, idx) => {
+      const i = idx + 1;
+      const row = r.rows.find((x) => x.id === p.id);
+      if (!row) {
+        nodes.push({ x: i, y: nodes[nodes.length - 1].y });
+        return;
+      }
+      if (row.halved) {
+        nodes.push({ x: i - 0.5, y: row.raw, peak: true });
+        nodes.push({ x: i, y: row.total, row });
+      } else {
+        nodes.push({ x: i, y: row.total, row });
+      }
+    });
+    return { p, nodes };
+  });
+
+  const maxVal = Math.max(210, ...series.flatMap((s) => s.nodes.map((n) => n.y)));
+  const maxY = Math.ceil(maxVal / 20) * 20;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const xFor = (x) => padL + (N === 0 ? 0 : (x / N) * plotW);
+  const yFor = (v) => padT + (1 - v / maxY) * plotH;
+
+  return (
+    <div className="chart">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Score progression chart">
+        {/* guides */}
+        {[100, 200].map((g) => (
+          <g key={g}>
+            <line x1={padL} x2={W - padR} y1={yFor(g)} y2={yFor(g)} stroke="rgba(243,234,216,.18)" strokeDasharray="4 4" />
+            <text x={padL - 5} y={yFor(g) + 3} textAnchor="end" className="chart__axis">{g}</text>
+          </g>
+        ))}
+        <text x={padL - 5} y={yFor(0) + 3} textAnchor="end" className="chart__axis">0</text>
+        {/* x labels */}
+        {Array.from({ length: N + 1 }).map((_, i) => (
+          <text key={i} x={xFor(i)} y={H - 6} textAnchor="middle" className="chart__axis">{i}</text>
+        ))}
+        {/* lines */}
+        {series.map(({ p, nodes }) => (
+          <polyline
+            key={p.id}
+            fill="none"
+            stroke={p.color}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            points={nodes.map((n) => `${xFor(n.x)},${yFor(n.y)}`).join(" ")}
+          />
+        ))}
+        {/* nodes + events */}
+        {series.map(({ p, nodes }) =>
+          nodes.map((n, k) => {
+            if (n.x === 0) return null;
+            const row = n.row;
+            const evt = row && (row.bust ? "✕" : row.isCaller ? "Y" : row.isCatcher ? "A" : "");
+            return (
+              <g key={p.id + "-" + k}>
+                {n.peak && <circle cx={xFor(n.x)} cy={yFor(n.y)} r="6" fill="none" stroke={p.color} strokeWidth="1.4" />}
+                <circle cx={xFor(n.x)} cy={yFor(n.y)} r={n.peak ? 2.4 : 3.1} fill={p.color} />
+                {evt && <text x={xFor(n.x)} y={yFor(n.y) - 9} textAnchor="middle" className="chart__evt" fill={p.color}>{evt}</text>}
+              </g>
+            );
+          })
+        )}
+      </svg>
+    </div>
+  );
+}
+
+/* ------------------------------- CSS ------------------------------ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Space+Mono:wght@400;700&display=swap');
+
+html, body, #root, #app, main { margin:0; padding:0; min-height:100%; background:#17131f; }
+
+.yz-root{
+  --ink:#17131f; --ink-2:#221b2e; --ink-3:#2c2440;
+  --bone:#f3ead8; --bone-2:#e7dcc6; --bone-dim:#b6a988;
+  --red:#dd4b43; --red-deep:#b3271f; --gold:#e8b24c; --mint:#54c2a0;
+  --line:rgba(243,234,216,0.14);
+  --shadow:0 18px 40px -22px rgba(0,0,0,.75);
+  min-height:100vh; min-height:100dvh; margin:0;
+  font-family:'Bricolage Grotesque',system-ui,-apple-system,sans-serif;
+  color:var(--bone);
+  background:
+    radial-gradient(130% 90% at 50% -15%, #2b2339 0%, rgba(43,35,57,0) 58%),
+    radial-gradient(80% 60% at 50% 120%, #20182c 0%, rgba(32,24,44,0) 60%),
+    var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+*{box-sizing:border-box;}
+.mono{font-family:'Space Mono',ui-monospace,monospace;}
+.dim{opacity:.55;} .red{color:var(--red-deep);}
+
+.yz-wrap{ max-width:560px; margin:0 auto; padding:26px 18px 40px; }
+.yz-head{ display:flex; align-items:center; justify-content:space-between; padding:2px 0 18px; gap:8px; }
+.yz-head__nav{ display:flex; gap:6px; }
+.yz-head a.btn{ text-decoration:none; }
+.eyebrow{ font-size:12px; letter-spacing:.28em; color:var(--bone-dim); border:1px solid var(--line); border-radius:999px; padding:8px 16px; }
+
+.panel{ animation:rise .45s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes rise{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+
+.display{ font-size:clamp(28px,8vw,42px); line-height:1.02; font-weight:800; letter-spacing:-.02em; margin:8px 0 12px; }
+.lede{ color:var(--bone-dim); line-height:1.5; font-size:15px; margin:0 0 22px; } .lede.center{ text-align:center; }
+
+.btn{ font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; border-radius:13px; padding:13px 18px; border:1px solid var(--line); background:var(--ink-2); color:var(--bone); transition:transform .12s, background .2s, opacity .2s; }
+.btn:hover{ background:var(--ink-3); } .btn:active{ transform:translateY(1px) scale(.99); } .btn:disabled{ opacity:.38; cursor:not-allowed; }
+.btn--solid{ background:var(--red); border-color:transparent; color:#fff; } .btn--solid:hover{ background:#e85a52; }
+.btn--ghost{ background:transparent; padding:9px 12px; font-size:13px; }
+.btn--big{ width:100%; padding:17px; font-size:17px; font-weight:800; background:var(--red); border-color:transparent; color:#fff; margin-top:6px; box-shadow:var(--shadow); }
+.btn--big:hover{ background:#e85a52; }
+.btnrow{ display:flex; gap:12px; margin-top:22px; } .btnrow .btn{ flex:1; }
+.fineprint{ text-align:center; font-size:11px; color:var(--bone-dim); margin:13px 0 0; letter-spacing:.03em; }
+.hint{ font-size:12px; color:var(--gold); background:rgba(232,178,76,.1); border:1px solid rgba(232,178,76,.3); border-radius:11px; padding:9px 12px; margin:0 0 14px; }
+
+.addbar{ display:flex; gap:9px; margin-bottom:16px; }
+.addbar__pip{ width:46px; display:grid; place-items:center; font-size:20px; background:var(--ink-2); border:1px solid var(--line); border-radius:13px; color:var(--bone-dim); }
+.addbar__input{ flex:1; min-width:0; font-family:inherit; font-size:16px; color:var(--bone); background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:13px 15px; }
+.addbar__input::placeholder{ color:var(--bone-dim); opacity:.7; }
+.addbar__input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+.keyrow{ display:flex; gap:9px; }
+
+.roster{ list-style:none; padding:0; margin:0 0 24px; display:flex; flex-direction:column; gap:8px; }
+.roster__empty{ color:var(--bone-dim); font-size:14px; padding:8px 2px; }
+.chip{ display:flex; align-items:center; gap:11px; background:var(--bone); color:var(--ink); border-radius:13px; padding:11px 13px; box-shadow:var(--shadow); }
+.chip__dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+.chip__pip{ font-size:20px; color:var(--ink); } .chip__pip.red{ color:var(--red-deep); }
+.chip__name{ font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chip__seat{ font-size:11px; color:#8a7e63; letter-spacing:.08em; }
+.chip__x{ border:none; background:transparent; color:#9b8e72; font-size:22px; line-height:1; cursor:pointer; padding:0 4px; border-radius:8px; }
+.chip__x:hover{ color:var(--red-deep); }
+
+.cut{ text-align:center; } .cut .lede{ text-align:center; }
+.cutcard{ width:170px; height:236px; margin:8px auto 6px; border-radius:18px; background:linear-gradient(160deg,#fbf5e9,#e9dcc2); color:var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; box-shadow:0 26px 50px -20px rgba(0,0,0,.8), inset 0 0 0 1px rgba(0,0,0,.06); position:relative; }
+.cutcard::before, .cutcard::after{ content:""; position:absolute; inset:10px; border:1px solid rgba(23,19,31,.14); border-radius:11px; pointer-events:none; }
+.cutcard.settled{ animation:pop .4s cubic-bezier(.2,.8,.2,1); }
+@keyframes pop{ 0%{transform:scale(.92) rotate(-2deg);} 60%{transform:scale(1.04) rotate(1deg);} 100%{transform:none;} }
+.cutcard__pip{ font-size:64px; line-height:1; color:var(--ink); } .cutcard__pip.red{ color:var(--red-deep); }
+.cutcard__name{ font-size:20px; font-weight:800; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cutresult{ font-size:18px; margin:14px 0 0; min-height:26px; } .cutresult strong{ color:var(--gold); }
+
+.roundbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; gap:8px; }
+.round{ font-size:13px; letter-spacing:.18em; color:var(--bone-dim); }
+.roundbar__tools{ display:flex; gap:6px; }
+.dealnote{ font-size:11px; color:var(--bone-dim); letter-spacing:.05em; margin:0 0 16px; }
+
+.comment{ position:relative; display:flex; gap:11px; align-items:flex-start; background:linear-gradient(135deg, rgba(232,178,76,.14), rgba(221,75,67,.10)); border:1px solid rgba(232,178,76,.34); border-radius:15px; padding:14px 44px 14px 14px; margin-bottom:18px; }
+.comment--final{ margin:22px 0 4px; text-align:left; }
+.comment__mic{ font-size:20px; line-height:1.3; }
+.comment__body{ flex:1; }
+.comment__text{ margin:0; font-size:15px; line-height:1.45; font-weight:600; color:#f7eeda; }
+.comment__think{ font-size:13px; color:var(--gold); }
+.dots i{ animation:blink 1.2s infinite both; } .dots i:nth-child(2){ animation-delay:.2s; } .dots i:nth-child(3){ animation-delay:.4s; }
+@keyframes blink{ 0%,100%{opacity:.2;} 50%{opacity:1;} }
+.comment__reroll{ position:absolute; top:10px; right:10px; width:26px; height:26px; border-radius:8px; border:1px solid var(--line); background:rgba(23,19,31,.25); color:var(--bone-dim); cursor:pointer; font-size:14px; }
+.comment__reroll:hover{ color:var(--bone); background:rgba(23,19,31,.5); }
+
+.cards{ display:flex; flex-direction:column; gap:13px; margin-bottom:16px; }
+.pcard{ position:relative; overflow:hidden; background:var(--bone); color:var(--ink); border-radius:16px; padding:13px 15px 15px; box-shadow:var(--shadow); border:2px solid transparent; }
+.pcard--bust{ background:#f4d9d4; }
+.pcard--caller{ border-color:var(--gold); }
+.pcard--catcher{ border-color:var(--mint); }
+.pcard__watermark{ position:absolute; right:-6px; top:-22px; font-size:128px; line-height:1; pointer-events:none; user-select:none; }
+.pcard__top{ display:flex; align-items:center; gap:8px; position:relative; flex-wrap:wrap; }
+.pcard__dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+.pcard__pip{ font-size:18px; color:var(--ink); } .pcard__pip.red{ color:var(--red-deep); }
+.pcard__name{ font-weight:700; font-size:16px; max-width:38%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pcard__btns{ margin-left:auto; display:flex; gap:6px; }
+.rolebtn{ font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border-radius:9px; padding:6px 11px; border:1px solid rgba(23,19,31,.18); background:#fff; color:#3a3340; transition:transform .1s; }
+.rolebtn:active{ transform:scale(.95); }
+.rolebtn--yaniv.on{ background:var(--gold); border-color:transparent; color:#241c0a; }
+.rolebtn--asaf{ color:#1f6b56; }
+.rolebtn--asaf.on{ background:var(--mint); border-color:transparent; color:#0c2a22; }
+.tag{ font-size:10px; font-weight:700; border-radius:999px; padding:3px 8px; white-space:nowrap; letter-spacing:.04em; }
+.tag--deal{ background:#1f1a2b; color:var(--bone); }
+
+.pcard__scorerow{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:8px 0 12px; }
+.pcard__scorewrap{ display:flex; align-items:baseline; gap:7px; }
+.pcard__score{ font-size:46px; font-weight:800; line-height:.9; letter-spacing:-.02em; font-variant-numeric:tabular-nums; animation:bump .3s ease; }
+@keyframes bump{ from{transform:scale(1.12); opacity:.5;} to{transform:none; opacity:1;} }
+.pcard__crown{ font-size:18px; }
+.pcard--bust .pcard__score{ color:var(--red-deep); font-size:34px; }
+.addwrap{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.preview{ font-size:11px; font-weight:700; color:#8a7e63; }
+.preview--zero{ color:#1f6b56; } .preview--pen{ color:var(--red-deep); } .preview--asaf{ color:#1f6b56; }
+.adder{ display:flex; align-items:center; gap:7px; background:#fff; border:1px solid rgba(23,19,31,.16); border-radius:11px; padding:6px 10px; }
+.adder__label{ font-size:10px; color:#9b8e72; letter-spacing:.06em; }
+.adder__input{ width:46px; border:none; background:transparent; font-size:18px; font-weight:700; color:var(--ink); text-align:center; }
+.adder__input:focus{ outline:none; } .adder__input::placeholder{ color:#c4b89c; }
+
+.meter{ position:relative; height:9px; border-radius:6px; background:rgba(23,19,31,.1); margin-bottom:14px; }
+.meter__fill{ position:absolute; left:0; top:0; bottom:0; border-radius:6px; transition:width .55s cubic-bezier(.2,.7,.2,1), background .4s; }
+.meter__tick{ position:absolute; top:-3px; width:2px; height:15px; background:rgba(23,19,31,.35); transform:translateX(-1px); }
+.meter__tick--end{ background:var(--red-deep); }
+.meter__ticklabel{ position:absolute; top:16px; left:50%; transform:translateX(-50%); font-size:9px; color:#9b8e72; }
+
+.over{ text-align:center; }
+.bust{ color:var(--red); font-size:13px; letter-spacing:.06em; margin:0 0 18px; }
+.crown{ font-size:46px; } .win{ margin-top:4px; background:linear-gradient(180deg,var(--gold),#caa53e); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.standings{ list-style:none; padding:0; margin:22px 0 0; display:flex; flex-direction:column; gap:9px; text-align:left; }
+.stand{ display:flex; align-items:center; gap:11px; background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:12px 15px; }
+.stand--win{ background:var(--bone); color:var(--ink); border-color:transparent; box-shadow:var(--shadow); }
+.stand__rank{ width:18px; color:var(--bone-dim); font-size:13px; } .stand--win .stand__rank{ color:#9b8e72; }
+.stand__pip{ font-size:18px; } .stand__pip.red{ color:var(--red); } .stand--win .stand__pip.red{ color:var(--red-deep); }
+.stand__name{ font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stand__score{ font-weight:700; font-size:17px; }
+
+/* stats */
+.chart{ background:var(--ink-2); border:1px solid var(--line); border-radius:15px; padding:12px 10px 4px; margin:6px 0 14px; }
+.chart__axis{ font-family:'Space Mono',monospace; font-size:9px; fill:var(--bone-dim); }
+.chart__evt{ font-family:'Space Mono',monospace; font-size:10px; font-weight:700; }
+.legend{ display:flex; flex-wrap:wrap; gap:10px 16px; margin-bottom:8px; }
+.legend__item{ display:flex; align-items:center; gap:6px; font-size:13px; }
+.legend__dot{ width:11px; height:11px; border-radius:50%; }
+.chartkey{ font-size:10.5px; color:var(--bone-dim); letter-spacing:.05em; margin:0 0 16px; }
+
+.tablewrap{ overflow-x:auto; border:1px solid var(--line); border-radius:14px; -webkit-overflow-scrolling:touch; }
+.stattable{ border-collapse:collapse; width:100%; min-width:max-content; }
+.stattable th, .stattable td{ padding:9px 11px; text-align:center; border-bottom:1px solid rgba(243,234,216,.08); white-space:nowrap; }
+.stattable thead th{ font-size:12px; font-weight:700; color:var(--bone); position:sticky; top:0; background:var(--ink-2); }
+.th__dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+.stattable th:first-child, .stattable td:first-child{ position:sticky; left:0; background:var(--ink-2); z-index:1; }
+.rdcell{ color:var(--bone-dim); font-size:12px; }
+.cell__add{ font-weight:700; font-size:15px; }
+.cell__evt{ display:inline-block; margin-left:5px; font-family:'Space Mono',monospace; font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; vertical-align:middle; }
+.evt-Y{ background:var(--gold); color:#241c0a; } .evt-A{ background:var(--mint); color:#0c2a22; }
+.evt-◌{ background:rgba(243,234,216,.16); color:var(--bone); } .evt-✕{ background:var(--red-deep); color:#fff; }
+.cell__total{ display:block; font-size:10px; color:var(--bone-dim); margin-top:2px; }
+.cell--win .cell__add{ color:var(--mint); }
+.totalrow td{ border-top:1px solid var(--line); font-weight:700; font-size:15px; background:rgba(255,255,255,.02); }
+
+.rules h3{ font-size:13px; letter-spacing:.04em; margin:20px 0 5px; color:var(--gold); }
+.rules h3:first-child{ margin-top:4px; }
+.rules p{ margin:0; font-size:15px; line-height:1.5; color:var(--bone); }
+.rules p + p{ margin-top:7px; }
+.rules b{ color:#fff; }
+.rules__vals{ font-size:13px; color:var(--bone-dim); letter-spacing:.02em; }
+.rules__src{ margin-top:26px; font-size:12px; color:var(--bone-dim); }
+.rules__src a{ color:var(--mint); }
+
+.settings{ display:flex; flex-direction:column; gap:14px; margin-top:6px; }
+.setrow{ display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.setrow__txt h3{ font-size:15px; margin:0 0 2px; color:var(--bone); }
+.setrow__txt p{ font-size:13px; margin:0; color:var(--bone-dim); line-height:1.5; }
+.setdiv{ height:1px; background:var(--line); margin:4px 0; }
+.stepper{ display:flex; align-items:center; gap:2px; background:var(--ink-2); border:1px solid var(--line); border-radius:12px; padding:4px; flex:none; }
+.stepper__b{ width:38px; height:38px; border:none; border-radius:9px; background:var(--ink-3); color:var(--bone); font-size:22px; line-height:1; cursor:pointer; }
+.stepper__b:hover{ background:#352b4a; } .stepper__b:disabled{ opacity:.3; cursor:not-allowed; }
+.stepper__v{ min-width:42px; text-align:center; font-size:18px; font-weight:700; }
+.toggle{ display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:13px 15px; cursor:pointer; color:var(--bone); font-family:inherit; text-align:left; }
+.toggle.on{ border-color:rgba(84,194,160,.5); }
+.toggle__txt{ display:flex; flex-direction:column; gap:3px; }
+.toggle__label{ font-size:15px; font-weight:700; }
+.toggle__sub{ font-size:11px; color:var(--bone-dim); letter-spacing:.04em; }
+.toggle__track{ width:46px; height:27px; border-radius:999px; background:var(--ink-3); position:relative; flex:none; transition:background .2s; }
+.toggle.on .toggle__track{ background:var(--mint); }
+.toggle__knob{ position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:left .18s cubic-bezier(.2,.8,.2,1); }
+.toggle.on .toggle__knob{ left:22px; }
+
+@media (prefers-reduced-motion: reduce){
+  .panel,.cutcard.settled,.pcard__score,.dots i{ animation:none !important; }
+  .meter__fill{ transition:none !important; }
+}
+`;
+
+ReactDOM.createRoot(document.getElementById("root")).render(<YanivScorekeeper />);
+</script>
+</body>
+</html>

@@ -9,18 +9,31 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | App | Folder | What it is |
 | --- | --- | --- |
 | 🍬 Beadie | [`candy-beads/`](candy-beads/) | Candy-bead whiteboard — place beads on a hex board, lace the thread bead by bead, tie knots, preview the finished piece in 3D, and get a shopping list of beads + cord length. |
+| 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. |
 
 ## How it's laid out
 
 ```
 index.html              # the landing page — lists every app
 candy-beads/index.html  # one app, one folder, one HTML file
+yaniv/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
 
 Every app is a single `index.html` with its CSS and JS inline. No build step, no
-dependencies to install — the repo root *is* the website.
+dependencies to install — the repo root *is* the website. An app may pull a
+library off a CDN (three.js, React) but nothing is compiled ahead of time; edit
+the file, push, done.
+
+### Yaniv and the AI commentator
+
+`yaniv/` writes its between-round roasts by calling the Claude API straight from
+the browser. That needs your own Anthropic API key — paste one under
+**Settings → Live commentator** and it's kept in that browser's `localStorage`,
+sent only to `api.anthropic.com`. Anyone with access to the browser profile can
+read it, so use a key you're happy to rotate. With no key the app falls back to
+a set of canned roasts and plays exactly the same.
 
 ## Adding a new app
 
