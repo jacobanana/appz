@@ -104,6 +104,123 @@ const KEY_STORE = "yaniv_api_key";
 const getApiKey = () => { try { return localStorage.getItem(KEY_STORE) || ""; } catch (e) { return ""; } };
 const setApiKey = (k) => { try { k ? localStorage.setItem(KEY_STORE, k) : localStorage.removeItem(KEY_STORE); } catch (e) {} };
 
+/* ------------------------- what we remember ------------------------ */
+/* Three things survive a visit: the house rules, the last table's
+   line-up, and an archive of finished games that feeds the all-time
+   stats page. Every read is defensive — a missing, corrupt or
+   hand-edited value falls back to the default rather than blowing up
+   the app, and every write is wrapped because private-mode Safari
+   throws on setItem. */
+const LS = {
+  settings: "yaniv_settings",
+  roster: "yaniv_roster",
+  games: "yaniv_games",
+};
+const MAX_GAMES = 50; // keep the archive from growing without bound
+
+function readJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const val = JSON.parse(raw);
+    return val == null ? fallback : val;
+  } catch (e) {
+    return fallback;
+  }
+}
+const writeJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} };
+const dropKey = (key) => { try { localStorage.removeItem(key); } catch (e) {} };
+
+function clampInt(v, min, max, fallback) {
+  const n = typeof v === "number" ? v : parseInt(v, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function loadSettings() {
+  const s = readJSON(LS.settings, null);
+  if (!s || typeof s !== "object") return DEFAULT_SETTINGS;
+  return {
+    yanivThreshold: clampInt(s.yanivThreshold, 1, 20, DEFAULT_SETTINGS.yanivThreshold),
+    penalty: clampInt(s.penalty, 0, 100, DEFAULT_SETTINGS.penalty),
+    half100_200: typeof s.half100_200 === "boolean" ? s.half100_200 : DEFAULT_SETTINGS.half100_200,
+    halfEvery50: typeof s.halfEvery50 === "boolean" ? s.halfEvery50 : DEFAULT_SETTINGS.halfEvery50,
+  };
+}
+
+// The roster is stored as plain names — seats, suits and colours are
+// derived from the order when the table is rebuilt.
+function loadRoster() {
+  const r = readJSON(LS.roster, null);
+  if (!Array.isArray(r)) return [];
+  return r
+    .map((n) => (typeof n === "string" ? n.trim().slice(0, 18) : ""))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+const saveRoster = (names) => (names.length ? writeJSON(LS.roster, names) : dropKey(LS.roster));
+
+function makePlayers(names) {
+  return names.slice(0, 8).map((name, i) => ({
+    id: crypto.randomUUID(),
+    name,
+    suit: SUITS[i % SUITS.length],
+    color: PALETTE[i % PALETTE.length],
+    score: 0,
+  }));
+}
+
+function loadGames() {
+  const raw = readJSON(LS.games, []);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((g) => g && typeof g === "object" && Array.isArray(g.players) && Array.isArray(g.rounds))
+    .slice(0, MAX_GAMES);
+}
+function pushGame(game) {
+  const list = [game, ...loadGames()].slice(0, MAX_GAMES);
+  writeJSON(LS.games, list);
+  return list;
+}
+function dropGame(id) {
+  const list = loadGames().filter((g) => g.id !== id);
+  list.length ? writeJSON(LS.games, list) : dropKey(LS.games);
+  return list;
+}
+
+/* A finished game, trimmed for storage: suit/colour come back from the
+   player list, and the roast recaps are prompt scaffolding we don't need. */
+function archiveEntry(players, rounds, settings) {
+  return {
+    id: crypto.randomUUID(),
+    endedAt: new Date().toISOString(),
+    settings: { ...settings },
+    players: players.map((p) => ({ id: p.id, name: p.name, suit: p.suit, color: p.color, score: p.score })),
+    rounds: rounds.map((r) => ({
+      round: r.round,
+      callerId: r.callerId,
+      catcherId: r.catcherId,
+      winnerId: r.winnerId,
+      rows: r.rows.map((x) => ({
+        id: x.id, name: x.name, hand: x.hand, added: x.added, raw: x.raw, total: x.total,
+        role: x.role, isCaller: x.isCaller, isCatcher: x.isCatcher, halved: x.halved, bust: x.bust,
+      })),
+    })),
+  };
+}
+
+function gameWinners(g) {
+  if (!g.players.length) return [];
+  const low = Math.min(...g.players.map((p) => p.score));
+  return g.players.filter((p) => p.score === low);
+}
+function formatWhen(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 async function generateRoast(prompt) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("no-key");
@@ -161,9 +278,10 @@ function pickFallback(ctx) {
 function YanivScorekeeper() {
   const [phase, setPhase] = useState("setup"); // setup | cut | playing | over
   const [showStats, setShowStats] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(loadSettings);
   const [players, setPlayers] = useState([]);
   const [nameDraft, setNameDraft] = useState("");
   const [roundNumber, setRoundNumber] = useState(1);
@@ -185,7 +303,16 @@ function YanivScorekeeper() {
   const [starterId, setStarterId] = useState(null);
   const cutTimer = useRef(null);
 
+  // remembered between visits
+  const [games, setGames] = useState(loadGames);
+  const [roster, setRoster] = useState(loadRoster);
+  const [viewGame, setViewGame] = useState(null); // an archived game opened from the stats page
+  const [archivedId, setArchivedId] = useState(null); // the entry this game wrote, so undo can take it back
+
   const minScore = players.length ? Math.min(...players.map((p) => p.score)) : 0;
+
+  // House rules follow you to the next visit.
+  useEffect(() => { writeJSON(LS.settings, settings); }, [settings]);
 
   /* ----------------------------- setup ---------------------------- */
   function addPlayer() {
@@ -209,6 +336,39 @@ function YanivScorekeeper() {
         .filter((p) => p.id !== id)
         .map((p, i) => ({ ...p, suit: SUITS[i % SUITS.length], color: PALETTE[i % PALETTE.length] }))
     );
+  }
+
+  // Rebuild the last table. `deal` skips straight to the cut.
+  function useLastTable(deal) {
+    if (roster.length < 2) return;
+    setPlayers(makePlayers(roster));
+    setNameDraft("");
+    resetRound();
+    if (deal) {
+      setPhase("cut");
+      setStarterId(null);
+      setCutIndex(null);
+    }
+  }
+
+  /* ------------------------- stored history ----------------------- */
+  function deleteGame(id) {
+    setGames(dropGame(id));
+    if (archivedId === id) setArchivedId(null);
+    setViewGame((g) => (g && g.id === id ? null : g));
+  }
+  function clearGames() {
+    dropKey(LS.games);
+    setGames([]);
+    setArchivedId(null);
+    setViewGame(null);
+  }
+  function forgetRoster() {
+    dropKey(LS.roster);
+    setRoster([]);
+  }
+  function resetSettings() {
+    setSettings(DEFAULT_SETTINGS);
   }
 
   /* --------------------------- cut deck --------------------------- */
@@ -240,7 +400,11 @@ function YanivScorekeeper() {
     tick();
   }
   function goToCut() {
-    if (players.length >= 2) setPhase("cut");
+    if (players.length < 2) return;
+    const names = players.map((p) => p.name);
+    saveRoster(names);
+    setRoster(names);
+    setPhase("cut");
   }
   useEffect(() => {
     if (phase === "cut") runCut(players);
@@ -321,6 +485,9 @@ function YanivScorekeeper() {
 
     if (busted) {
       setPhase("over");
+      const entry = archiveEntry(updated, [...rounds, roundEntry], settings);
+      setGames(pushGame(entry));
+      setArchivedId(entry.id);
       const fb = pickFallback(ctx);
       setFinalRoast({ status: "loading", text: "", prompt, fallback: fb });
       generateRoast(prompt)
@@ -355,6 +522,11 @@ function YanivScorekeeper() {
 
   function undo() {
     if (!history.length) return;
+    // Undoing the round that ended the game also takes back its archive entry.
+    if (archivedId) {
+      setGames(dropGame(archivedId));
+      setArchivedId(null);
+    }
     const last = history[history.length - 1];
     setPlayers(last.players.map((p) => ({ ...p })));
     setRoundNumber(last.roundNumber);
@@ -378,6 +550,7 @@ function YanivScorekeeper() {
     setYanivCallerId(null);
     setCatcherId(null);
     setShowStats(false);
+    setArchivedId(null);
   }
   function rematch() {
     setPlayers((ps) => ps.map((p) => ({ ...p, score: 0 })));
@@ -430,7 +603,41 @@ function YanivScorekeeper() {
       <div className="yz-root">
         <style>{CSS}</style>
         <div className="yz-wrap">
-          <SettingsPanel settings={settings} setSettings={setSettings} onBack={() => setShowSettings(false)} />
+          <SettingsPanel
+            settings={settings}
+            setSettings={setSettings}
+            games={games}
+            roster={roster}
+            onClearGames={clearGames}
+            onForgetRoster={forgetRoster}
+            onResetSettings={resetSettings}
+            onBack={() => setShowSettings(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+  if (showHistory) {
+    return (
+      <div className="yz-root">
+        <style>{CSS}</style>
+        <div className="yz-wrap">
+          {viewGame ? (
+            <StatsPanel
+              players={viewGame.players}
+              rounds={viewGame.rounds}
+              label={formatWhen(viewGame.endedAt)}
+              onBack={() => setViewGame(null)}
+            />
+          ) : (
+            <StatsPage
+              games={games}
+              onView={setViewGame}
+              onDelete={deleteGame}
+              onClear={clearGames}
+              onBack={() => setShowHistory(false)}
+            />
+          )}
         </div>
       </div>
     );
@@ -464,6 +671,7 @@ function YanivScorekeeper() {
           <a className="btn btn--ghost" href="../" title="All apps">← Apps</a>
           <span className="eyebrow mono">YANIV</span>
           <div className="yz-head__nav">
+            <button className="btn btn--ghost" onClick={() => { setViewGame(null); setShowHistory(true); }}>Stats</button>
             <button className="btn btn--ghost" onClick={() => setShowSettings(true)}>Settings</button>
             <button className="btn btn--ghost" onClick={() => setShowRules(true)}>Rules</button>
           </div>
@@ -474,6 +682,17 @@ function YanivScorekeeper() {
           <section className="panel">
             <h1 className="display">New table</h1>
             <p className="lede">Lowest score wins. Add two to eight players.</p>
+
+            {roster.length >= 2 && players.length === 0 && (
+              <div className="lasttable">
+                <span className="lasttable__eyebrow mono">LAST TABLE</span>
+                <p className="lasttable__names">{roster.join(" · ")}</p>
+                <div className="lasttable__btns">
+                  <button className="btn btn--ghost" onClick={() => useLastTable(false)}>Edit line-up</button>
+                  <button className="btn btn--solid" onClick={() => useLastTable(true)}>Same players →</button>
+                </div>
+              </div>
+            )}
 
             <div className="addbar">
               <span className="addbar__pip mono">{SUITS[players.length % SUITS.length]}</span>
@@ -540,7 +759,7 @@ function YanivScorekeeper() {
             <div className="roundbar">
               <span className="round mono">ROUND {roundNumber}</span>
               <div className="roundbar__tools">
-                <button className="btn btn--ghost" onClick={() => setShowStats(true)} disabled={!rounds.length}>Stats</button>
+                <button className="btn btn--ghost" onClick={() => setShowStats(true)} disabled={!rounds.length}>This game</button>
                 <button className="btn btn--ghost" onClick={undo} disabled={!history.length}>Undo</button>
                 <button className="btn btn--ghost" onClick={newGame}>New</button>
               </div>
@@ -627,7 +846,11 @@ function YanivScorekeeper() {
               <button className="btn" onClick={() => setShowStats(true)} disabled={!rounds.length}>View stats</button>
               <button className="btn btn--solid" onClick={rematch}>Rematch</button>
             </div>
-            <button className="btn" style={{ width: "100%", marginTop: 12 }} onClick={newGame}>New table</button>
+            <div className="btnrow btnrow--tight">
+              {/* undoing the round that ended it also pulls the game back out of the archive */}
+              <button className="btn" onClick={undo} disabled={!history.length}>Undo last round</button>
+              <button className="btn" onClick={newGame}>New table</button>
+            </div>
           </section>
         )}
       </div>
@@ -837,7 +1060,30 @@ function Toggle({ on, onChange, label, sub }) {
     </button>
   );
 }
-function SettingsPanel({ settings, setSettings, onBack }) {
+/* Two taps to wipe anything: the first arms the button, the second does
+   it. Disarms itself after a few seconds so a stray tap can't linger. */
+function ConfirmButton({ label, confirm, onConfirm, className = "btn", disabled }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      className={className + (armed ? " btn--danger" : "")}
+      disabled={disabled}
+      onClick={() => {
+        if (armed) { setArmed(false); onConfirm(); }
+        else setArmed(true);
+      }}
+    >
+      {armed ? confirm : label}
+    </button>
+  );
+}
+
+function SettingsPanel({ settings, setSettings, games, roster, onClearGames, onForgetRoster, onResetSettings, onBack }) {
   const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
   const [key, setKey] = useState(getApiKey());
   const [saved, setSaved] = useState(false);
@@ -902,17 +1148,278 @@ function SettingsPanel({ settings, setSettings, onBack }) {
           Anyone with access to this browser profile can read the key. Use a scoped key you
           can rotate, and clear the field to remove it.
         </p>
+
+        <div className="setdiv" />
+
+        <div className="setrow__txt">
+          <h3>Saved on this device</h3>
+          <p>
+            House rules, the last line-up and finished games are kept in this browser's
+            storage — nothing leaves the device. Clearing is instant and can't be undone.
+          </p>
+        </div>
+        <div className="datarows">
+          <div className="datarow">
+            <span className="datarow__txt">
+              <b>Game history</b>
+              <span className="datarow__sub mono">
+                {games.length ? `${games.length} game${games.length === 1 ? "" : "s"} archived` : "nothing saved yet"}
+              </span>
+            </span>
+            <ConfirmButton
+              className="btn btn--ghost btn--pill"
+              label="Clear"
+              confirm="Tap to confirm"
+              disabled={!games.length}
+              onConfirm={onClearGames}
+            />
+          </div>
+          <div className="datarow">
+            <span className="datarow__txt">
+              <b>Last players</b>
+              <span className="datarow__sub mono">{roster.length ? roster.join(" · ") : "nothing saved yet"}</span>
+            </span>
+            <ConfirmButton
+              className="btn btn--ghost btn--pill"
+              label="Forget"
+              confirm="Tap to confirm"
+              disabled={!roster.length}
+              onConfirm={onForgetRoster}
+            />
+          </div>
+          <div className="datarow">
+            <span className="datarow__txt">
+              <b>House rules</b>
+              <span className="datarow__sub mono">
+                yaniv ≤{settings.yanivThreshold} · asaf +{settings.penalty}
+                {settings.halfEvery50 ? " · halve every 50" : settings.half100_200 ? " · halve 100 & 200" : ""}
+              </span>
+            </span>
+            <ConfirmButton
+              className="btn btn--ghost btn--pill"
+              label="Reset"
+              confirm="Tap to confirm"
+              onConfirm={onResetSettings}
+            />
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-/* ----------------------------- Stats ------------------------------ */
-function StatsPanel({ players, rounds, onBack }) {
+/* -------------------------- All-time stats ------------------------- */
+/* Players are tracked by name (case-insensitively) — ids are minted per
+   game, so they can't carry a career across tables. */
+function careerStats(games) {
+  const byKey = new Map();
+  const touch = (name) => {
+    const clean = (name || "").trim();
+    if (!clean) return null;
+    const key = clean.toLowerCase();
+    let s = byKey.get(key);
+    if (!s) {
+      s = {
+        name: clean, games: 0, wins: 0, busts: 0, rounds: 0, points: 0,
+        yanivs: 0, asafd: 0, catches: 0, finals: [], bestFinal: null, worstRound: 0,
+      };
+      byKey.set(key, s);
+    }
+    return s;
+  };
+
+  games.forEach((g) => {
+    const winners = new Set(gameWinners(g).map((p) => p.id));
+    g.players.forEach((p) => {
+      const s = touch(p.name);
+      if (!s) return;
+      s.games++;
+      s.finals.push(p.score);
+      if (winners.has(p.id)) s.wins++;
+      if (p.score > 200) s.busts++;
+      if (s.bestFinal == null || p.score < s.bestFinal) s.bestFinal = p.score;
+    });
+    g.rounds.forEach((r) => {
+      r.rows.forEach((row) => {
+        const s = touch(row.name);
+        if (!s) return;
+        const added = Number.isFinite(row.added) ? row.added : 0;
+        s.rounds++;
+        s.points += added;
+        if (row.role === "caller_win") s.yanivs++;
+        else if (row.role === "caller_asaf") s.asafd++;
+        else if (row.role === "catcher") s.catches++;
+        if (added > s.worstRound) s.worstRound = added;
+      });
+    });
+  });
+
+  return [...byKey.values()]
+    .map((s) => ({
+      ...s,
+      winPct: s.games ? Math.round((s.wins / s.games) * 100) : 0,
+      avgFinal: s.finals.length ? Math.round(s.finals.reduce((a, b) => a + b, 0) / s.finals.length) : 0,
+      avgRound: s.rounds ? Math.round((s.points / s.rounds) * 10) / 10 : 0,
+    }))
+    .sort((a, b) => b.wins - a.wins || a.avgFinal - b.avgFinal || a.name.localeCompare(b.name));
+}
+
+function buildRecords(games, stats) {
+  const out = [];
+  const top = (key, label, fmt) => {
+    const best = [...stats].sort((a, b) => b[key] - a[key])[0];
+    if (best && best[key] > 0) out.push({ label, value: fmt(best), who: best.name });
+  };
+  top("wins", "Most wins", (s) => `${s.wins}`);
+  top("yanivs", "Most clean Yanivs", (s) => `${s.yanivs}`);
+  top("catches", "Most Asafs caught", (s) => `${s.catches}`);
+  top("worstRound", "Biggest round", (s) => `+${s.worstRound}`);
+
+  const finishes = games.map((g) => gameWinners(g)[0]).filter(Boolean);
+  const bestFinish = finishes.sort((a, b) => a.score - b.score)[0];
+  if (bestFinish) out.push({ label: "Lowest winning total", value: `${bestFinish.score}`, who: bestFinish.name });
+
+  const longest = [...games].sort((a, b) => b.rounds.length - a.rounds.length)[0];
+  if (longest && longest.rounds.length) {
+    out.push({ label: "Longest game", value: `${longest.rounds.length} rds`, who: formatWhen(longest.endedAt) });
+  }
+  return out;
+}
+
+function StatsPage({ games, onView, onDelete, onClear, onBack }) {
+  const stats = careerStats(games);
+  const totalRounds = games.reduce((n, g) => n + g.rounds.length, 0);
+  const records = buildRecords(games, stats);
+
   return (
     <section className="panel">
       <div className="roundbar">
-        <span className="round mono">GAME STATS · {rounds.length} ROUND{rounds.length === 1 ? "" : "S"}</span>
+        <span className="round mono">ALL-TIME STATS</span>
+        <button className="btn btn--ghost" onClick={onBack}>← Back</button>
+      </div>
+
+      {!games.length ? (
+        <p className="empty">
+          No finished games yet. Play a table through to 200 and it lands here — every
+          round, every Yaniv, every disaster.
+        </p>
+      ) : (
+        <>
+          <div className="tiles">
+            <div className="tile"><span className="tile__n mono">{games.length}</span><span className="tile__l mono">GAMES</span></div>
+            <div className="tile"><span className="tile__n mono">{totalRounds}</span><span className="tile__l mono">ROUNDS</span></div>
+            <div className="tile"><span className="tile__n mono">{stats.length}</span><span className="tile__l mono">PLAYERS</span></div>
+            <div className="tile">
+              <span className="tile__n mono">{games.length ? Math.round((totalRounds / games.length) * 10) / 10 : 0}</span>
+              <span className="tile__l mono">RDS / GAME</span>
+            </div>
+          </div>
+
+          <h3 className="secthead">Leaderboard</h3>
+          <div className="tablewrap">
+            <table className="stattable stattable--career">
+              <thead>
+                <tr>
+                  <th className="th--name">Player</th>
+                  <th className="mono">G</th>
+                  <th className="mono">W</th>
+                  <th className="mono">WIN%</th>
+                  <th className="mono">AVG</th>
+                  <th className="mono">BEST</th>
+                  <th className="mono">Y</th>
+                  <th className="mono">A</th>
+                  <th className="mono">ASAF'D</th>
+                  <th className="mono">BUST</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((s, i) => (
+                  <tr key={s.name.toLowerCase()} className={i === 0 ? "row--top" : ""}>
+                    <td className="th--name">{i === 0 && <span className="crownmini">👑</span>}{s.name}</td>
+                    <td className="mono">{s.games}</td>
+                    <td className="mono">{s.wins}</td>
+                    <td className="mono">{s.winPct}%</td>
+                    <td className="mono">{s.avgFinal}</td>
+                    <td className="mono">{s.bestFinal == null ? "–" : s.bestFinal}</td>
+                    <td className="mono">{s.yanivs || "–"}</td>
+                    <td className="mono">{s.catches || "–"}</td>
+                    <td className="mono">{s.asafd || "–"}</td>
+                    <td className="mono">{s.busts || "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="chartkey mono">
+            G games · W wins · AVG mean final total · BEST lowest final · Y clean yanivs · A asafs caught
+          </p>
+
+          {records.length > 0 && (
+            <>
+              <h3 className="secthead">Records</h3>
+              <div className="records">
+                {records.map((r) => (
+                  <div className="record" key={r.label}>
+                    <span className="record__label mono">{r.label}</span>
+                    <span className="record__value">{r.value}</span>
+                    <span className="record__who">{r.who}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="secthead secthead--row">
+            <h3>Past games</h3>
+            <ConfirmButton
+              className="btn btn--ghost btn--pill"
+              label="Clear history"
+              confirm="Tap to confirm"
+              onConfirm={onClear}
+            />
+          </div>
+          <ul className="gamelist">
+            {games.map((g) => {
+              const winners = gameWinners(g);
+              return (
+                <li className="gamerow" key={g.id}>
+                  <button className="gamerow__main" onClick={() => onView(g)}>
+                    <span className="gamerow__top">
+                      <span className="gamerow__win">
+                        👑 {winners.map((w) => w.name).join(" & ") || "—"}
+                        <span className="gamerow__score mono">{winners[0] ? winners[0].score : ""}</span>
+                      </span>
+                      <span className="gamerow__when mono">{formatWhen(g.endedAt)}</span>
+                    </span>
+                    <span className="gamerow__sub mono">
+                      {g.rounds.length} round{g.rounds.length === 1 ? "" : "s"} · {g.players.map((p) => p.name).join(", ")}
+                    </span>
+                  </button>
+                  <ConfirmButton
+                    className="gamerow__del"
+                    label="×"
+                    confirm="✓"
+                    onConfirm={() => onDelete(g.id)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+          <p className="fineprint mono">Tap a game to replay its scoreboard. The last {MAX_GAMES} games are kept.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ----------------------------- Stats ------------------------------ */
+function StatsPanel({ players, rounds, label, onBack }) {
+  return (
+    <section className="panel">
+      <div className="roundbar">
+        <span className="round mono">
+          {label || "GAME STATS"} · {rounds.length} ROUND{rounds.length === 1 ? "" : "S"}
+        </span>
         <button className="btn btn--ghost" onClick={onBack}>← Back</button>
       </div>
 
@@ -1077,7 +1584,11 @@ html, body, #root, #app, main { margin:0; padding:0; min-height:100%; background
 
 .yz-wrap{ max-width:560px; margin:0 auto; padding:26px 18px 40px; }
 .yz-head{ display:flex; align-items:center; justify-content:space-between; padding:2px 0 18px; gap:8px; }
-.yz-head__nav{ display:flex; gap:6px; }
+.yz-head__nav{ display:flex; gap:4px; }
+@media (max-width:430px){
+  .yz-head .eyebrow{ display:none; }
+  .yz-head__nav .btn--ghost{ padding:9px 9px; font-size:12.5px; }
+}
 .yz-head a.btn{ text-decoration:none; }
 .eyebrow{ font-size:12px; letter-spacing:.28em; color:var(--bone-dim); border:1px solid var(--line); border-radius:999px; padding:8px 16px; }
 
@@ -1093,7 +1604,11 @@ html, body, #root, #app, main { margin:0; padding:0; min-height:100%; background
 .btn--ghost{ background:transparent; padding:9px 12px; font-size:13px; }
 .btn--big{ width:100%; padding:17px; font-size:17px; font-weight:800; background:var(--red); border-color:transparent; color:#fff; margin-top:6px; box-shadow:var(--shadow); }
 .btn--big:hover{ background:#e85a52; }
+.btn--pill{ border-radius:999px; padding:8px 14px; font-size:12.5px; flex:none; }
+.btn--danger{ background:var(--red-deep); border-color:transparent; color:#fff; }
+.btn--danger:hover{ background:var(--red); }
 .btnrow{ display:flex; gap:12px; margin-top:22px; } .btnrow .btn{ flex:1; }
+.btnrow--tight{ margin-top:12px; }
 .fineprint{ text-align:center; font-size:11px; color:var(--bone-dim); margin:13px 0 0; letter-spacing:.03em; }
 .hint{ font-size:12px; color:var(--gold); background:rgba(232,178,76,.1); border:1px solid rgba(232,178,76,.3); border-radius:11px; padding:9px 12px; margin:0 0 14px; }
 
@@ -1103,6 +1618,11 @@ html, body, #root, #app, main { margin:0; padding:0; min-height:100%; background
 .addbar__input::placeholder{ color:var(--bone-dim); opacity:.7; }
 .addbar__input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
 .keyrow{ display:flex; gap:9px; }
+
+.lasttable{ background:var(--ink-2); border:1px solid var(--line); border-radius:15px; padding:14px 15px; margin-bottom:18px; }
+.lasttable__eyebrow{ font-size:10.5px; letter-spacing:.18em; color:var(--bone-dim); }
+.lasttable__names{ margin:6px 0 12px; font-size:16px; font-weight:700; line-height:1.4; }
+.lasttable__btns{ display:flex; gap:9px; justify-content:flex-end; flex-wrap:wrap; }
 
 .roster{ list-style:none; padding:0; margin:0 0 24px; display:flex; flex-direction:column; gap:8px; }
 .roster__empty{ color:var(--bone-dim); font-size:14px; padding:8px 2px; }
@@ -1212,6 +1732,50 @@ html, body, #root, #app, main { margin:0; padding:0; min-height:100%; background
 .cell__total{ display:block; font-size:10px; color:var(--bone-dim); margin-top:2px; }
 .cell--win .cell__add{ color:var(--mint); }
 .totalrow td{ border-top:1px solid var(--line); font-weight:700; font-size:15px; background:rgba(255,255,255,.02); }
+
+/* all-time stats */
+.empty{ color:var(--bone-dim); font-size:15px; line-height:1.55; background:var(--ink-2); border:1px solid var(--line); border-radius:15px; padding:18px 16px; margin:10px 0 0; }
+.secthead{ font-size:13px; letter-spacing:.04em; color:var(--gold); margin:24px 0 9px; }
+.secthead--row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 9px; }
+.secthead--row h3{ font-size:13px; letter-spacing:.04em; color:var(--gold); margin:0; }
+
+.tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:6px 0 4px; }
+.tile{ background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.tile__n{ font-size:21px; font-weight:700; }
+.tile__l{ font-size:9px; letter-spacing:.1em; color:var(--bone-dim); white-space:nowrap; }
+@media (max-width:390px){ .tiles{ grid-template-columns:repeat(2,1fr); } }
+
+.stattable--career th.th--name, .stattable--career td.th--name{ text-align:left; min-width:120px; }
+.stattable--career thead th{ font-size:10.5px; letter-spacing:.06em; color:var(--bone-dim); }
+.stattable--career td{ font-size:14px; }
+.stattable--career td.th--name{ font-weight:700; font-size:15px; }
+.row--top td{ background:rgba(232,178,76,.09); }
+.crownmini{ margin-right:6px; }
+
+.records{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+.record{ background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:11px 13px; display:flex; flex-direction:column; gap:2px; }
+.record__label{ font-size:9.5px; letter-spacing:.09em; color:var(--bone-dim); text-transform:uppercase; }
+.record__value{ font-size:22px; font-weight:800; color:var(--gold); line-height:1.1; }
+.record__who{ font-size:13px; color:var(--bone); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.gamelist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+.gamerow{ display:flex; align-items:stretch; gap:6px; background:var(--ink-2); border:1px solid var(--line); border-radius:13px; overflow:hidden; }
+.gamerow__main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; text-align:left; background:transparent; border:none; color:var(--bone); font-family:inherit; padding:12px 4px 12px 14px; cursor:pointer; }
+.gamerow__main:hover{ background:rgba(255,255,255,.03); }
+.gamerow__top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.gamerow__win{ font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gamerow__score{ color:var(--gold); margin-left:7px; font-size:13px; }
+.gamerow__when{ font-size:10.5px; color:var(--bone-dim); flex:none; }
+.gamerow__sub{ font-size:11px; color:var(--bone-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gamerow__del{ flex:none; width:40px; border:none; border-left:1px solid var(--line); background:transparent; color:var(--bone-dim); font-size:18px; font-family:inherit; cursor:pointer; }
+.gamerow__del:hover{ color:var(--red); background:rgba(221,75,67,.1); }
+.gamerow__del.btn--danger{ background:var(--red-deep); color:#fff; }
+
+.datarows{ display:flex; flex-direction:column; gap:8px; }
+.datarow{ display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--ink-2); border:1px solid var(--line); border-radius:13px; padding:12px 14px; }
+.datarow__txt{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.datarow__txt b{ font-size:14.5px; }
+.datarow__sub{ font-size:11px; color:var(--bone-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .rules h3{ font-size:13px; letter-spacing:.04em; margin:20px 0 5px; color:var(--gold); }
 .rules h3:first-child{ margin-top:4px; }
