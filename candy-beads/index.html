@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Beadie — candy bead whiteboard</title>
+<meta name="description" content="Design candy bead jewellery on a hex board: place beads, lace the thread yourself, tie knots, and preview the finished piece in 3D." />
+<meta name="theme-color" content="#7c3aed" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23ec4899'/><ellipse cx='11' cy='11' rx='4' ry='2.6' fill='white' opacity='.6'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f1f9; --ink:#2c2440; --muted:#8b8399; --line:#e7e2f0;
+    --panel:#fff; --grape:#7c3aed; --pink:#ec4899; --mint:#14b8a6;
+    --shadow:0 12px 34px -14px rgba(76,29,149,.35);
+    --shadow-sm:0 4px 14px -7px rgba(76,29,149,.4);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:'Nunito',system-ui,'Segoe UI',sans-serif;overscroll-behavior:none}
+  .f,h1,h2,h3{font-family:'Fredoka',system-ui,sans-serif;font-weight:600}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  :focus-visible{outline:3px solid var(--grape);outline-offset:2px;border-radius:10px}
+
+  header{position:fixed;top:0;left:0;right:0;height:54px;z-index:30;display:flex;align-items:center;gap:10px;
+    padding:0 12px;background:rgba(255,255,255,.82);backdrop-filter:blur(10px);border-bottom:1.5px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:8px;font-family:'Fredoka';font-weight:700;font-size:19px;color:var(--grape)}
+  .brand .d{display:flex;gap:2px}.brand .d i{width:9px;height:9px;border-radius:50%;box-shadow:inset -1.5px -1.5px 2px rgba(0,0,0,.15)}
+  a.home{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;color:var(--muted);
+    border:1.5px solid var(--line);background:var(--bg);text-decoration:none;flex:none}
+  a.home:hover{color:var(--grape);border-color:var(--grape)}
+  a.home svg{width:17px;height:17px}
+  #proj{border:1.5px solid transparent;background:transparent;font-family:'Fredoka';font-size:15px;color:var(--ink);
+    padding:6px 8px;border-radius:9px;width:150px;max-width:32vw}
+  #proj:hover,#proj:focus{background:var(--bg);border-color:var(--line)}
+  .grow{flex:1}
+  .hbtn{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--muted);border:1.5px solid transparent}
+  .hbtn:hover{background:var(--bg);color:var(--grape)}
+  .hbtn:disabled{opacity:.35;cursor:default}
+  .hbtn svg{width:20px;height:20px}
+  .chip{display:flex;align-items:center;gap:9px;height:38px;padding:0 12px;border-radius:12px;background:var(--bg);
+    border:1.5px solid var(--line);font-weight:800;font-size:13px;color:var(--ink)}
+  .chip b{font-family:'Fredoka';font-weight:600}
+  .chip .dot{color:var(--pink)} .chip .th{color:var(--mint)}
+
+  #stage{position:fixed;inset:54px 0 0 0;touch-action:none}
+  #svg{width:100%;height:100%;display:block;cursor:crosshair}
+  #svg.hand{cursor:grab} #svg.hand.grab{cursor:grabbing}
+  .bead-h{filter:drop-shadow(0 1px 1px rgba(0,0,0,.15))}
+
+  #tools{position:fixed;z-index:25;display:flex;gap:6px;background:var(--panel);padding:7px;border-radius:16px;
+    box-shadow:var(--shadow);border:1.5px solid var(--line)}
+  .tool{width:48px;height:48px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;color:var(--muted);font-weight:800;font-size:9.5px}
+  .tool svg{width:22px;height:22px}
+  .tool.on{background:linear-gradient(135deg,var(--grape),var(--pink));color:#fff;box-shadow:var(--shadow-sm)}
+  .tool:not(.on):hover{background:var(--bg);color:var(--ink)}
+
+  #colors{position:fixed;z-index:25;background:var(--panel);border-radius:16px;box-shadow:var(--shadow);
+    border:1.5px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:8px}
+  .pals{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:3px}
+  .pals button{flex:1;border-radius:8px;padding:5px 8px;font-weight:800;font-size:11px;color:var(--muted)}
+  .pals button.on{background:#fff;color:var(--grape);box-shadow:var(--shadow-sm)}
+  .swrow{display:flex;gap:7px;flex-wrap:wrap;max-width:330px;justify-content:center}
+  .sw{width:34px;height:34px;border-radius:11px;position:relative;border:2px solid rgba(0,0,0,.06);
+    box-shadow:inset -3px -3px 5px rgba(0,0,0,.14),inset 3px 3px 5px rgba(255,255,255,.5)}
+  .sw:hover{transform:translateY(-2px)}
+  .sw.on{outline:3px solid var(--ink);outline-offset:2px}
+  .sw .g{position:absolute;top:13%;left:15%;width:34%;height:26%;border-radius:50%;background:rgba(255,255,255,.6)}
+  .sw.clear{opacity:.85}
+
+  #zoom{position:fixed;right:14px;bottom:14px;z-index:24;display:flex;flex-direction:column;gap:6px}
+  #zoom button{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1.5px solid var(--line);
+    box-shadow:var(--shadow-sm);font-size:20px;font-weight:800;color:var(--grape);display:flex;align-items:center;justify-content:center}
+  #zoom button svg{width:18px;height:18px}
+
+  .pop{position:fixed;z-index:40;background:var(--panel);border:1.5px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:14px;display:none}
+  .pop.show{display:block;animation:pin .16s ease}
+  @keyframes pin{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+  .pop h3{margin:0 0 10px;font-size:15px}
+  .lgd{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto}
+  .lg{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;background:var(--bg)}
+  .lg .bd{width:18px;height:18px;border-radius:50%;flex:none;box-shadow:inset -2px -2px 4px rgba(0,0,0,.18)}
+  .lg .nm{font-weight:800;font-size:12.5px}.lg .ct{margin-left:auto;font-family:'Fredoka';font-size:15px}
+  .lg .swp{font-size:10.5px;font-weight:800;color:var(--grape);background:#fff;border:1.5px solid var(--line);border-radius:7px;padding:3px 6px}
+  .brk{margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line);font-size:12px;color:var(--muted);font-weight:700;line-height:1.5}
+  .brk b{color:var(--ink)}
+  .sizes{display:flex;gap:5px;margin-top:8px}
+  .sizes button{flex:1;border:1.5px solid var(--line);background:var(--bg);border-radius:9px;padding:6px;font-weight:800;font-size:11px;color:var(--muted)}
+  .sizes button.on{background:var(--ink);color:#fff}
+
+  .menu{min-width:200px;padding:8px}
+  .menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 10px;border-radius:10px;font-weight:800;font-size:13.5px;text-align:left}
+  .menu button:hover{background:var(--bg)}
+  .menu button svg{width:17px;height:17px;color:var(--muted)}
+  .menu hr{border:none;border-top:1.5px solid var(--line);margin:6px 2px}
+
+  .exgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:min(92vw,440px)}
+  .ex{background:var(--bg);border:1.5px solid var(--line);border-radius:13px;padding:8px;text-align:center}
+  .ex:hover{border-color:var(--grape);transform:translateY(-2px)}
+  .ex svg{width:100%;height:62px}
+  .ex .n{font-family:'Fredoka';font-size:12.5px;margin-top:2px}
+  .ex .s{font-size:10px;font-weight:800;color:var(--muted)}
+
+  .saves{width:min(92vw,380px);max-height:60vh;overflow:auto}
+  .save{display:flex;align-items:center;gap:9px;padding:8px;border-radius:11px;background:var(--bg);margin-bottom:7px}
+  .save .th{width:52px;height:40px;border-radius:8px;background:#fff;border:1.5px solid var(--line);overflow:hidden;flex:none}
+  .save .i{flex:1;min-width:0}.save .i .t{font-family:'Fredoka';font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .save .i .d{font-size:11px;color:var(--muted);font-weight:700}
+  .ib{width:30px;height:30px;border-radius:8px;background:#fff;border:1.5px solid var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none}
+  .ib:hover{color:var(--grape);border-color:var(--grape)} .ib svg{width:15px;height:15px}
+
+  .scrim{position:fixed;inset:0;z-index:38;background:rgba(44,36,64,.28);display:none}
+  .scrim.show{display:block}
+  .center{left:50%;top:50%;transform:translate(-50%,-50%)}
+
+  .hint{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:20;background:var(--ink);color:#fff;
+    font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:20px;opacity:0;transition:.2s;pointer-events:none;white-space:nowrap}
+  .hint.show{opacity:.94}
+  #toast{position:fixed;left:50%;bottom:84px;transform:translate(-50%,10px);background:var(--ink);color:#fff;
+    padding:10px 16px;border-radius:13px;font-weight:800;font-size:13.5px;opacity:0;pointer-events:none;transition:.22s;z-index:50}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  .btn{width:100%;background:linear-gradient(135deg,var(--grape),var(--pink));color:#fff;border-radius:12px;
+    padding:11px;font-family:'Fredoka';font-size:15px;box-shadow:var(--shadow-sm);margin-top:4px}
+  .empty{color:var(--muted);font-weight:700;font-size:13px;text-align:center;padding:16px}
+
+  /* 3D finished preview */
+  .pv{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;
+    background:radial-gradient(120% 90% at 50% 8%, #ffffff, #ece7f6 52%, #e0d8ef)}
+  .pv.show{display:flex}
+  .pvbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,.72);backdrop-filter:blur(8px);border-bottom:1.5px solid var(--line)}
+  .pvtitle{font-family:'Fredoka';font-size:16px;color:var(--grape)}
+  .pvtoggle{background:var(--bg);border:1.5px solid var(--line);border-radius:11px;padding:8px 12px;font-weight:800;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .pvtoggle.on{background:linear-gradient(135deg,var(--grape),var(--pink));color:#fff;border-color:transparent}
+  #pvStage{flex:1;min-height:0;touch-action:none;position:relative}
+  #pvStage canvas{display:block;width:100%;height:100%}
+  .pvhint{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(44,36,64,.8);color:#fff;
+    font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:20px;pointer-events:none;z-index:2}
+
+  #tools{left:14px;top:50%;transform:translateY(-50%);flex-direction:column}
+  #colors{left:50%;bottom:14px;transform:translateX(-50%)}
+  #burgerBtn{display:none}
+  .m-mobile{display:none}
+  @media (max-width:820px){
+    #tools{left:50%;bottom:10px;top:auto;transform:translateX(-50%);flex-direction:row}
+    #colors{left:50%;bottom:74px;transform:translateX(-50%)}
+    #zoom{bottom:140px}
+    #proj{width:34vw}
+    #undo,#redo,#statsBtn,#previewBtn,#menuBtn{display:none}
+    #burgerBtn{display:flex}
+    .m-mobile{display:flex}
+    hr.m-mobile{display:block}
+    .menu{max-height:76vh;overflow:auto}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../" title="All apps" aria-label="Back to all apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></a>
+  <div class="brand"><span class="d"><i style="background:#f43f5e"></i><i style="background:#38bdf8"></i><i style="background:#f7b500"></i></span>Beadie</div>
+  <input id="proj" value="My candy design" aria-label="Project name" />
+  <div class="grow"></div>
+  <button class="hbtn" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+  <button class="hbtn" id="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+  <button class="chip" id="statsBtn" title="Beads &amp; thread"><span class="dot">●</span> <b id="cBeads">0</b> <span class="th">🧵</span> <b id="cThread">0 cm</b></button>
+  <button class="hbtn" id="previewBtn" title="See it finished in 3D" aria-label="3D preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg></button>
+  <button class="hbtn" id="menuBtn" title="Menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+  <button class="hbtn" id="burgerBtn" title="Menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+</header>
+
+<div id="stage"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div class="hint" id="hint"></div>
+
+<div id="tools" role="toolbar" aria-label="Tools">
+  <button class="tool on" data-tool="bead" title="Bead — tap to place, tap a bead to recolor">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><ellipse cx="9.5" cy="9.5" rx="2" ry="1.3" fill="currentColor" stroke="none"/></svg>Bead</button>
+  <button class="tool" data-tool="thread" title="Thread — tap bead to bead to lace">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="10" r="2.4"/><circle cx="8" cy="19" r="2.4"/><path d="M6.8 7.4L17 9M17.6 12L9.6 17.2"/></svg>Thread</button>
+  <button class="tool" data-tool="knot" title="Knot — tap a bead to tie off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7c5 3 5 7 10 10M17 7C12 10 12 14 7 17"/><circle cx="12" cy="12" r="2.2"/></svg>Knot</button>
+  <button class="tool" data-tool="move" title="Move — drag a bead">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>Move</button>
+  <button class="tool" data-tool="erase" title="Erase — tap a bead, thread, or knot">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 20H8.5L3.5 15a2 2 0 0 1 0-2.8l8-8a2 2 0 0 1 2.8 0l5.2 5.2a2 2 0 0 1 0 2.8L14 20"/><path d="M7 12l5 5"/></svg>Erase</button>
+  <button class="tool" data-tool="hand" title="Move the board around">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V6a1.5 1.5 0 0 1 3 0v5V4.5a1.5 1.5 0 0 1 3 0V11V6.5a1.5 1.5 0 0 1 3 0V14c0 3.5-2 6-5.5 6S8 17 8 13z"/></svg>Pan</button>
+</div>
+
+<div id="colors">
+  <div class="pals" id="pals">
+    <button data-pal="full" class="on">Full</button>
+    <button data-pal="pastel">Pastel</button>
+    <button data-pal="clear">Clear</button>
+  </div>
+  <div class="swrow" id="swrow"></div>
+</div>
+
+<div id="zoom">
+  <button id="zin" title="Zoom in" aria-label="Zoom in">+</button>
+  <button id="zout" title="Zoom out" aria-label="Zoom out">−</button>
+  <button id="zfit" title="Fit to screen" aria-label="Fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+</div>
+
+<div class="pop" id="statsPop">
+  <h3>Shopping list</h3>
+  <div class="lgd" id="legend"></div>
+  <div class="brk" id="brk"></div>
+  <div class="sizes" id="sizes">
+    <button data-mm="9" class="on">Pony 9mm</button>
+    <button data-mm="6">Midi 6mm</button>
+    <button data-mm="4">Seed 4mm</button>
+  </div>
+</div>
+
+<div class="pop menu" id="menuPop">
+  <button id="mUndo" class="m-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Undo</button>
+  <button id="mRedo" class="m-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>Redo</button>
+  <button id="mPreview" class="m-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 2v20M3 7l9 5 9-5"/></svg>3D preview</button>
+  <button id="mStats" class="m-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Shopping list</button>
+  <hr class="m-mobile">
+  <button id="mEx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg>Examples &amp; stitches</button>
+  <button id="mSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></svg>Save a copy</button>
+  <button id="mOpen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v11H3z"/></svg>My saves</button>
+  <hr>
+  <button id="mExport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M8 11l4 4 4-4M4 21h16"/></svg>Export file</button>
+  <button id="mImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15V3M8 7l4-4 4 4M4 21h16"/></svg>Import file</button>
+  <hr>
+  <button id="mClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Clear board</button>
+  <input type="file" id="fileIn" accept="application/json" hidden>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="pop center" id="exPop">
+  <h3>Start from a shape <span style="font-weight:700;color:var(--muted);font-size:12px">— tap to place it</span></h3>
+  <div class="exgrid" id="exGrid"></div>
+</div>
+<div class="pop center" id="savePop">
+  <h3>My saves</h3>
+  <div class="saves" id="saveList"></div>
+</div>
+
+<div id="preview" class="pv">
+  <div class="pvbar">
+    <span class="pvtitle">✨ Finished preview</span>
+    <div class="grow"></div>
+    <button class="pvtoggle on" id="pvSpin" title="Auto-spin">↻ Spin</button>
+    <button class="hbtn" id="pvClose" title="Back to editing" aria-label="Close preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div id="pvStage"></div>
+  <div class="pvhint">Drag to rotate · pinch or scroll to zoom</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* Persistence shim: the app talks to an async window.storage API. On a static
+   host (GitHub Pages) there is no host-provided storage, so back it with
+   localStorage — same shape, so the app code stays untouched. */
+(function(){
+  if(window.storage&&window.storage.get&&window.storage.set)return;
+  const mem={};
+  const ok=(()=>{ try{ const k='__beadie_t'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
+  window.storage={
+    async get(key){ try{ const v=ok?localStorage.getItem('beadie:'+key):mem[key]; return v==null?null:{value:v}; }catch(e){ return null; } },
+    async set(key,value){ try{ if(ok)localStorage.setItem('beadie:'+key,value); else mem[key]=value; }catch(e){} }
+  };
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* Beadie — candy bead whiteboard.
+   Model: beads snap to a hex lattice; the maker draws the THREAD manually
+   bead-to-bead (as in real cross-weave / RAW / brick beadwork) and places
+   knots. Nothing is auto-threaded. Build several shapes on one board and
+   lace them together to "stitch parts". */
+
+  const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+  const uid=()=>Math.random().toString(36).slice(2,9);
+  let toastT=null;
+  function toast(m){ const t=$('#toast'); if(!t)return; t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1900); }
+
+  const PAL={
+    full:[['Cherry','#f43f5e'],['Tangerine','#fb923c'],['Lemon','#facc15'],['Lime','#84cc16'],['Teal','#14b8a6'],
+          ['Sky','#38bdf8'],['Grape','#8b5cf6'],['Bubblegum','#ec4899'],['Cocoa','#92400e'],['Snow','#ffffff'],['Licorice','#1f2937']],
+    pastel:[['Blush','#fbcfe8'],['Peach','#fed7aa'],['Butter','#fef08a'],['Mint','#bbf7d0'],['Seafoam','#99f6e4'],
+          ['Sky','#bae6fd'],['Lilac','#ddd6fe'],['Rose','#fda4ab'],['Sand','#fde68a'],['Cloud','#f1f5f9'],['Dove','#cbd5e1']],
+    clear:[['Ruby','#e11d48'],['Amber','#f59e0b'],['Citrine','#eab308'],['Emerald','#10b981'],['Aqua','#06b6d4'],
+          ['Sapphire','#3b82f6'],['Amethyst','#a855f7'],['Rose','#f472b6'],['Smoke','#6b7280'],['Ice','#e2e8f0'],['Lime','#a3e635']]
+  };
+  const isClear = ()=> S.palette==='clear';
+  function cname(h,t){ for(const k in PAL){const f=PAL[k].find(x=>x[1]===h); if(f)return f[0]+(t?' (clear)':'');} return h.toUpperCase(); }
+
+  const SP=34, VS=SP*0.866, R=15;
+  const cToPx=(c,r)=>({x:c*SP+(r&1?SP/2:0), y:r*VS});
+  function pxToCell(x,y){ const r=Math.round(y/VS); const c=Math.round((x-(r&1?SP/2:0))/SP); return {c,r}; }
+  function shade(hex,f){let n=parseInt(hex.slice(1),16);let R2=Math.min(255,Math.round(((n>>16)&255)*f)),G=Math.min(255,Math.round(((n>>8)&255)*f)),B2=Math.min(255,Math.round((n&255)*f));return '#'+((1<<24)+(R2<<16)+(G<<8)+B2).toString(16).slice(1);}
+  const hexA=(hex,a)=>{let n=parseInt(hex.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;};
+
+  let S = fresh();
+  function fresh(){ return {
+    name:'My candy design', palette:'full', color:'#ec4899', tool:'bead',
+    cord:'#f4a72a', beadMM:9,
+    beads:{}, threads:[], knots:{},
+    cam:{tx:0,ty:0,s:1}
+  };}
+  let occ={};
+  function reindex(){ occ={}; for(const id in S.beads){const b=S.beads[id]; occ[b.c+','+b.r]=id;} }
+  const beadAt=(c,r)=> occ[c+','+r];
+
+  let hist=[], future=[];
+  function snap(){ return JSON.stringify({beads:S.beads,threads:S.threads,knots:S.knots}); }
+  function pushHist(){ hist.push(snap()); if(hist.length>60)hist.shift(); future=[]; refreshUndo(); }
+  function restore(str){ const d=JSON.parse(str); S.beads=d.beads; S.threads=d.threads; S.knots=d.knots; reindex(); render(); stats(); saveBoard(); }
+  function undo(){ if(!hist.length)return; future.push(snap()); restore(hist.pop()); refreshUndo(); }
+  function redo(){ if(!future.length)return; hist.push(snap()); restore(future.pop()); refreshUndo(); }
+  function refreshUndo(){ $('#undo').disabled=!hist.length; $('#redo').disabled=!future.length; }
+
+  let svT=null;
+  function saveBoard(){ clearTimeout(svT); svT=setTimeout(async()=>{ try{ if(window.storage&&window.storage.set)
+    await window.storage.set('beadie_board', JSON.stringify(pack()), false);}catch(e){} },400); }
+  function pack(){ return {name:S.name,palette:S.palette,color:S.color,cord:S.cord,beadMM:S.beadMM,beads:S.beads,threads:S.threads,knots:S.knots,cam:S.cam}; }
+  async function loadBoard(){ try{ if(window.storage&&window.storage.get){ const r=await window.storage.get('beadie_board',false);
+    if(r&&r.value){ Object.assign(S,JSON.parse(r.value)); } } }catch(e){} reindex(); }
+
+  const svg=$('#svg'); let camG,gLat,gThr,gKnot,gBead,gOver, W=0,Hh=0;
+  function buildScaffold(){
+    svg.innerHTML=`<g id="cam"><g id="lat"></g><g id="thr"></g><g id="knot"></g><g id="bead"></g><g id="over"></g></g>`;
+    camG=$('#cam');gLat=$('#lat');gThr=$('#thr');gKnot=$('#knot');gBead=$('#bead');gOver=$('#over');
+    drawLattice();
+  }
+  function resize(){ const r=svg.getBoundingClientRect(); W=r.width; Hh=r.height; svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`); }
+  function applyCam(){ camG.setAttribute('transform',`translate(${S.cam.tx} ${S.cam.ty}) scale(${S.cam.s})`); }
+  function drawLattice(){ let g=''; for(let r=-14;r<=14;r++)for(let c=-16;c<=16;c++){const p=cToPx(c,r); g+=`<circle cx="${p.x}" cy="${p.y}" r="1.4" fill="#cfc7de"/>`;} gLat.innerHTML=g; }
+
+  function beadSVG(b){ const op=b.t?0.55:1, rim=shade(b.h,.72), p=cToPx(b.c,b.r);
+    let s=`<circle class="bead-h" cx="${p.x}" cy="${p.y}" r="${R}" fill="${b.h}" fill-opacity="${op}" stroke="${rim}" stroke-width="1.6"/>`;
+    s+=`<ellipse cx="${p.x-R*.32}" cy="${p.y-R*.36}" rx="${R*.42}" ry="${R*.27}" fill="#fff" opacity="${b.t?.5:.55}"/>`;
+    if(b.t)s+=`<circle cx="${p.x}" cy="${p.y}" r="${R*.6}" fill="none" stroke="#fff" stroke-opacity=".35"/>`;
+    return s; }
+
+  function render(){
+    let t=''; const cc=S.cord, cd=shade(cc,.62);
+    S.threads.forEach((th,i)=>{ const a=S.beads[th.a],b=S.beads[th.b]; if(!a||!b)return;
+      const p1=cToPx(a.c,a.r),p2=cToPx(b.c,b.r);
+      t+=`<line data-thr="${i}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="transparent" stroke-width="16"/>`;
+      t+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${cd}" stroke-opacity=".3" stroke-width="5.5" stroke-linecap="round"/>`;
+      t+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${cc}" stroke-width="3" stroke-linecap="round"/>`; });
+    gThr.innerHTML=t;
+    let bs=''; for(const id in S.beads) bs+=`<g data-bead="${id}">${beadSVG(S.beads[id])}</g>`; gBead.innerHTML=bs;
+    let k=''; for(const id in S.knots){ const v=S.knots[id]; let p; if(typeof v==='string'){const b=S.beads[v]; if(!b){continue;} p=cToPx(b.c,b.r); p={x:p.x+R*.7,y:p.y-R*.7};} else p=cToPx(v.c,v.r);
+      k+=`<g data-knot="${id}"><circle cx="${p.x}" cy="${p.y}" r="6.5" fill="${S.cord}" stroke="${shade(S.cord,.55)}" stroke-width="1.5"/>`+
+         `<path d="M${p.x-3} ${p.y-3}q3 3 6 0M${p.x-3} ${p.y+3}q3 -3 6 0" stroke="${shade(S.cord,.5)}" stroke-width="1.3" fill="none" stroke-linecap="round"/></g>`; }
+    gKnot.innerHTML=k;
+    applyCam();
+  }
+  function overlay(){
+    if(S.tool==='thread'&&anchor&&S.beads[anchor]){ const a=cToPx(S.beads[anchor].c,S.beads[anchor].r);
+      let s=`<circle cx="${a.x}" cy="${a.y}" r="${R+4}" fill="none" stroke="${S.color==='#ffffff'?'#94a3b8':S.color}" stroke-width="2.5" stroke-dasharray="4 4"/>`;
+      if(cur) s+=`<line x1="${a.x}" y1="${a.y}" x2="${cur.x}" y2="${cur.y}" stroke="${shade(S.cord,.6)}" stroke-width="2.5" stroke-dasharray="5 5" stroke-linecap="round"/>`;
+      gOver.innerHTML=s;
+    } else gOver.innerHTML=''; }
+
+  const pts=new Map(); let mode=null, anchor=null, cur=null, movingBead=null, lastPlace=null, panStart=null, pinch=null;
+  function toWorld(e){ const r=svg.getBoundingClientRect(); return {x:(e.clientX-r.left-S.cam.tx)/S.cam.s, y:(e.clientY-r.top-S.cam.ty)/S.cam.s}; }
+
+  svg.addEventListener('pointerdown',e=>{ svg.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){ startGesture(); return; }
+    const w=toWorld(e), cell=pxToCell(w.x,w.y), id=beadAt(cell.c,cell.r);
+    if(S.tool==='hand'){ mode='pan'; panStart={x:e.clientX,y:e.clientY,tx:S.cam.tx,ty:S.cam.ty}; svg.classList.add('grab'); return; }
+    if(S.tool==='bead'){ pushHist(); if(id){S.beads[id].h=S.color;S.beads[id].t=isClear()?1:0;} else placeBead(cell.c,cell.r); lastPlace=cell.c+','+cell.r; mode='bead'; commit(); }
+    else if(S.tool==='thread'){ handleThread(id); }
+    else if(S.tool==='knot'){ pushHist(); toggleKnot(id,cell); commit(); }
+    else if(S.tool==='move'){ if(id){ pushHist(); movingBead=id; mode='move'; } }
+    else if(S.tool==='erase'){ pushHist(); mode='erase'; eraseAt(e,id); lastPlace=cell.c+','+cell.r; commit(); }
+  });
+  svg.addEventListener('pointermove',e=>{ if(pts.has(e.pointerId))pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(mode==='gesture'){ doGesture(); return; }
+    if(mode==='pan'){ S.cam.tx=panStart.tx+(e.clientX-panStart.x); S.cam.ty=panStart.ty+(e.clientY-panStart.y); applyCam(); return; }
+    const w=toWorld(e); cur=w;
+    if(mode==='bead'){ const cell=pxToCell(w.x,w.y),k=cell.c+','+cell.r; if(k!==lastPlace){ if(!beadAt(cell.c,cell.r))placeBead(cell.c,cell.r); lastPlace=k; commit(false);} }
+    else if(mode==='erase'){ const cell=pxToCell(w.x,w.y),k=cell.c+','+cell.r; if(k!==lastPlace){ lastPlace=k; const bid=beadAt(cell.c,cell.r); if(bid){ delete S.beads[bid]; reindex(); S.threads=S.threads.filter(t=>t.a!==bid&&t.b!==bid); for(const kk in S.knots){if(S.knots[kk]===bid)delete S.knots[kk];} commit(false);} } }
+    else if(mode==='move'&&movingBead){ const cell=pxToCell(w.x,w.y); if(!beadAt(cell.c,cell.r)){ S.beads[movingBead].c=cell.c; S.beads[movingBead].r=cell.r; reindex(); render(); } }
+    else if(S.tool==='thread'&&anchor){ overlay(); }
+  });
+  function endPtr(e){ pts.delete(e.pointerId); svg.classList.remove('grab');
+    if(mode==='bead'||mode==='move'||mode==='erase'){ commit(); saveBoard(); }
+    if(pts.size<2&&mode==='gesture')mode=null;
+    if(mode!=='gesture')mode=null; movingBead=null; lastPlace=null;
+  }
+  svg.addEventListener('pointerup',endPtr); svg.addEventListener('pointercancel',endPtr);
+
+  function startGesture(){ mode='gesture'; const a=[...pts.values()]; pinch={d:dist(a[0],a[1]),mx:(a[0].x+a[1].x)/2,my:(a[0].y+a[1].y)/2,tx:S.cam.tx,ty:S.cam.ty,s:S.cam.s}; }
+  function doGesture(){ const a=[...pts.values()]; if(a.length<2)return; const d=dist(a[0],a[1]),mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;
+    const r=svg.getBoundingClientRect(); const f=d/pinch.d; const ns=Math.max(.4,Math.min(3,pinch.s*f));
+    const wx=(pinch.mx-r.left-pinch.tx)/pinch.s, wy=(pinch.my-r.top-pinch.ty)/pinch.s;
+    S.cam.s=ns; S.cam.tx=(mx-r.left)-wx*ns; S.cam.ty=(my-r.top)-wy*ns; applyCam(); }
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+  function placeBead(c,r){ const id=uid(); S.beads[id]={c,r,h:S.color,t:isClear()?1:0}; occ[c+','+r]=id; }
+  function handleThread(id){ if(!id){ anchor=null; overlay(); return; }
+    if(anchor===null){ anchor=id; overlay(); return; }
+    if(anchor===id){ anchor=null; overlay(); return; }
+    pushHist(); S.threads.push({a:anchor,b:id}); anchor=id; commit(); overlay(); }
+  function toggleKnot(id,cell){ if(id){ const key=Object.keys(S.knots).find(k=>S.knots[k]===id); if(key)delete S.knots[key]; else S.knots[uid()]=id;
+    } else { const key=Object.keys(S.knots).find(k=>{const v=S.knots[k];return v&&v.c===cell.c&&v.r===cell.r;}); if(key)delete S.knots[key]; else S.knots[uid()]={c:cell.c,r:cell.r}; } }
+  function eraseAt(e,id){ const tt=e.target.getAttribute&&e.target.getAttribute('data-thr'); const kEl=e.target.closest&&e.target.closest('[data-knot]');
+    if(kEl){ delete S.knots[kEl.getAttribute('data-knot')]; return; }
+    if(tt!==null&&tt!==undefined){ S.threads.splice(+tt,1); return; }
+    if(id){ delete S.beads[id]; reindex(); S.threads=S.threads.filter(t=>t.a!==id&&t.b!==id); for(const k in S.knots){if(S.knots[k]===id)delete S.knots[k];} } }
+  function commit(full=true){ if(full)reindex(); render(); overlay(); stats(); }
+
+  function stats(){
+    const beads=Object.values(S.beads); $('#cBeads').textContent=beads.length;
+    const mmPerPx=S.beadMM/(2*R); let segPx=0;
+    S.threads.forEach(t=>{const a=S.beads[t.a],b=S.beads[t.b]; if(a&&b){const p1=cToPx(a.c,a.r),p2=cToPx(b.c,b.r); segPx+=Math.hypot(p1.x-p2.x,p1.y-p2.y);}});
+    const knotN=Object.keys(S.knots).length;
+    const segMM=segPx*mmPerPx, knotMM=knotN*60, tailMM=segPx? 300:0, totalMM=(segMM+knotMM+tailMM)*1.15;
+    const cm=Math.round(totalMM/10), inch=Math.round(totalMM/25.4);
+    $('#cThread').textContent = segPx? cm+' cm' : '0 cm';
+    const m={}; beads.forEach(b=>{const k=b.h+'|'+(b.t?1:0);(m[k]=m[k]||{h:b.h,t:b.t,n:0}).n++;});
+    const keys=Object.keys(m).sort((a,b)=>m[b].n-m[a].n); const leg=$('#legend');
+    leg.innerHTML = keys.length? '' : '<div class="empty">No beads yet. Tap the board to drop your first bead 🔵</div>';
+    keys.forEach(k=>{const it=m[k];const row=document.createElement('div');row.className='lg';
+      row.innerHTML=`<span class="bd" style="background:${it.t?hexA(it.h,.6):it.h}"></span><span class="nm">${cname(it.h,it.t)}</span>
+        <button class="swp" title="Recolor all of these to the current color">↺</button><span class="ct">${it.n}</span>`;
+      row.querySelector('.swp').onclick=()=>{ pushHist(); for(const id in S.beads){const b=S.beads[id]; if(b.h===it.h&&!!b.t===!!it.t){b.h=S.color;b.t=isClear()?1:0;}} commit(); toast('Recolored to '+cname(S.color,isClear()?1:0)); };
+      leg.appendChild(row);});
+    $('#brk').innerHTML = segPx
+      ? `Thread ≈ <b>${cm} cm</b> (${inch} in): laced path + ${knotN} knot${knotN!==1?'s':''} + tails, +15% spare. Cut one length and fold in half to start.`
+      : `Draw thread between beads to see how much cord you'll need. Each knot adds a little for tying off.`;
+  }
+
+  function drawSwatches(){ const box=$('#swrow'); box.innerHTML='';
+    PAL[S.palette].forEach(([n,h])=>{ const b=document.createElement('button');
+      b.className='sw'+(isClear()?' clear':'')+(h===S.color?' on':''); b.title=n;
+      b.style.background=isClear()?hexA(h,.6):h; b.innerHTML='<span class="g"></span>';
+      b.onclick=()=>{ S.color=h; if(S.tool!=='thread'&&S.tool!=='knot'&&S.tool!=='erase'){S.tool='bead';setTool();} drawSwatches(); saveBoard(); };
+      box.appendChild(b); }); }
+  function setPalette(p){ S.palette=p; $$('#pals button').forEach(b=>b.classList.toggle('on',b.dataset.pal===p));
+    if(!PAL[p].find(x=>x[1]===S.color))S.color=PAL[p][0][1]; drawSwatches(); saveBoard(); }
+  function setTool(){ $$('.tool').forEach(b=>b.classList.toggle('on',b.dataset.tool===S.tool)); svg.classList.toggle('hand',S.tool==='hand');
+    anchor=null; overlay(); showHint(); }
+  const HINTS={bead:'Tap to place a bead · tap a bead to recolor it',thread:'Tap a bead, then another, to lace thread through them',knot:'Tap a bead to tie a knot there',move:'Drag a bead to move it',erase:'Tap a bead, thread, or knot to remove it',hand:'Drag to move the board · pinch or scroll to zoom'};
+  let hintT=null; function showHint(){ const h=$('#hint'); h.textContent=HINTS[S.tool]; h.classList.add('show'); clearTimeout(hintT); hintT=setTimeout(()=>h.classList.remove('show'),2200); }
+
+  function zoomBy(f,cx,cy){ const r=svg.getBoundingClientRect(); cx=cx==null?r.width/2:cx; cy=cy==null?r.height/2:cy;
+    const ns=Math.max(.4,Math.min(3,S.cam.s*f)); const wx=(cx-S.cam.tx)/S.cam.s, wy=(cy-S.cam.ty)/S.cam.s;
+    S.cam.s=ns; S.cam.tx=cx-wx*ns; S.cam.ty=cy-wy*ns; applyCam(); saveBoard(); }
+  function fit(){ const ids=Object.keys(S.beads); const r=svg.getBoundingClientRect();
+    if(!ids.length){ S.cam={tx:r.width/2,ty:r.height/2,s:1}; applyCam(); return; }
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; ids.forEach(id=>{const p=cToPx(S.beads[id].c,S.beads[id].r); x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);});
+    x0-=R*2;y0-=R*2;x1+=R*2;y1+=R*2; const bw=x1-x0,bh=y1-y0; const s=Math.max(.4,Math.min(2.2,Math.min(r.width/bw,r.height/bh)*.9));
+    S.cam.s=s; S.cam.tx=r.width/2-(x0+bw/2)*s; S.cam.ty=r.height/2-(y0+bh/2)*s; applyCam(); saveBoard(); }
+  svg.addEventListener('wheel',e=>{ e.preventDefault(); const r=svg.getBoundingClientRect(); zoomBy(e.deltaY<0?1.12:0.89, e.clientX-r.left, e.clientY-r.top); },{passive:false});
+
+  const C={R:'#f43f5e',O:'#fb923c',Y:'#facc15',G:'#84cc16',T:'#14b8a6',B:'#38bdf8',P:'#8b5cf6',K:'#ec4899',W:'#ffffff',D:'#1f2937'};
+  function Bld(){ const o={beads:[],threads:[],knots:[],idx:{}}; o.add=(c,r,h)=>{o.idx[c+'_'+r]=o.beads.length;o.beads.push({c,r,h});return o.beads.length-1;}; o.t=(i,j)=>o.threads.push([i,j]); o.k=i=>o.knots.push(i); return o; }
+  // shapes authored in hex coords, symmetric about column K=4 (even rows mirror c<->8-c, odd rows c<->7-c)
+  function rowsEx(map,color,over){ const o=Bld(); for(const r in map) map[r].forEach(c=>o.add(c,+r,(over&&over[r]&&over[r][c])||color)); return o; }
+  const EX=[
+    {n:'Bracelet',s:'stringing',make(){const o=Bld();let p=-1;for(let c=0;c<10;c++){const i=o.add(c,0,c%2?C.B:C.K);if(p>=0)o.t(p,i);p=i;}o.k(0);o.k(p);return o;}},
+    {n:'Cuff',s:'band',make(){const o=Bld();const cs=[C.P,C.Y,C.T,C.K];for(let r=0;r<3;r++)for(let c=0;c<8;c++)o.add(c,r,cs[(c+r)%4]);return o;}},
+    {n:'Ring',s:'loop',make(){const o=Bld();const pts=[[1,1],[2,1],[3,2],[2,3],[1,3],[1,2]];const ids=pts.map(p=>o.add(p[0],p[1],C.G));for(let i=0;i<ids.length;i++)o.t(ids[i],ids[(i+1)%ids.length]);o.k(ids[0]);return o;}},
+    {n:'Flower',s:'rosette',make(){const o=Bld();o.add(2,2,C.O);[[1,1],[2,1],[1,2],[3,2],[1,3],[2,3]].forEach(p=>o.add(p[0],p[1],C.K));return o;}},
+    {n:'Heart',s:'shape',make:()=>rowsEx({0:[2,3,5,6],1:[1,2,3,4,5,6],2:[1,2,3,4,5,6,7],3:[2,3,4,5],4:[3,4,5],5:[3,4],6:[4]},C.K)},
+    {n:'Star',s:'shape',make:()=>rowsEx({0:[4],1:[3,4],2:[3,4,5],3:[0,1,2,3,4,5,6,7],4:[2,3,4,5,6],5:[2,3,4,5],6:[2,3,5,6],7:[1,2,5,6]},C.Y)},
+    {n:'Butterfly',s:'shape',make:()=>rowsEx({0:[1,2,6,7],1:[0,1,2,3,4,5,6,7],2:[1,2,3,4,5,6,7],3:[1,2,3,4,5,6],4:[2,3,4,5],5:[2,3,4,5],6:[1,2,3,4,5,6],7:[1,2,3,4,5,6,7],8:[1,2,6,7]},C.P,
+      {0:{4:C.D},1:{4:C.D},2:{4:C.D},3:{3:C.D,4:C.D},4:{3:C.D,4:C.D},5:{3:C.D,4:C.D},6:{3:C.D,4:C.D},7:{4:C.D},8:{4:C.D}})},
+    {n:'Gecko',s:'animal',make:()=>rowsEx({0:[4],1:[3,4],2:[3,4,5],3:[3,4,5],4:[0,1,2,3,4,5,6,7,8],5:[3,4,5],6:[3,4,5],7:[3,4,5],8:[3,4,5],9:[0,1,2,3,4,5,6,7,8],10:[4],11:[4],12:[4],13:[4]},C.P,
+      {2:{3:C.D,5:C.D},4:{0:C.K,1:C.K,7:C.K,8:C.K},5:{4:C.K},6:{4:C.K},7:{4:C.K},8:{4:C.K},9:{0:C.K,1:C.K,7:C.K,8:C.K},10:{4:C.K},12:{4:C.K}})}
+  ];
+  function loadEx(ex){ const o=ex.make();
+    let minc=99,minr=99; o.beads.forEach(b=>{minc=Math.min(minc,b.c);minr=Math.min(minr,b.r);});
+    let ox=0; const have=Object.keys(S.beads); if(have.length){ let mx=-99; have.forEach(id=>mx=Math.max(mx,S.beads[id].c)); ox=mx+3; }
+    pushHist(); const map={}; o.beads.forEach((b,i)=>{const id=uid(); const c=b.c-minc+ox, r=b.r-minr; S.beads[id]={c,r,h:b.h,t:isClear()?1:0}; map[i]=id;});
+    o.threads.forEach(([a,b])=>S.threads.push({a:map[a],b:map[b]})); o.knots.forEach(i=>S.knots[uid()]=map[i]);
+    reindex(); render(); stats(); fit(); saveBoard(); closeAll(); toast(have.length?'Added '+ex.n+' beside your design ✨':'Placed '+ex.n+' ✨'); }
+  function exThumb(ex){ const o=ex.make(); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; const P=o.beads.map(b=>cToPx(b.c,b.r));
+    P.forEach(p=>{x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);});
+    const pad=8,w=x1-x0+pad*2,h=y1-y0+pad*2,ox=-x0+pad,oy=-y0+pad; let g='';
+    o.threads.forEach(([a,b])=>{const p1=P[a],p2=P[b];g+=`<line x1="${p1.x+ox}" y1="${p1.y+oy}" x2="${p2.x+ox}" y2="${p2.y+oy}" stroke="#c9bba8" stroke-width="2.4" stroke-linecap="round"/>`;});
+    o.beads.forEach((b,i)=>{const p=P[i];g+=`<circle cx="${p.x+ox}" cy="${p.y+oy}" r="${R*.75}" fill="${b.h}" stroke="${shade(b.h,.72)}" stroke-width="1"/><ellipse cx="${p.x+ox-3}" cy="${p.y+oy-3}" rx="3" ry="2" fill="#fff" opacity=".55"/>`;});
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${g}</svg>`; }
+  function drawExamples(){ const box=$('#exGrid'); box.innerHTML=''; EX.forEach(ex=>{const el=document.createElement('button');el.className='ex';
+    el.innerHTML=`${exThumb(ex)}<div class="n">${ex.n}</div><div class="s">${ex.s}</div>`; el.onclick=()=>loadEx(ex); box.appendChild(el);}); }
+
+  async function getSaves(){ try{ if(window.storage&&window.storage.get){const r=await window.storage.get('beadie_saves',false); if(r&&r.value)return JSON.parse(r.value);} }catch(e){} return []; }
+  async function putSaves(a){ try{ if(window.storage&&window.storage.set)await window.storage.set('beadie_saves',JSON.stringify(a),false);}catch(e){} }
+  async function doSave(){ const a=await getSaves(); a.unshift({id:uid(),name:S.name,ts:Date.now(),data:pack()}); await putSaves(a.slice(0,40)); toast('Saved 💾'); closeAll(); }
+  async function openSaves(){ const a=await getSaves(); const box=$('#saveList');
+    box.innerHTML = a.length? '' : '<div class="empty">No saves yet. Use “Save a copy” to keep a version.</div>';
+    a.forEach(sv=>{ const el=document.createElement('div'); el.className='save';
+      el.innerHTML=`<div class="th">${boardThumb(sv.data)}</div><div class="i"><div class="t">${sv.name}</div><div class="d">${Object.keys(sv.data.beads).length} beads · ${new Date(sv.ts).toLocaleDateString()}</div></div>
+        <button class="ib load" title="Open">↺</button><button class="ib del" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>`;
+      el.querySelector('.load').onclick=()=>{ pushHist(); Object.assign(S,JSON.parse(JSON.stringify(sv.data))); reindex(); $('#proj').value=S.name; setPalette(S.palette); render(); stats(); fit(); closeAll(); toast('Opened '+sv.name); };
+      el.querySelector('.del').onclick=async()=>{ const b=(await getSaves()).filter(x=>x.id!==sv.id); await putSaves(b); openSaves(); };
+      box.appendChild(el); });
+    show($('#savePop'),true); }
+  function boardThumb(data){ const beads=Object.values(data.beads); if(!beads.length)return''; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    const P=beads.map(b=>cToPx(b.c,b.r)); P.forEach(p=>{x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);});
+    const pad=6,w=x1-x0+pad*2,h=y1-y0+pad*2,ox=-x0+pad,oy=-y0+pad; let g='';
+    beads.forEach((b,i)=>{const p=P[i];g+=`<circle cx="${p.x+ox}" cy="${p.y+oy}" r="${R*.7}" fill="${b.h}"/>`;});
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">${g}</svg>`; }
+
+  function exportFile(){ const blob=new Blob([JSON.stringify(pack(),null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(S.name||'beadie').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.beadie.json';a.click(); closeAll(); }
+  $('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{pushHist();Object.assign(S,JSON.parse(rd.result));reindex();$('#proj').value=S.name;setPalette(S.palette);render();stats();fit();toast('Imported ⬆');}catch(x){toast('Could not read that file');}e.target.value='';};rd.readAsText(f);closeAll();};
+
+  let openPop=null;
+  function show(el,center){ closeAll(); el.classList.add('show'); if(center)$('#scrim').classList.add('show'); openPop=el; }
+  function closeAll(){ $$('.pop').forEach(p=>p.classList.remove('show')); $('#scrim').classList.remove('show'); openPop=null; }
+  function placePop(el,anchorEl){ closeAll(); el.classList.add('show'); const a=anchorEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+    let l=a.right-r.width; if(l<8)l=8; el.style.left=l+'px'; el.style.top=(a.bottom+8)+'px'; openPop=el; }
+  function openStats(anchorEl){ const sp=$('#statsPop'); if(openPop===sp){closeAll();return;} stats();
+    if(window.innerWidth<=820){ sp.classList.add('center'); sp.style.left=''; sp.style.top=''; show(sp,true); }
+    else { sp.classList.remove('center'); placePop(sp,anchorEl); } }
+
+  /* ---- 3D finished preview ---- */
+  const pv={raf:0,renderer:null,scene:null,cam:null,grp:null,geo:null,mats:{},spin:true,drag:false,rx:-0.25,ry:0,dist:6};
+  function openPreview(){ const beads=Object.values(S.beads); if(!beads.length){ toast('Add some beads first 🔵'); return; }
+    closeAll(); $('#preview').classList.add('show');
+    requestAnimationFrame(()=>{ if(window.THREE) build3D(beads,0); else build2D(beads); }); }
+  function closePreview(){ $('#preview').classList.remove('show'); teardown3D(); $('#pvStage').innerHTML=''; }
+  function teardown3D(){ if(pv.raf)cancelAnimationFrame(pv.raf); pv.raf=0;
+    if(pv.renderer){ try{pv.renderer.dispose();}catch(e){} const el=pv.renderer.domElement; if(el&&el.parentNode)el.parentNode.removeChild(el); }
+    if(pv.geo)pv.geo.dispose(); for(const k in pv.mats)pv.mats[k].dispose(); pv.mats={}; pv.geo=null;pv.renderer=null;pv.scene=null;pv.grp=null; }
+  function build3D(beads,tries){ const T=window.THREE, host=$('#pvStage'); const w=host.clientWidth,h=host.clientHeight;
+    if((!w||!h)&&tries<8){ requestAnimationFrame(()=>build3D(beads,tries+1)); return; }
+    teardown3D();
+    const scene=new T.Scene();
+    const cam=new T.PerspectiveCamera(38,(w||1)/(h||1),0.1,100);
+    const renderer=new T.WebGLRenderer({antialias:true,alpha:true}); renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); renderer.setSize(w,h); host.appendChild(renderer.domElement);
+    scene.add(new T.HemisphereLight(0xffffff,0x9c92b6,0.95));
+    const d1=new T.DirectionalLight(0xffffff,0.95); d1.position.set(3,5,5); scene.add(d1);
+    const d2=new T.DirectionalLight(0xffe9f4,0.5); d2.position.set(-4,-1,3); scene.add(d2);
+    const grp=new T.Group(); scene.add(grp);
+    let cx=0,cy=0; beads.forEach(b=>{const p=cToPx(b.c,b.r);cx+=p.x;cy+=p.y;}); cx/=beads.length; cy/=beads.length;
+    let maxd=1; beads.forEach(b=>{const p=cToPx(b.c,b.r);maxd=Math.max(maxd,Math.hypot(p.x-cx,p.y-cy));});
+    const SC=1/22, geo=new T.SphereGeometry(0.52,26,20); pv.geo=geo;
+    beads.forEach(b=>{ const p=cToPx(b.c,b.r), key=b.h+'|'+(b.t?1:0);
+      let m=pv.mats[key]; if(!m){ const col=new T.Color(b.h);
+        m=b.t? new T.MeshPhysicalMaterial({color:col,roughness:0.08,metalness:0,transparent:true,opacity:0.6,clearcoat:1,clearcoatRoughness:0.1})
+             : new T.MeshPhysicalMaterial({color:col,roughness:0.17,metalness:0,clearcoat:1,clearcoatRoughness:0.22}); pv.mats[key]=m; }
+      const mesh=new T.Mesh(geo,m); const dist=Math.hypot(p.x-cx,p.y-cy), bulge=0.6*Math.max(0,1-dist/(maxd||1));
+      mesh.position.set((p.x-cx)*SC, -(p.y-cy)*SC, bulge); mesh.scale.z=0.82; grp.add(mesh); });
+    const radius=maxd*SC+1; pv.dist=radius/Math.tan((cam.fov*Math.PI/180)/2)*1.12; pv.rx=-0.22; pv.ry=0;
+    cam.position.set(0,0,pv.dist);
+    pv.renderer=renderer;pv.scene=scene;pv.cam=cam;pv.grp=grp;
+    bindOrbit(renderer.domElement);
+    (function loop(){ pv.raf=requestAnimationFrame(loop); if(pv.spin&&!pv.drag)pv.ry+=0.006;
+      grp.rotation.x=pv.rx; grp.rotation.y=pv.ry; cam.position.z=pv.dist; cam.lookAt(0,0,0); renderer.render(scene,cam); })();
+  }
+  function onResize3D(){ if(!pv.renderer)return; const host=$('#pvStage'),w=host.clientWidth,h=host.clientHeight; if(!w||!h)return;
+    pv.renderer.setSize(w,h); pv.cam.aspect=w/h; pv.cam.updateProjectionMatrix(); }
+  function bindOrbit(el){ const m=new Map(); let px,py,pd=0;
+    el.addEventListener('pointerdown',e=>{ el.setPointerCapture(e.pointerId); m.set(e.pointerId,{x:e.clientX,y:e.clientY}); pv.drag=true;
+      if(m.size===1){px=e.clientX;py=e.clientY;} else{const a=[...m.values()];pd=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);} });
+    el.addEventListener('pointermove',e=>{ if(!m.has(e.pointerId))return; m.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(m.size>=2){ const a=[...m.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); if(pd)pv.dist=Math.max(2,Math.min(30,pv.dist*(pd/d))); pd=d; return; }
+      pv.ry+=(e.clientX-px)*0.01; pv.rx+=(e.clientY-py)*0.01; pv.rx=Math.max(-1.35,Math.min(1.35,pv.rx)); px=e.clientX;py=e.clientY; });
+    const up=e=>{ m.delete(e.pointerId); if(m.size<2)pd=0; if(m.size===0)pv.drag=false; if(m.size===1){const a=[...m.values()][0];px=a.x;py=a.y;} };
+    el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
+    el.addEventListener('wheel',e=>{e.preventDefault(); pv.dist=Math.max(2,Math.min(30,pv.dist*(e.deltaY>0?1.1:0.9)));},{passive:false}); }
+  function build2D(beads){ const host=$('#pvStage'); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    const P=beads.map(b=>{const p=cToPx(b.c,b.r);x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);return p;});
+    const pad=40,w=x1-x0+pad*2,h=y1-y0+pad*2,ox=-x0+pad,oy=-y0+pad; const seen={}; let defs='';
+    beads.forEach(b=>{const key=b.h.replace('#','')+(b.t?'t':''); if(seen[key])return; seen[key]=1;
+      defs+=`<radialGradient id="pg${key}" cx="38%" cy="30%" r="72%"><stop offset="0%" stop-color="#fff" stop-opacity="${b.t?.7:.9}"/><stop offset="32%" stop-color="${b.h}"/><stop offset="100%" stop-color="${shade(b.h,.58)}"/></radialGradient>`;});
+    let g=''; beads.forEach((b,i)=>{const p=P[i];g+=`<ellipse cx="${p.x+ox}" cy="${p.y+oy+R*1.15}" rx="${R*.85}" ry="${R*.3}" fill="#000" opacity="0.1"/>`;});
+    beads.forEach((b,i)=>{const p=P[i],key=b.h.replace('#','')+(b.t?'t':''),cx=p.x+ox,cy=p.y+oy;
+      g+=`<circle cx="${cx}" cy="${cy}" r="${R*1.05}" fill="url(#pg${key})" opacity="${b.t?.85:1}"/><ellipse cx="${cx-R*.34}" cy="${cy-R*.4}" rx="${R*.32}" ry="${R*.19}" fill="#fff" opacity="0.75"/>`;});
+    host.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%"><defs>${defs}</defs>${g}</svg>`; }
+
+  function bind(){
+    $('#proj').oninput=e=>{S.name=e.target.value;saveBoard();};
+    $$('.tool').forEach(b=>b.onclick=()=>{S.tool=b.dataset.tool;setTool();});
+    $$('#pals button').forEach(b=>b.onclick=()=>setPalette(b.dataset.pal));
+    $('#undo').onclick=undo; $('#redo').onclick=redo;
+    $('#zin').onclick=()=>zoomBy(1.2); $('#zout').onclick=()=>zoomBy(.83); $('#zfit').onclick=fit;
+    $('#statsBtn').onclick=()=>openStats($('#statsBtn'));
+    $('#menuBtn').onclick=()=>{ if(openPop===$('#menuPop'))closeAll(); else placePop($('#menuPop'),$('#menuBtn')); };
+    $('#burgerBtn').onclick=()=>{ if(openPop===$('#menuPop'))closeAll(); else placePop($('#menuPop'),$('#burgerBtn')); };
+    $('#mUndo').onclick=()=>{undo();closeAll();}; $('#mRedo').onclick=()=>{redo();closeAll();};
+    $('#mPreview').onclick=openPreview; $('#mStats').onclick=()=>openStats($('#burgerBtn'));
+    $$('#sizes button').forEach(b=>b.onclick=()=>{S.beadMM=+b.dataset.mm;$$('#sizes button').forEach(x=>x.classList.toggle('on',x===b));stats();saveBoard();});
+    $('#mEx').onclick=()=>{drawExamples();show($('#exPop'),true);};
+    $('#mSave').onclick=doSave; $('#mOpen').onclick=openSaves;
+    $('#mExport').onclick=exportFile; $('#mImport').onclick=()=>$('#fileIn').click();
+    $('#mClear').onclick=()=>{ if(!Object.keys(S.beads).length&&!S.threads.length&&!Object.keys(S.knots).length){toast('Board is already empty');closeAll();return;} pushHist();S.beads={};S.threads=[];S.knots={};reindex();render();stats();saveBoard();closeAll();toast('Board cleared — tap undo to bring it back'); };
+    $('#previewBtn').onclick=openPreview; $('#pvClose').onclick=closePreview;
+    $('#pvSpin').onclick=()=>{ pv.spin=!pv.spin; $('#pvSpin').classList.toggle('on',pv.spin); };
+    window.addEventListener('resize',()=>{ if($('#preview').classList.contains('show'))onResize3D(); });
+    $('#scrim').onclick=closeAll;
+    document.addEventListener('pointerdown',e=>{ if(openPop&&!openPop.contains(e.target)&&!e.target.closest('#statsBtn,#menuBtn,#burgerBtn')&&!$('#scrim').classList.contains('show'))closeAll(); },true);
+    window.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT')return;
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return;}
+      const map={b:'bead',t:'thread',k:'knot',m:'move',e:'erase',h:'hand',v:'hand'};
+      if(map[e.key]){S.tool=map[e.key];setTool();}
+      if(e.key==='Escape'){closeAll();closePreview();}
+    });
+    new ResizeObserver(()=>{resize();}).observe(svg);
+  }
+
+  async function boot(){ buildScaffold(); resize(); await loadBoard(); $('#proj').value=S.name;
+    setPalette(S.palette); setTool(); render(); stats(); refreshUndo();
+    if(!Object.keys(S.beads).length){ loadEx(EX[0]); hist=[]; future=[]; refreshUndo(); } else fit();
+    bind(); }
+  boot();
+})();
+</script>
+</body>
+</html>
