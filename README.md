@@ -10,6 +10,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | --- | --- | --- |
 | 🍬 Beadie | [`candy-beads/`](candy-beads/) | Candy-bead whiteboard — place beads on a hex board, lace the thread bead by bead, tie knots, preview the finished piece in 3D, and get a shopping list of beads + cord length. |
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
+| 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 
 ## How it's laid out
 
@@ -17,6 +18,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 index.html              # the landing page — lists every app
 candy-beads/index.html  # one app, one folder, one HTML file
 yaniv/index.html
+breathing-flow-log/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
@@ -53,6 +55,17 @@ the browser. That needs your own Anthropic API key — paste one under
 sent only to `api.anthropic.com`. Anyone with access to the browser profile can
 read it, so use a key you're happy to rotate. With no key the app falls back to
 a set of canned roasts and plays exactly the same.
+
+### What the breathing log remembers
+
+`breathing-flow-log/` keeps one `localStorage` key, `peakflow_log`: an array of
+`{date, am, pm}` rows, nothing else. It never leaves the browser — no account,
+no sync, no network calls at all. **Clear all readings** at the foot of the page
+wipes the key; clearing the browser's site data does the same.
+
+The green / amber / red bands are the common 80% / 50%-of-personal-best
+rule of thumb, computed from the highest reading in the log. It's a log, not
+medical advice — if there's an action plan with its own numbers, that wins.
 
 ## Adding a new app
 

@@ -210,6 +210,34 @@ const APPS = [
         </g>
         <text x="139" y="79" font-size="11" text-anchor="middle" fill="#e8b24c" font-family="monospace">200</text>
       </svg>`,
+  },
+  {
+    slug: 'breathing-flow-log',
+    name: 'Breathing Flow Log',
+    emoji: '🫁',
+    desc: 'A peak-flow diary. Type the morning and evening blow, and it tells you which zone the reading falls in — green, amber or red, worked out from your own best — plus the trend, the daily swing and a running average.',
+    tags: ['health', 'asthma', 'tracking', 'charts'],
+    thumb: `
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A peak-flow line chart drawn across green, amber and red zone bands">
+        <defs>
+          <linearGradient id="bfBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f6faf9"/><stop offset="100%" stop-color="#dde7e5"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#bfBg)"/>
+        <rect y="0" width="160" height="36" fill="#2E7D5B" opacity=".14"/>
+        <rect y="36" width="160" height="30" fill="#C9820A" opacity=".14"/>
+        <rect y="66" width="160" height="24" fill="#B3382C" opacity=".13"/>
+        <line x1="0" y1="14" x2="160" y2="14" stroke="#2E7D5B" stroke-width="1" stroke-dasharray="3 4" opacity=".75"/>
+        <g fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="14,58 41,52 68,61 95,49 122,51 149,44" stroke="#3D3B8E" opacity=".75"/>
+          <polyline points="14,48 41,60 68,54 95,51 122,43 149,36" stroke="#1F7A8C"/>
+        </g>
+        <g fill="#f6faf9" stroke="#1F7A8C" stroke-width="2">
+          <circle cx="14" cy="48" r="3"/><circle cx="41" cy="60" r="3"/><circle cx="68" cy="54" r="3"/>
+          <circle cx="95" cy="51" r="3"/><circle cx="122" cy="43" r="3"/><circle cx="149" cy="36" r="3"/>
+        </g>
+      </svg>`,
   }
 ];
 

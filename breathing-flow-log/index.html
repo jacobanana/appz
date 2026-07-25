@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breathing flow log</title>
+<meta name="description" content="Log peak expiratory flow morning and evening, see the trend, and read each reading against the green / amber / red zones worked out from your best." />
+<meta name="theme-color" content="#12313B" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2312313B'/><path d='M5 22 L11 16 L16 19 L21 10 L27 13' fill='none' stroke='%232E7D5B' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12313B;
+    --ink-soft:#5A727B;
+    --paper:#EEF3F2;
+    --surface:#FFFFFF;
+    --rule:#D2DEDC;
+    --am:#1F7A8C;
+    --pm:#3D3B8E;
+    --green:#2E7D5B;
+    --amber:#C9820A;
+    --red:#B3382C;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:28px 18px 80px}
+
+  .home{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);text-decoration:none;margin-bottom:18px}
+  .home:hover{color:var(--ink)}
+
+  header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.02em;margin:2px 0 0}
+  .unit{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+
+  .card{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:18px;margin-bottom:16px}
+
+  /* ---- meter: the hero ---- */
+  .meter-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .reading{font-family:var(--mono);font-size:54px;font-weight:600;line-height:1;letter-spacing:-.03em}
+  .reading small{font-size:14px;font-weight:400;letter-spacing:0;color:var(--ink-soft);margin-left:6px}
+  .zone-tag{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:4px 9px;border-radius:2px;color:#fff}
+  .meter-meta{font-size:13px;color:var(--ink-soft);text-align:right}
+  .scale{margin-top:20px}
+  .scale svg{display:block;width:100%;height:auto}
+
+  /* ---- stats ---- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin-bottom:16px}
+  .stat{background:var(--surface);padding:13px 14px}
+  .stat dt{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:0}
+  .stat dd{margin:5px 0 0;font-family:var(--mono);font-size:21px;font-weight:500;letter-spacing:-.02em}
+  .stat dd span{font-size:12px;color:var(--ink-soft);font-weight:400}
+
+  h2{font-size:13px;font-weight:600;letter-spacing:.02em;margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  h2::after{content:"";flex:1;height:1px;background:var(--rule)}
+  .legend{display:flex;gap:14px;font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-bottom:10px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  #chartWrap{width:100%}
+  #chart{display:block;max-width:100%;overflow:visible}
+
+  /* ---- table ---- */
+  table{width:100%;border-collapse:collapse}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;text-align:left;padding:0 8px 8px;border-bottom:1px solid var(--rule)}
+  th.n,td.n{text-align:right}
+  td{padding:0;border-bottom:1px solid var(--rule)}
+  td.day{padding:0 8px;font-size:14px;white-space:nowrap}
+  td.day b{font-weight:500}
+  td.day em{font-style:normal;color:var(--ink-soft);font-size:12px;margin-left:6px}
+  td.empty{padding:22px 8px;color:var(--ink-soft);font-size:13.5px;text-align:center;border-bottom:0}
+  input.val{
+    width:100%;border:0;background:transparent;font-family:var(--mono);font-size:16px;
+    color:var(--ink);text-align:right;padding:11px 8px;border-radius:2px;
+  }
+  input.val::placeholder{color:#B9C7C5}
+  input.val:focus{outline:2px solid var(--am);outline-offset:-2px;background:#F6FAFA}
+  td.swing{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right;padding-right:8px}
+  td.act{width:34px}
+  .del{border:0;background:transparent;color:#AEBDBB;font-size:17px;line-height:1;cursor:pointer;padding:8px 6px;border-radius:2px}
+  .del:hover,.del:focus-visible{color:var(--red);background:#FBEFEE;outline:none}
+  tr.zone-amber td.day b::before,tr.zone-red td.day b::before{
+    content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px;vertical-align:middle
+  }
+  tr.zone-amber td.day b::before{background:var(--amber)}
+  tr.zone-red td.day b::before{background:var(--red)}
+
+  .addrow{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  input[type=date]{font-family:var(--mono);font-size:13px;padding:8px 10px;border:1px solid var(--rule);border-radius:3px;background:var(--surface);color:var(--ink)}
+  button.add{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 15px;border:0;border-radius:3px;background:var(--ink);color:#fff;cursor:pointer}
+  button.add:hover{background:#1B4553}
+  button.add:focus-visible,input[type=date]:focus-visible{outline:2px solid var(--am);outline-offset:2px}
+
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin:22px 2px 0}
+  .note a,.reset{color:var(--ink-soft);text-decoration:underline;background:none;border:0;font:inherit;cursor:pointer;padding:0}
+  .status{font-family:var(--mono);font-size:11px;color:var(--ink-soft);min-height:15px;margin-top:10px}
+  .status[data-bad="1"]{color:var(--red)}
+
+  @media (max-width:560px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .reading{font-size:44px}
+    .meter-meta{text-align:left}
+    td.swing,th.swing{display:none}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .pointer{transition:transform .45s cubic-bezier(.22,1,.36,1)}
+    polyline,circle{transition:all .3s ease}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="home" href="../">← all apps</a>
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">Peak expiratory flow</div>
+      <h1>Breathing flow log</h1>
+    </div>
+    <div class="unit">litres / minute · twice daily</div>
+  </header>
+
+  <section class="card" aria-label="Latest reading">
+    <div class="meter-head">
+      <div>
+        <div class="reading" id="latestVal">—<small id="latestPct"></small></div>
+        <div style="margin-top:10px"><span class="zone-tag" id="zoneTag" style="background:var(--ink-soft)">—</span></div>
+      </div>
+      <div class="meter-meta" id="latestMeta">No readings yet</div>
+    </div>
+    <div class="scale" id="scaleWrap"></div>
+  </section>
+
+  <dl class="stats" id="stats"></dl>
+
+  <section class="card">
+    <h2>Trend</h2>
+    <div class="legend">
+      <span><i style="background:var(--am)"></i>Morning</span>
+      <span><i style="background:var(--pm)"></i>Evening</span>
+      <span><i style="background:#DCE8E0"></i>Green zone (80%+ of best)</span>
+    </div>
+    <div id="chartWrap"><svg id="chart" viewBox="0 0 720 280" role="img" aria-label="Peak flow readings over time"></svg></div>
+  </section>
+
+  <section class="card">
+    <h2>Readings</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th class="n" style="width:92px">Morning</th>
+          <th class="n" style="width:92px">Evening</th>
+          <th class="n swing" style="width:70px">Swing</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="addrow">
+      <input type="date" id="newDate" aria-label="Date to add">
+      <button class="add" id="addBtn">Add day</button>
+    </div>
+    <div class="status" id="status" role="status"></div>
+  </section>
+
+  <p class="note">
+    Zones are worked out from the best reading in this log (<span id="bestInline">—</span>): green is 80% or more, amber 50–80%, red below 50%.
+    These are the usual rule-of-thumb bands — if a doctor has written an action plan with their own numbers, go by those instead.
+    Swing is the gap between the day's high and low as a percentage of the high.
+    <br><br>
+    Everything is saved on this device, in this browser. <button class="reset" id="resetBtn">Clear all readings</button>
+  </p>
+</div>
+
+<script>
+const KEY = 'peakflow_log';
+let data = [];
+
+const $ = id => document.getElementById(id);
+const status = (msg, bad) => { const s=$('status'); s.textContent=msg||''; s.dataset.bad = bad?'1':'0'; };
+const fmtDay = iso => {
+  const d = new Date(iso+'T12:00:00');
+  return d.toLocaleDateString(undefined,{day:'numeric',month:'short'});
+};
+const weekday = iso => new Date(iso+'T12:00:00').toLocaleDateString(undefined,{weekday:'short'});
+const sortData = () => data.sort((a,b)=>a.date.localeCompare(b.date));
+const allVals = () => data.flatMap(r=>[r.am,r.pm]).filter(v=>typeof v==='number');
+const best = () => allVals().length ? Math.max(...allVals()) : null;
+const zoneOf = (v,b) => !v||!b ? null : (v >= b*0.8 ? 'green' : v >= b*0.5 ? 'amber' : 'red');
+const ZONE_COLOR = {green:'var(--green)',amber:'var(--amber)',red:'var(--red)'};
+const ZONE_NAME = {green:'Green zone',amber:'Amber zone',red:'Red zone'};
+const today = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+};
+/* Both SVGs use a viewBox measured in real CSS pixels rather than a fixed
+   720-wide one, so labels stay 10px on a phone instead of shrinking with the
+   drawing. Redrawn on resize — see the listener at the bottom. */
+const boxWidth = id => Math.max(260, Math.round($(id).getBoundingClientRect().width) || 680);
+
+/* ---------- storage ----------
+   One localStorage key holds the whole log: an array of
+   {date:'YYYY-MM-DD', am:number|null, pm:number|null}. Anything that doesn't
+   look like that (hand-edited, or written by an older version) is dropped on
+   load rather than crashing the page. */
+const isReading = v => v===null || (typeof v==='number' && v>=40 && v<=900);
+const isRow = r => r && typeof r==='object'
+  && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && isReading(r.am ?? null) && isReading(r.pm ?? null);
+
+function load(){
+  let stored = null;
+  try{ stored = JSON.parse(localStorage.getItem(KEY)); }catch(e){ stored = null; }
+  data = Array.isArray(stored)
+    ? stored.filter(isRow).map(r=>({date:r.date, am:r.am ?? null, pm:r.pm ?? null}))
+    : [];
+  sortData();
+  render();
+}
+let saveTimer;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      localStorage.setItem(KEY, JSON.stringify(data));
+      status('Saved');
+      setTimeout(()=>status(''),1400);
+    }catch(e){ status('Not saved — storage unavailable',true); }
+  },250);
+}
+
+/* ---------- meter ---------- */
+function drawMeter(){
+  const b = best();
+  const last = [...data].reverse().find(r=>r.pm!=null||r.am!=null);
+  const v = last ? (last.pm!=null?last.pm:last.am) : null;
+  const when = last ? (last.pm!=null?'evening':'morning') : null;
+
+  $('bestInline').textContent = b ? b+' L/min' : '—';
+  $('latestVal').firstChild.nodeValue = v ?? '—';
+  $('latestPct').textContent = (v&&b) ? ' L/min · '+Math.round(v/b*100)+'% of best' : '';
+  $('latestMeta').innerHTML = last
+    ? weekday(last.date)+' '+fmtDay(last.date)+'<br>'+when+' reading'
+    : 'No readings yet';
+  const z = zoneOf(v,b);
+  const tag = $('zoneTag');
+  tag.textContent = z ? ZONE_NAME[z] : '—';
+  tag.style.background = z ? ZONE_COLOR[z] : 'var(--ink-soft)';
+
+  if(!b){ $('scaleWrap').innerHTML=''; return; }
+  const lo = Math.round(b*0.35), hi = Math.round(b*1.05);
+  const W=boxWidth('scaleWrap'),H=64,x=p=>((p-lo)/(hi-lo))*W;
+  const g50=x(b*0.5), g80=x(b*0.8), gb=x(b);
+  const px = x(v);
+  const ticks=[];
+  const step = (b>500||W<420)?100:50;
+  for(let t=Math.ceil(lo/step)*step;t<=hi;t+=step) ticks.push(t);
+
+  $('scaleWrap').innerHTML = `
+  <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <rect x="0" y="26" width="${g50}" height="16" fill="#B3382C" opacity=".82"/>
+    <rect x="${g50}" y="26" width="${g80-g50}" height="16" fill="#C9820A" opacity=".82"/>
+    <rect x="${g80}" y="26" width="${W-g80}" height="16" fill="#2E7D5B" opacity=".82"/>
+    <line x1="${gb}" y1="22" x2="${gb}" y2="46" stroke="#12313B" stroke-width="2"/>
+    <text x="${Math.min(gb,W-4)}" y="60" font-family="IBM Plex Mono, monospace" font-size="11" fill="#5A727B" text-anchor="${gb>W-60?'end':'middle'}">best ${b}</text>
+    ${ticks.map(t=>`<text x="${x(t)}" y="16" font-family="IBM Plex Mono, monospace" font-size="10" fill="#8CA0A3" text-anchor="middle">${t}</text>`).join('')}
+    <g class="pointer" transform="translate(${px},0)">
+      <path d="M0,44 l-7,13 l14,0 Z" fill="#12313B"/>
+      <rect x="-1.5" y="20" width="3" height="26" fill="#12313B"/>
+    </g>
+  </svg>`;
+}
+
+/* ---------- stats ---------- */
+function drawStats(){
+  const b = best();
+  const withBoth = data.filter(r=>r.am!=null&&r.pm!=null);
+  const swings = withBoth.map(r=>{
+    const hi=Math.max(r.am,r.pm), lo=Math.min(r.am,r.pm);
+    return (hi-lo)/hi*100;
+  });
+  const recent = data.slice(-7);
+  const avg = arr => arr.length ? Math.round(arr.reduce((a,c)=>a+c,0)/arr.length) : null;
+  const amAvg = avg(recent.map(r=>r.am).filter(v=>v!=null));
+  const pmAvg = avg(recent.map(r=>r.pm).filter(v=>v!=null));
+  const swingAvg = swings.length ? (swings.reduce((a,c)=>a+c,0)/swings.length) : null;
+
+  const cells = [
+    ['Best ever', b ?? '—', b?'L/min':''],
+    ['Avg morning', amAvg ?? '—', 'last 7 days'],
+    ['Avg evening', pmAvg ?? '—', 'last 7 days'],
+    ['Avg swing', swingAvg!=null ? swingAvg.toFixed(1)+'%' : '—', withBoth.length+' full days'],
+  ];
+  $('stats').innerHTML = cells.map(c=>
+    `<div class="stat"><dt>${c[0]}</dt><dd>${c[1]} <span>${c[2]}</span></dd></div>`).join('');
+}
+
+/* ---------- chart ---------- */
+function drawChart(){
+  const svg = $('chart');
+  const W=boxWidth('chartWrap'),H=W<520?230:280,L=40,R=12,T=14,B=30;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+  const vals = allVals();
+  if(!vals.length){ svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="13" fill="#8CA0A3">Add a reading to see the trend</text>`; return; }
+  const b = best();
+  let yMin = Math.floor((Math.min(...vals)-30)/20)*20;
+  let yMax = Math.ceil((Math.max(...vals)+30)/20)*20;
+  if(yMax-yMin < 100) yMax = yMin+100;
+  const n = data.length;
+  const px = i => L + (n===1 ? (W-L-R)/2 : i*(W-L-R)/(n-1));
+  const py = v => T + (1-(v-yMin)/(yMax-yMin))*(H-T-B);
+  const clampY = v => Math.max(T, Math.min(H-B, py(v)));
+
+  const segs = key => {
+    const out=[]; let cur=[];
+    data.forEach((r,i)=>{ if(r[key]!=null){cur.push(px(i)+','+py(r[key]));} else if(cur.length){out.push(cur);cur=[];} });
+    if(cur.length) out.push(cur);
+    return out;
+  };
+  const line = (key,color) => segs(key).map(s=>
+    `<polyline points="${s.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`).join('')
+    + data.map((r,i)=> r[key]==null?'':
+      `<circle cx="${px(i)}" cy="${py(r[key])}" r="3.5" fill="#fff" stroke="${color}" stroke-width="2"/>`).join('');
+
+  // keep at least ~26px between grid lines, whatever the height and range
+  const gridStep = [20,40,60,100,200].find(s=>(H-T-B)/((yMax-yMin)/s) >= 26) || 200;
+  let grid='';
+  for(let g=yMin;g<=yMax;g+=gridStep){
+    grid += `<line x1="${L}" y1="${py(g)}" x2="${W-R}" y2="${py(g)}" stroke="#E7EEEC" stroke-width="1"/>
+             <text x="${L-9}" y="${py(g)+4}" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="10" fill="#8CA0A3">${g}</text>`;
+  }
+  const gTop = clampY(yMax), gBot = clampY(b*0.8);
+  const aBot = clampY(b*0.5);
+  const bands = `
+    <rect x="${L}" y="${gTop}" width="${W-L-R}" height="${Math.max(0,gBot-gTop)}" fill="#2E7D5B" opacity=".07"/>
+    <rect x="${L}" y="${gBot}" width="${W-L-R}" height="${Math.max(0,aBot-gBot)}" fill="#C9820A" opacity=".07"/>
+    <line x1="${L}" y1="${clampY(b)}" x2="${W-R}" y2="${clampY(b)}" stroke="#2E7D5B" stroke-width="1" stroke-dasharray="3 4"/>`;
+  const skip = Math.ceil(n/Math.max(2,Math.floor((W-L-R)/62)));
+  const xlabels = data.map((r,i)=> (i%skip)?'':
+    `<text x="${px(i)}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#8CA0A3">${fmtDay(r.date)}</text>`).join('');
+
+  svg.innerHTML = bands+grid+xlabels+line('pm','#3D3B8E')+line('am','#1F7A8C');
+}
+
+/* ---------- table ---------- */
+function drawTable(){
+  const b = best();
+  if(!data.length){
+    $('rows').innerHTML = `<tr><td class="empty" colspan="5">No days logged yet — pick a date below and add one.</td></tr>`;
+    return;
+  }
+  $('rows').innerHTML = data.map((r,i)=>{
+    const both = r.am!=null&&r.pm!=null;
+    const hi = both?Math.max(r.am,r.pm):null, lo = both?Math.min(r.am,r.pm):null;
+    const swing = both ? ((hi-lo)/hi*100).toFixed(1)+'%' : '·';
+    const dayLow = [r.am,r.pm].filter(v=>v!=null);
+    const z = dayLow.length ? zoneOf(Math.min(...dayLow),b) : null;
+    return `<tr class="${z?'zone-'+z:''}">
+      <td class="day"><b>${fmtDay(r.date)}</b><em>${weekday(r.date)}</em></td>
+      <td><input class="val" inputmode="numeric" data-i="${i}" data-k="am" value="${r.am??''}" placeholder="—" aria-label="Morning reading ${fmtDay(r.date)}"></td>
+      <td><input class="val" inputmode="numeric" data-i="${i}" data-k="pm" value="${r.pm??''}" placeholder="—" aria-label="Evening reading ${fmtDay(r.date)}"></td>
+      <td class="swing">${swing}</td>
+      <td class="act"><button class="del" data-del="${i}" aria-label="Delete ${fmtDay(r.date)}">×</button></td>
+    </tr>`;
+  }).reverse().join('');
+}
+
+function render(){ drawMeter(); drawStats(); drawChart(); drawTable(); }
+
+/* ---------- events ---------- */
+$('rows').addEventListener('change', e=>{
+  const el = e.target;
+  if(!el.classList.contains('val')) return;
+  const raw = el.value.trim();
+  if(raw===''){ data[el.dataset.i][el.dataset.k]=null; }
+  else{
+    const v = parseInt(raw,10);
+    if(isNaN(v)||v<40||v>900){ status('Enter a reading between 40 and 900',true); el.value = data[el.dataset.i][el.dataset.k] ?? ''; return; }
+    data[el.dataset.i][el.dataset.k]=v;
+  }
+  save(); render();
+});
+$('rows').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-del]');
+  if(!btn) return;
+  data.splice(+btn.dataset.del,1);
+  save(); render();
+});
+$('addBtn').addEventListener('click', ()=>{
+  const d = $('newDate').value;
+  if(!d){ status('Pick a date first',true); return; }
+  if(data.some(r=>r.date===d)){ status(fmtDay(d)+' is already in the table',true); return; }
+  data.push({date:d,am:null,pm:null});
+  sortData(); save(); render();
+  status('');
+  const el = document.querySelector(`input[data-k="am"][data-i="${data.findIndex(r=>r.date===d)}"]`);
+  if(el) el.focus();
+});
+$('resetBtn').addEventListener('click', ()=>{
+  if(!data.length){ status('Nothing to clear'); return; }
+  if(!confirm('Delete every reading? This cannot be undone.')) return;
+  data = [];
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  render(); status('All readings cleared');
+});
+
+let resizeTimer;
+addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{ drawMeter(); drawChart(); },150);
+});
+
+$('newDate').value = today();
+load();
+</script>
+</body>
+</html>
