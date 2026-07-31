@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sensor Readout — live motion channels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E7E6E0;
+    --panel:#F2F1EC;
+    --grid:#D2D3C9;
+    --rule:#B7B8AD;
+    --ink:#171C1F;
+    --mid:#5C6369;
+    --x:#1B3FA0;
+    --y:#C0361D;
+    --z:#1A6E4E;
+    --ochre:#B9860B;
+    --dead:#9AA0A4;
+    --pad:18px;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{margin:0;padding:0;}
+
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:13px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 64px;
+    background-image:
+      linear-gradient(to right,rgba(0,0,0,.035) 1px,transparent 1px),
+      linear-gradient(to bottom,rgba(0,0,0,.035) 1px,transparent 1px);
+    background-size:14px 14px;
+  }
+
+  .wrap{max-width:760px;margin:0 auto;padding:0 var(--pad);}
+
+  /* ---------- nameplate ---------- */
+  .plate{
+    padding:26px 0 14px;
+    border-bottom:2px solid var(--ink);
+  }
+  .plate h1{
+    font-family:Archivo,"Arial Narrow",system-ui,sans-serif;
+    font-weight:800;
+    font-stretch:expanded;
+    font-size:clamp(30px,10vw,52px);
+    letter-spacing:-.02em;
+    line-height:.92;
+    margin:0;
+    text-transform:uppercase;
+  }
+  .plate h1 span{display:block;color:var(--mid);}
+  .plate .sub{
+    margin-top:10px;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--mid);
+    word-break:break-word;
+  }
+
+  /* ---------- arm bar ---------- */
+  .arm{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    padding:14px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  button{
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:11px 16px;
+    border:1.5px solid var(--ink);
+    border-radius:2px;
+    background:var(--ink);
+    color:var(--panel);
+    cursor:pointer;
+  }
+  button.ghost{background:transparent;color:var(--ink);}
+  button:focus-visible{outline:3px solid var(--ochre);outline-offset:2px;}
+  button[disabled]{opacity:.35;cursor:default;}
+
+  .rate{
+    margin-left:auto;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--mid);
+  }
+  .rate b{color:var(--ink);font-weight:600;}
+
+  /* ---------- bands ---------- */
+  .band{border-bottom:1px solid var(--rule);padding:20px 0;}
+  .band-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}
+  .band-head h2{
+    font-family:Archivo,sans-serif;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:.02em;
+    margin:0;
+    text-transform:uppercase;
+  }
+  .band-head .api{
+    font-size:10.5px;
+    color:var(--mid);
+    letter-spacing:.06em;
+    word-break:break-all;
+  }
+
+  .lamp{
+    display:inline-block;
+    width:9px;height:9px;
+    border-radius:50%;
+    border:1.5px solid var(--ink);
+    background:transparent;
+    flex:none;
+    align-self:center;
+  }
+  .lamp.live{background:var(--z);border-color:var(--z);}
+  .lamp.warn{background:var(--ochre);border-color:var(--ochre);}
+  .lamp.off{background:var(--dead);border-color:var(--dead);}
+
+  .note{
+    font-size:11.5px;
+    color:var(--mid);
+    margin:0 0 12px;
+    padding-left:10px;
+    border-left:2px solid var(--ochre);
+  }
+
+  /* ---------- channel readouts ---------- */
+  .chan{
+    display:grid;
+    grid-template-columns:26px 1fr auto;
+    align-items:center;
+    gap:8px;
+    padding:3px 0;
+  }
+  .chan .k{font-weight:600;font-size:12px;}
+  .chan .bar{
+    position:relative;
+    height:8px;
+    background:var(--panel);
+    border:1px solid var(--grid);
+    overflow:hidden;
+  }
+  .chan .bar i{
+    position:absolute;
+    top:0;bottom:0;
+    left:50%;
+    width:0;
+    background:currentColor;
+  }
+  .chan .bar::after{
+    content:"";position:absolute;left:50%;top:0;bottom:0;
+    width:1px;background:var(--rule);
+  }
+  .chan .v{
+    font-variant-numeric:tabular-nums;
+    font-weight:500;
+    min-width:9ch;
+    text-align:right;
+    font-size:13px;
+  }
+  .cx{color:var(--x);} .cy{color:var(--y);} .cz{color:var(--z);}
+
+  .units{
+    font-size:10.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--mid);
+    margin:10px 0 4px;
+  }
+
+  canvas{display:block;width:100%;height:82px;background:var(--panel);border:1px solid var(--grid);}
+
+  /* ---------- instruments ---------- */
+  .instruments{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .inst{background:var(--panel);border:1px solid var(--grid);padding:12px;}
+  .inst h3{
+    margin:0 0 10px;
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--mid);
+    font-family:"IBM Plex Mono",monospace;
+    font-weight:600;
+  }
+  .inst svg{display:block;width:100%;height:auto;}
+  .inst .big{
+    font-variant-numeric:tabular-nums;
+    font-size:22px;
+    font-weight:600;
+    text-align:center;
+    margin-top:6px;
+  }
+  .inst .big small{font-size:11px;color:var(--mid);font-weight:400;}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  td{padding:5px 0;border-bottom:1px dotted var(--grid);vertical-align:top;}
+  td:first-child{color:var(--mid);padding-right:14px;white-space:nowrap;}
+  td:last-child{text-align:right;font-variant-numeric:tabular-nums;word-break:break-word;}
+
+  pre{
+    background:var(--panel);
+    border:1px solid var(--grid);
+    padding:12px;
+    margin:0;
+    font-size:11px;
+    line-height:1.5;
+    overflow-x:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    max-height:320px;
+  }
+
+  .status{font-size:11.5px;color:var(--mid);}
+  .status b{color:var(--ink);font-weight:600;}
+  .fail{color:var(--y);}
+  .ok{color:var(--z);}
+
+  @media (max-width:520px){
+    .instruments{grid-template-columns:1fr;}
+    .rate{margin-left:0;width:100%;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="plate">
+    <h1>Sensor<span>Readout</span></h1>
+    <div class="sub" id="ua">reading device…</div>
+  </header>
+
+  <div class="arm">
+    <button id="arm">Turn on sensors</button>
+    <button id="peakReset" class="ghost">Reset peaks</button>
+    <div class="rate">
+      motion <b id="hzMotion">—</b> hz &nbsp;·&nbsp; orient <b id="hzOrient">—</b> hz
+    </div>
+  </div>
+
+  <!-- ============ ACCELERATION ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampMotion"></span>
+      <h2>Acceleration</h2>
+      <span class="api">devicemotion · acceleration</span>
+    </div>
+    <p class="note" id="noteAccel" hidden>Gravity-free acceleration is null on this device — the browser isn't separating gravity out. Use the "with gravity" channel below.</p>
+    <div class="units">linear, gravity removed · m/s²</div>
+    <div id="accelChans"></div>
+    <canvas id="cAccel" aria-label="Acceleration trace"></canvas>
+
+    <div class="units" style="margin-top:16px">including gravity · m/s²</div>
+    <div id="accelGChans"></div>
+    <canvas id="cAccelG" aria-label="Acceleration with gravity trace"></canvas>
+  </section>
+
+  <!-- ============ ROTATION ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampRot"></span>
+      <h2>Rotation rate</h2>
+      <span class="api">devicemotion · rotationRate (gyroscope)</span>
+    </div>
+    <div class="units">deg/s · alpha=yaw, beta=pitch, gamma=roll</div>
+    <div id="rotChans"></div>
+    <canvas id="cRot" aria-label="Rotation rate trace"></canvas>
+  </section>
+
+  <!-- ============ ORIENTATION ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampOrient"></span>
+      <h2>Orientation</h2>
+      <span class="api">deviceorientation</span>
+    </div>
+    <div class="instruments">
+      <div class="inst">
+        <h3>Attitude · pitch &amp; roll</h3>
+        <svg viewBox="0 0 200 200" id="level">
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#D2D3C9" stroke-width="1.5"/>
+          <circle cx="100" cy="100" r="46" fill="none" stroke="#D2D3C9" stroke-width="1.5"/>
+          <circle cx="100" cy="100" r="14" fill="none" stroke="#B7B8AD" stroke-width="1.5"/>
+          <line x1="100" y1="4" x2="100" y2="30" stroke="#B7B8AD" stroke-width="1.5"/>
+          <line x1="100" y1="170" x2="100" y2="196" stroke="#B7B8AD" stroke-width="1.5"/>
+          <line x1="4" y1="100" x2="30" y2="100" stroke="#B7B8AD" stroke-width="1.5"/>
+          <line x1="170" y1="100" x2="196" y2="100" stroke="#B7B8AD" stroke-width="1.5"/>
+          <circle id="bubble" cx="100" cy="100" r="11" fill="#1B3FA0" opacity=".85"/>
+        </svg>
+        <div class="big" id="levelTxt">— <small>β</small> &nbsp; — <small>γ</small></div>
+      </div>
+      <div class="inst">
+        <h3>Heading · alpha / compass</h3>
+        <svg viewBox="0 0 200 200" id="compass">
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#D2D3C9" stroke-width="1.5"/>
+          <g id="rose">
+            <polygon points="100,16 110,100 100,86 90,100" fill="#C0361D"/>
+            <polygon points="100,184 110,100 100,114 90,100" fill="#5C6369"/>
+          </g>
+          <text x="100" y="12" text-anchor="middle" font-size="13" font-family="IBM Plex Mono,monospace" fill="#5C6369">N</text>
+        </svg>
+        <div class="big" id="headTxt">—<small>°</small></div>
+      </div>
+    </div>
+    <div style="margin-top:14px"></div>
+    <table id="orientTable"></table>
+  </section>
+
+  <!-- ============ MAGNITUDE / PEAKS ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampPeak"></span>
+      <h2>Magnitude</h2>
+      <span class="api">derived</span>
+    </div>
+    <table id="peakTable"></table>
+    <div class="units" style="margin-top:12px">|a| including gravity · m/s²</div>
+    <canvas id="cMag" aria-label="Magnitude trace"></canvas>
+  </section>
+
+  <!-- ============ GENERIC SENSOR API ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampGeneric"></span>
+      <h2>Generic Sensor API</h2>
+      <span class="api">window.Accelerometer, Gyroscope, Magnetometer…</span>
+    </div>
+    <p class="note">Chromium on Android only. Gives raw hardware channels at a chosen sample rate, plus the magnetometer and fused orientation quaternions the event APIs never expose.</p>
+    <table id="genericTable"></table>
+  </section>
+
+  <!-- ============ ENVIRONMENT ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp live"></span>
+      <h2>Screen &amp; environment</h2>
+      <span class="api">screen.orientation, window</span>
+    </div>
+    <table id="envTable"></table>
+  </section>
+
+  <!-- ============ RAW ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampRaw"></span>
+      <h2>Raw event payloads</h2>
+      <span class="api">last object received, verbatim</span>
+    </div>
+    <pre id="raw">waiting for first event…</pre>
+    <div style="margin-top:12px"><button class="ghost" id="copyBtn">Copy full report</button></div>
+  </section>
+
+  <section class="band" style="border-bottom:none">
+    <div class="band-head"><h2>Support check</h2></div>
+    <div class="status" id="support"></div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ---------------------------------------------------------------- utilities
+const $ = id => document.getElementById(id);
+const AXES = [["x","cx"],["y","cy"],["z","cz"]];
+const ROTAXES = [["alpha","cx"],["beta","cy"],["gamma","cz"]];
+const fmt = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? "—" : v.toFixed(d);
+
+function buildChans(host, keys, scale){
+  const rows = {};
+  keys.forEach(([k,cls])=>{
+    const el = document.createElement("div");
+    el.className = "chan " + cls;
+    el.innerHTML = '<span class="k">'+k.charAt(0)+'</span>'+
+                   '<span class="bar"><i></i></span>'+
+                   '<span class="v">—</span>';
+    host.appendChild(el);
+    rows[k] = { bar: el.querySelector("i"), val: el.querySelector(".v"), scale };
+  });
+  return rows;
+}
+
+function paintChans(rows, obj, digits){
+  for (const k in rows){
+    const r = rows[k], v = obj ? obj[k] : null;
+    r.val.textContent = fmt(v, digits);
+    if (v===null||v===undefined||Number.isNaN(v)){ r.bar.style.width="0"; continue; }
+    const f = Math.max(-1, Math.min(1, v / r.scale));
+    r.bar.style.width = Math.abs(f*50) + "%";
+    r.bar.style.left  = (f<0 ? 50 + f*50 : 50) + "%";
+  }
+}
+
+// ---------------------------------------------------------------- strip chart
+function Chart(canvas, colors, opts){
+  opts = opts || {};
+  const N = 260;
+  const buf = colors.map(()=> new Float32Array(N).fill(NaN));
+  let head = 0, dpr = 1;
+  const ctx = canvas.getContext("2d");
+
+  function size(){
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width  = Math.round(canvas.clientWidth  * dpr);
+    canvas.height = Math.round(canvas.clientHeight * dpr);
+  }
+  size();
+  window.addEventListener("resize", size);
+
+  return {
+    push(vals){
+      for (let i=0;i<colors.length;i++){
+        const v = vals[i];
+        buf[i][head] = (v===null||v===undefined||Number.isNaN(v)) ? NaN : v;
+      }
+      head = (head+1) % N;
+    },
+    draw(){
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+
+      // peak-to-peak autoscale with a floor
+      let lo = opts.zero===false ? Infinity : 0, hi = opts.zero===false ? -Infinity : 0;
+      for (let i=0;i<colors.length;i++) for (let j=0;j<N;j++){
+        const v = buf[i][j];
+        if (!Number.isNaN(v)){ if(v<lo)lo=v; if(v>hi)hi=v; }
+      }
+      if (!isFinite(lo)||!isFinite(hi)){ lo=0; hi=1; }
+      const min = opts.min||1;
+      if (hi-lo < min){ const c=(hi+lo)/2; lo=c-min/2; hi=c+min/2; }
+      const pad = (hi-lo)*0.12; lo-=pad; hi+=pad;
+      const y = v => H - ((v-lo)/(hi-lo))*H;
+
+      // grid + zero rule
+      ctx.strokeStyle = "#DCDDD3"; ctx.lineWidth = 1*dpr;
+      for (let g=1;g<4;g++){ const yy=Math.round(H*g/4)+.5; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke(); }
+      if (lo<0 && hi>0){
+        ctx.strokeStyle="#B7B8AD"; ctx.setLineDash([4*dpr,3*dpr]);
+        const yy=Math.round(y(0))+.5;
+        ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // traces, oldest at left
+      for (let i=0;i<colors.length;i++){
+        ctx.strokeStyle = colors[i];
+        ctx.lineWidth = 1.6*dpr;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        let pen = false, lastX = 0, lastY = 0;
+        for (let j=0;j<N;j++){
+          const v = buf[i][(head+j)%N];
+          if (Number.isNaN(v)){ pen=false; continue; }
+          const px = (j/(N-1))*W, py = y(v);
+          if (!pen){ ctx.moveTo(px,py); pen=true; } else ctx.lineTo(px,py);
+          lastX=px; lastY=py;
+        }
+        ctx.stroke();
+        if (pen){ // pen tip, like a chart recorder
+          ctx.fillStyle = colors[i];
+          ctx.beginPath(); ctx.arc(lastX,lastY,2.6*dpr,0,7); ctx.fill();
+        }
+      }
+
+      // scale labels
+      ctx.fillStyle="#8C9298";
+      ctx.font = (10*dpr)+"px 'IBM Plex Mono', monospace";
+      ctx.textAlign="left";
+      ctx.fillText(hi.toFixed(1), 4*dpr, 12*dpr);
+      ctx.fillText(lo.toFixed(1), 4*dpr, H-4*dpr);
+    }
+  };
+}
+
+// ---------------------------------------------------------------- state
+const S = {
+  motion:null, orient:null, orientAbs:null,
+  motionCount:0, orientCount:0, motionHz:0, orientHz:0,
+  peakA:0, peakG:0, peakRot:0,
+  generic:{}, armed:false, sawMotion:false, sawOrient:false
+};
+
+const chAccel  = buildChans($("accelChans"),  AXES, 20);
+const chAccelG = buildChans($("accelGChans"), AXES, 20);
+const chRot    = buildChans($("rotChans"),    ROTAXES, 400);
+
+const INK = ["#1B3FA0","#C0361D","#1A6E4E"];
+const gAccel  = Chart($("cAccel"),  INK, {min:2});
+const gAccelG = Chart($("cAccelG"), INK, {min:4});
+const gRot    = Chart($("cRot"),    INK, {min:40});
+const gMag    = Chart($("cMag"),    ["#B9860B"], {min:2, zero:false});
+
+// ---------------------------------------------------------------- listeners
+function onMotion(e){
+  S.motion = e; S.motionCount++; S.sawMotion = true;
+  const ag = e.accelerationIncludingGravity;
+  const a  = e.acceleration;
+  const r  = e.rotationRate;
+  if (ag){ const m = Math.hypot(ag.x||0, ag.y||0, ag.z||0); if (m > S.peakG) S.peakG = m; }
+  if (a){ const m = Math.hypot(a.x||0, a.y||0, a.z||0); if (m > S.peakA) S.peakA = m; }
+  if (r){ const m = Math.max(Math.abs(r.alpha||0),Math.abs(r.beta||0),Math.abs(r.gamma||0)); if (m > S.peakRot) S.peakRot = m; }
+}
+function onOrient(e){ S.orient = e; S.orientCount++; S.sawOrient = true; }
+function onOrientAbs(e){ S.orientAbs = e; }
+
+setInterval(()=>{
+  S.motionHz = S.motionCount; S.orientHz = S.orientCount;
+  S.motionCount = 0; S.orientCount = 0;
+}, 1000);
+
+// ---------------------------------------------------------------- arming
+const armBtn = $("arm");
+
+async function arm(){
+  armBtn.disabled = true;
+  armBtn.textContent = "Starting…";
+  const log = [];
+
+  // iOS 13+ gate — must be inside a user gesture
+  for (const [name, Ctor] of [["DeviceMotionEvent",window.DeviceMotionEvent],["DeviceOrientationEvent",window.DeviceOrientationEvent]]){
+    if (Ctor && typeof Ctor.requestPermission === "function"){
+      try {
+        const res = await Ctor.requestPermission();
+        log.push(name + ".requestPermission() → " + res);
+        if (res !== "granted") log.push("↳ blocked. Reload the page and allow it, or check Settings › Safari › Motion & Orientation Access.");
+      } catch (err){
+        log.push(name + ".requestPermission() threw: " + err.message);
+      }
+    } else {
+      log.push(name + ": no permission gate (not iOS 13+)");
+    }
+  }
+
+  window.addEventListener("devicemotion", onMotion);
+  window.addEventListener("deviceorientation", onOrient);
+  window.addEventListener("deviceorientationabsolute", onOrientAbs);
+
+  startGeneric(log);
+
+  S.armed = true;
+  armBtn.textContent = "Sensors on";
+
+  setTimeout(()=>{
+    if (!S.sawMotion && !S.sawOrient){
+      log.push("No events after 2s. Either the hardware isn't exposed, or a Permissions-Policy on this frame blocks accelerometer/gyroscope. Open this file in a browser tab of its own over https:// and it should work.");
+      armBtn.disabled = false;
+      armBtn.textContent = "Try again";
+    }
+    renderSupport(log);
+  }, 2000);
+
+  renderSupport(log);
+}
+armBtn.addEventListener("click", arm);
+$("peakReset").addEventListener("click", ()=>{ S.peakA=S.peakG=S.peakRot=0; });
+
+// ---------------------------------------------------------------- generic sensors
+const GENERIC = [
+  ["Accelerometer",             "m/s²",  ["x","y","z"]],
+  ["LinearAccelerationSensor",  "m/s²",  ["x","y","z"]],
+  ["GravitySensor",             "m/s²",  ["x","y","z"]],
+  ["Gyroscope",                 "rad/s", ["x","y","z"]],
+  ["Magnetometer",              "µT",    ["x","y","z"]],
+  ["AbsoluteOrientationSensor", "quat",  ["quaternion"]],
+  ["RelativeOrientationSensor", "quat",  ["quaternion"]],
+  ["AmbientLightSensor",        "lux",   ["illuminance"]]
+];
+
+function startGeneric(log){
+  let any = false;
+  GENERIC.forEach(([name, unit, fields])=>{
+    const Ctor = window[name];
+    if (!Ctor){ S.generic[name] = {state:"unsupported", unit, fields}; return; }
+    any = true;
+    S.generic[name] = {state:"starting", unit, fields, obj:null};
+    try {
+      const s = new Ctor({frequency:60});
+      s.addEventListener("reading", ()=>{
+        const rec = S.generic[name];
+        rec.state = "live";
+        rec.obj = {};
+        fields.forEach(f => rec.obj[f] = s[f]);
+        rec.ts = s.timestamp;
+      });
+      s.addEventListener("error", ev=>{
+        S.generic[name].state = "error: " + (ev.error && ev.error.name || "unknown");
+        log.push(name + " error: " + (ev.error && ev.error.message || ""));
+      });
+      s.start();
+    } catch (err){
+      S.generic[name].state = "blocked: " + err.name;
+      log.push(name + " construction failed: " + err.message);
+    }
+  });
+  $("lampGeneric").className = "lamp " + (any ? "warn" : "off");
+}
+
+// ---------------------------------------------------------------- render loop
+function rows(tbl, pairs){
+  tbl.innerHTML = pairs.map(([k,v]) =>
+    "<tr><td>"+k+"</td><td>"+v+"</td></tr>").join("");
+}
+
+let lastRaw = 0;
+
+function frame(){
+  const m = S.motion, o = S.orient;
+  const a  = m && m.acceleration;
+  const ag = m && m.accelerationIncludingGravity;
+  const r  = m && m.rotationRate;
+
+  paintChans(chAccel,  a  || {}, 3);
+  paintChans(chAccelG, ag || {}, 3);
+  paintChans(chRot,    r  || {}, 1);
+
+  gAccel.push([a?a.x:NaN, a?a.y:NaN, a?a.z:NaN]);
+  gAccelG.push([ag?ag.x:NaN, ag?ag.y:NaN, ag?ag.z:NaN]);
+  gRot.push([r?r.alpha:NaN, r?r.beta:NaN, r?r.gamma:NaN]);
+  const mag = ag ? Math.hypot(ag.x||0, ag.y||0, ag.z||0) : NaN;
+  gMag.push([mag]);
+
+  gAccel.draw(); gAccelG.draw(); gRot.draw(); gMag.draw();
+
+  if (m && a && a.x===null && ag) $("noteAccel").hidden = false;
+
+  // lamps
+  $("lampMotion").className = "lamp " + (S.motionHz ? "live" : S.armed ? "warn" : "off");
+  $("lampRot").className    = "lamp " + (r && r.alpha!==null ? "live" : S.armed ? "warn" : "off");
+  $("lampOrient").className = "lamp " + (S.orientHz ? "live" : S.armed ? "warn" : "off");
+  $("lampPeak").className   = "lamp " + (S.motionHz ? "live" : "off");
+  $("lampRaw").className    = "lamp " + ((m||o) ? "live" : "off");
+  $("hzMotion").textContent = S.armed ? S.motionHz : "—";
+  $("hzOrient").textContent = S.armed ? S.orientHz : "—";
+
+  // attitude bubble: gamma = roll (left/right), beta = pitch (front/back)
+  if (o && o.beta!==null && o.gamma!==null){
+    const cx = 100 + Math.max(-78, Math.min(78, (o.gamma/90)*78));
+    const cy = 100 + Math.max(-78, Math.min(78, (o.beta/90)*78));
+    const b = $("bubble"); b.setAttribute("cx", cx.toFixed(1)); b.setAttribute("cy", cy.toFixed(1));
+    $("levelTxt").innerHTML = fmt(o.beta,1)+" <small>β</small> &nbsp; "+fmt(o.gamma,1)+" <small>γ</small>";
+  }
+
+  // compass
+  const heading = (o && typeof o.webkitCompassHeading === "number") ? o.webkitCompassHeading
+                : (S.orientAbs && S.orientAbs.alpha!==null && S.orientAbs.alpha!==undefined) ? (360 - S.orientAbs.alpha) % 360
+                : (o && o.absolute && o.alpha!==null) ? (360 - o.alpha) % 360
+                : null;
+  if (heading !== null){
+    $("rose").setAttribute("transform","rotate("+(-heading).toFixed(1)+" 100 100)");
+    $("headTxt").innerHTML = heading.toFixed(0)+"<small>°</small>";
+  }
+
+  rows($("orientTable"), [
+    ["alpha · yaw 0–360",   fmt(o&&o.alpha,2)],
+    ["beta · pitch ±180",   fmt(o&&o.beta,2)],
+    ["gamma · roll ±90",    fmt(o&&o.gamma,2)],
+    ["absolute reference",  o ? String(o.absolute) : "—"],
+    ["webkitCompassHeading",(o&&o.webkitCompassHeading!=null) ? fmt(o.webkitCompassHeading,1)+"°" : "not exposed (non-iOS)"],
+    ["webkitCompassAccuracy",(o&&o.webkitCompassAccuracy!=null) ? "±"+o.webkitCompassAccuracy+"°" : "—"],
+    ["deviceorientationabsolute", S.orientAbs ? "firing · α "+fmt(S.orientAbs.alpha,1) : "no events"]
+  ]);
+
+  rows($("peakTable"), [
+    ["|a| with gravity",      fmt(mag,3)+" m/s²"],
+    ["net of 1 g",            fmt(mag-9.80665,3)+" m/s²"],
+    ["in g",                  fmt(mag/9.80665,3)+" g"],
+    ["peak |a| linear",       fmt(S.peakA,3)+" m/s²"],
+    ["peak |a| with gravity", fmt(S.peakG,3)+" m/s²"],
+    ["peak rotation",         fmt(S.peakRot,1)+" °/s"],
+    ["reported interval",     m && m.interval!=null ? m.interval+" ms" : "—"]
+  ]);
+
+  rows($("genericTable"), GENERIC.map(([name,unit])=>{
+    const rec = S.generic[name];
+    if (!rec) return [name, '<span class="status">not started</span>'];
+    if (rec.state === "unsupported") return [name, '<span class="fail">not in this browser</span>'];
+    if (rec.state !== "live") return [name, '<span class="status">'+rec.state+'</span>'];
+    const o2 = rec.obj || {};
+    const txt = Object.keys(o2).map(f=>{
+      const v = o2[f];
+      if (Array.isArray(v)) return v.map(n=>n.toFixed(3)).join(", ");
+      return typeof v === "number" ? v.toFixed(3) : String(v);
+    }).join(" · ");
+    return [name, '<span class="ok">'+txt+"</span> "+unit];
+  }));
+
+  const so = screen.orientation || {};
+  rows($("envTable"), [
+    ["screen.orientation.type",  so.type || "—"],
+    ["screen.orientation.angle", so.angle!=null ? so.angle+"°" : "—"],
+    ["window.orientation",       window.orientation!=null ? window.orientation+"°" : "not exposed"],
+    ["viewport",                 innerWidth+" × "+innerHeight+" css px"],
+    ["screen",                   screen.width+" × "+screen.height],
+    ["devicePixelRatio",         String(devicePixelRatio)],
+    ["secure context",           String(window.isSecureContext)],
+    ["in an iframe",             String(window.top !== window.self)],
+    ["touch points",             String(navigator.maxTouchPoints)],
+    ["platform",                 navigator.platform || "—"]
+  ]);
+
+  const now = performance.now();
+  if (now - lastRaw > 200){
+    lastRaw = now;
+    $("raw").textContent = JSON.stringify({
+      devicemotion: m ? {
+        acceleration: a ? {x:a.x,y:a.y,z:a.z} : null,
+        accelerationIncludingGravity: ag ? {x:ag.x,y:ag.y,z:ag.z} : null,
+        rotationRate: r ? {alpha:r.alpha,beta:r.beta,gamma:r.gamma} : null,
+        interval: m.interval
+      } : null,
+      deviceorientation: o ? {
+        alpha:o.alpha, beta:o.beta, gamma:o.gamma, absolute:o.absolute,
+        webkitCompassHeading: o.webkitCompassHeading ?? null,
+        webkitCompassAccuracy: o.webkitCompassAccuracy ?? null
+      } : null,
+      deviceorientationabsolute: S.orientAbs ? {
+        alpha:S.orientAbs.alpha, beta:S.orientAbs.beta, gamma:S.orientAbs.gamma
+      } : null,
+      genericSensors: Object.fromEntries(Object.entries(S.generic).map(([k,v])=>[k, v.state==="live"?v.obj:v.state]))
+    }, (k,v)=> typeof v === "number" ? Number(v.toFixed(4)) : v, 2);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- support panel
+function renderSupport(log){
+  const checks = [
+    ["DeviceMotionEvent", "DeviceMotionEvent" in window],
+    ["DeviceOrientationEvent", "DeviceOrientationEvent" in window],
+    ["deviceorientationabsolute", "ondeviceorientationabsolute" in window],
+    ["iOS permission gate", typeof (window.DeviceMotionEvent||{}).requestPermission === "function"],
+    ["Generic Sensor API", "Accelerometer" in window],
+    ["Magnetometer", "Magnetometer" in window],
+    ["AbsoluteOrientationSensor", "AbsoluteOrientationSensor" in window],
+    ["AmbientLightSensor", "AmbientLightSensor" in window],
+    ["secure context", window.isSecureContext]
+  ];
+  $("support").innerHTML =
+    checks.map(([k,v])=> '<div>'+(v?'<span class="ok">yes</span>':'<span class="fail">no </span>')+' &nbsp;'+k+'</div>').join("") +
+    (log && log.length ? '<div style="margin-top:12px;border-top:1px solid var(--rule);padding-top:10px">'+
+      log.map(l=>"<div>· "+l+"</div>").join("")+'</div>' : "");
+}
+
+$("copyBtn").addEventListener("click", ()=>{
+  const report = $("support").innerText + "\n\n" + $("raw").textContent;
+  navigator.clipboard.writeText(report).then(
+    ()=> $("copyBtn").textContent = "Copied",
+    ()=> $("copyBtn").textContent = "Copy failed — select the text above"
+  );
+  setTimeout(()=> $("copyBtn").textContent = "Copy full report", 2000);
+});
+
+$("ua").textContent = navigator.userAgent;
+renderSupport([]);
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
