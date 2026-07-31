@@ -178,6 +178,55 @@
   }
   .cx{color:var(--x);} .cy{color:var(--y);} .cz{color:var(--z);}
 
+  /* ---------- interpreted angles ---------- */
+  .angles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .ang{background:var(--panel);border:1px solid var(--grid);padding:12px;}
+  .ang h3{
+    margin:0 0 8px;
+    font-size:10px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--mid);
+    font-weight:600;
+  }
+  .ang h3 b{color:var(--ink);font-weight:700;}
+  .ang .deg{
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(24px,7.5vw,34px);
+    font-weight:600;
+    line-height:1;
+    letter-spacing:-.02em;
+  }
+  .ang .deg small{font-size:.48em;color:var(--mid);font-weight:400;}
+  .ang .scale{
+    position:relative;
+    height:7px;
+    margin-top:10px;
+    background:var(--paper);
+    border:1px solid var(--grid);
+    overflow:hidden;
+  }
+  .ang .scale i{position:absolute;top:0;bottom:0;left:50%;width:0;background:currentColor;}
+  .ang .scale::after{
+    content:"";position:absolute;left:50%;top:0;bottom:0;
+    width:1px;background:var(--rule);
+  }
+  .ang .rng{
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--mid);
+    margin-top:7px;
+  }
+  .zerobar{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:16px;
+  }
+  .zerobar .rate{margin-left:auto;}
+
   .units{
     font-size:10.5px;
     letter-spacing:.1em;
@@ -236,7 +285,9 @@
 
   @media (max-width:520px){
     .instruments{grid-template-columns:1fr;}
+    .angles{grid-template-columns:1fr;}
     .rate{margin-left:0;width:100%;}
+    .zerobar .rate{margin-left:0;}
   }
   @media (prefers-reduced-motion:reduce){
     *{transition:none!important;}
@@ -327,6 +378,46 @@
     <table id="orientTable"></table>
   </section>
 
+  <!-- ============ INTERPRETED ANGLES ============ -->
+  <section class="band">
+    <div class="band-head">
+      <span class="lamp off" id="lampAngle"></span>
+      <h2>Angles</h2>
+      <span class="api">interpreted · degrees about x, y, z</span>
+    </div>
+    <p class="note">How far the device is tilted about each of its own axes. Press <b>Set zero</b> to lock the current attitude as the reference — after that every number is the rotation away from it, so you can hold the phone at any angle and call it flat.</p>
+
+    <div class="angles">
+      <div class="ang cx">
+        <h3><b>X</b> · pitch</h3>
+        <div class="deg" id="angX">—<small>°</small></div>
+        <div class="scale"><i id="angBarX"></i></div>
+        <div class="rng">nose up / down · ±90°</div>
+      </div>
+      <div class="ang cy">
+        <h3><b>Y</b> · roll</h3>
+        <div class="deg" id="angY">—<small>°</small></div>
+        <div class="scale"><i id="angBarY"></i></div>
+        <div class="rng">left / right · ±180°</div>
+      </div>
+      <div class="ang cz">
+        <h3><b>Z</b> · yaw</h3>
+        <div class="deg" id="angZ">—<small>°</small></div>
+        <div class="scale"><i id="angBarZ"></i></div>
+        <div class="rng">turn on the spot · ±180°</div>
+      </div>
+    </div>
+
+    <div class="zerobar">
+      <button id="zeroBtn">Set zero</button>
+      <button id="zeroClear" class="ghost" disabled>Clear zero</button>
+      <div class="rate">reference <b id="zeroState">none · absolute</b></div>
+    </div>
+
+    <div class="units" style="margin-top:16px">angle trace · deg</div>
+    <canvas id="cAng" aria-label="Interpreted angle trace"></canvas>
+  </section>
+
   <!-- ============ MAGNITUDE / PEAKS ============ -->
   <section class="band">
     <div class="band-head">
@@ -411,6 +502,58 @@ function paintChans(rows, obj, digits){
     r.bar.style.width = Math.abs(f*50) + "%";
     r.bar.style.left  = (f<0 ? 50 + f*50 : 50) + "%";
   }
+}
+
+// ---------------------------------------------------------------- attitude math
+// deviceorientation is an intrinsic Z-X'-Y'' euler triple. Subtracting a stored
+// alpha/beta/gamma would only be right near the flat-on-a-table pose, so the
+// reference is held as a quaternion and taken out by rotation, not subtraction.
+const RAD = Math.PI/180, DEG = 180/Math.PI;
+
+function quatFromOrientation(alpha, beta, gamma){
+  const z = (alpha||0)*RAD/2, x = (beta||0)*RAD/2, y = (gamma||0)*RAD/2;
+  const cX=Math.cos(x), cY=Math.cos(y), cZ=Math.cos(z);
+  const sX=Math.sin(x), sY=Math.sin(y), sZ=Math.sin(z);
+  return [
+    cX*cY*cZ - sX*sY*sZ,  // w
+    sX*cY*cZ - cX*sY*sZ,  // x
+    cX*sY*cZ + sX*cY*sZ,  // y
+    cX*cY*sZ + sX*sY*cZ   // z
+  ];
+}
+
+// conj(a) · b — b expressed relative to a
+function quatRelative(a, b){
+  const [aw,ax,ay,az] = a, [bw,bx,by,bz] = b;
+  const cw=aw, cx=-ax, cy=-ay, cz=-az;
+  return [
+    cw*bw - cx*bx - cy*by - cz*bz,
+    cw*bx + cx*bw + cy*bz - cz*by,
+    cw*by - cx*bz + cy*bw + cz*bx,
+    cw*bz + cx*by - cy*bx + cz*bw
+  ];
+}
+
+// back to Z-X'-Y'' euler, in degrees, so the axes still mean what the labels say
+function eulerZXY(q){
+  const [w,x,y,z] = q;
+  const x2=x+x, y2=y+y, z2=z+z;
+  const xx=x*x2, xy=x*y2, xz=x*z2;
+  const yy=y*y2, yz=y*z2, zz=z*z2;
+  const wx=w*x2, wy=w*y2, wz=w*z2;
+  const m11=1-(yy+zz), m12=xy-wz;
+  const m21=xy+wz,     m22=1-(xx+zz);
+  const m31=xz-wy,     m32=yz+wx, m33=1-(xx+yy);
+  const ex = Math.asin(Math.max(-1, Math.min(1, m32)));
+  let ey, ez;
+  if (Math.abs(m32) < 0.9999999){   // away from straight up / straight down
+    ey = Math.atan2(-m31, m33);
+    ez = Math.atan2(-m12, m22);
+  } else {                          // gimbal lock: fold yaw and roll together
+    ey = 0;
+    ez = Math.atan2(m21, m11);
+  }
+  return { x: ex*DEG, y: ey*DEG, z: ez*DEG };
 }
 
 // ---------------------------------------------------------------- strip chart
@@ -499,7 +642,8 @@ const S = {
   motion:null, orient:null, orientAbs:null,
   motionCount:0, orientCount:0, motionHz:0, orientHz:0,
   peakA:0, peakG:0, peakRot:0,
-  generic:{}, armed:false, sawMotion:false, sawOrient:false
+  generic:{}, armed:false, sawMotion:false, sawOrient:false,
+  zeroQ:null, zeroRef:null
 };
 
 const chAccel  = buildChans($("accelChans"),  AXES, 20);
@@ -511,6 +655,7 @@ const gAccel  = Chart($("cAccel"),  INK, {min:2});
 const gAccelG = Chart($("cAccelG"), INK, {min:4});
 const gRot    = Chart($("cRot"),    INK, {min:40});
 const gMag    = Chart($("cMag"),    ["#B9860B"], {min:2, zero:false});
+const gAng    = Chart($("cAng"),    INK, {min:20});
 
 // ---------------------------------------------------------------- listeners
 function onMotion(e){
@@ -576,6 +721,21 @@ async function arm(){
 armBtn.addEventListener("click", arm);
 $("peakReset").addEventListener("click", ()=>{ S.peakA=S.peakG=S.peakRot=0; });
 
+// ---------------------------------------------------------------- zero reference
+function setZero(){
+  const o = S.orient;
+  if (!o || o.alpha===null || o.beta===null || o.gamma===null) return;
+  S.zeroQ   = quatFromOrientation(o.alpha, o.beta, o.gamma);
+  S.zeroRef = { alpha:o.alpha, beta:o.beta, gamma:o.gamma };
+  $("zeroClear").disabled = false;
+}
+function clearZero(){
+  S.zeroQ = null; S.zeroRef = null;
+  $("zeroClear").disabled = true;
+}
+$("zeroBtn").addEventListener("click", setZero);
+$("zeroClear").addEventListener("click", clearZero);
+
 // ---------------------------------------------------------------- generic sensors
 const GENERIC = [
   ["Accelerometer",             "m/s²",  ["x","y","z"]],
@@ -618,6 +778,12 @@ function startGeneric(log){
 }
 
 // ---------------------------------------------------------------- render loop
+const ANGVIEW = [
+  ["x", 90,  "angX", "angBarX"],
+  ["y", 180, "angY", "angBarY"],
+  ["z", 180, "angZ", "angBarZ"]
+];
+
 function rows(tbl, pairs){
   tbl.innerHTML = pairs.map(([k,v]) =>
     "<tr><td>"+k+"</td><td>"+v+"</td></tr>").join("");
@@ -671,6 +837,31 @@ function frame(){
     $("rose").setAttribute("transform","rotate("+(-heading).toFixed(1)+" 100 100)");
     $("headTxt").innerHTML = heading.toFixed(0)+"<small>°</small>";
   }
+
+  // interpreted angles, optionally relative to a stored zero
+  const haveOrient = !!(o && o.alpha!==null && o.beta!==null && o.gamma!==null);
+  let ang = null;
+  if (haveOrient){
+    const q = quatFromOrientation(o.alpha, o.beta, o.gamma);
+    ang = eulerZXY(S.zeroQ ? quatRelative(S.zeroQ, q) : q);
+  }
+  ANGVIEW.forEach(([k, span, txtEl, barEl])=>{
+    const v = ang ? ang[k] : null;
+    $(txtEl).innerHTML = (v===null ? "—" : (v<0?"":"+") + v.toFixed(1)) + "<small>°</small>";
+    const bar = $(barEl);
+    if (v===null){ bar.style.width = "0"; return; }
+    const f = Math.max(-1, Math.min(1, v/span));
+    bar.style.width = Math.abs(f*50) + "%";
+    bar.style.left  = (f<0 ? 50 + f*50 : 50) + "%";
+  });
+  gAng.push([ang?ang.x:NaN, ang?ang.y:NaN, ang?ang.z:NaN]);
+  gAng.draw();
+  $("lampAngle").className = "lamp " + (haveOrient ? "live" : S.armed ? "warn" : "off");
+  $("zeroBtn").disabled = !haveOrient;
+  $("zeroBtn").textContent = S.zeroQ ? "Re-zero here" : "Set zero";
+  $("zeroState").textContent = S.zeroRef
+    ? "α "+fmt(S.zeroRef.alpha,1)+" · β "+fmt(S.zeroRef.beta,1)+" · γ "+fmt(S.zeroRef.gamma,1)
+    : "none · absolute";
 
   rows($("orientTable"), [
     ["alpha · yaw 0–360",   fmt(o&&o.alpha,2)],
@@ -738,6 +929,7 @@ function frame(){
       deviceorientationabsolute: S.orientAbs ? {
         alpha:S.orientAbs.alpha, beta:S.orientAbs.beta, gamma:S.orientAbs.gamma
       } : null,
+      angles: ang ? { x:ang.x, y:ang.y, z:ang.z, zeroedAt:S.zeroRef } : null,
       genericSensors: Object.fromEntries(Object.entries(S.generic).map(([k,v])=>[k, v.state==="live"?v.obj:v.state]))
     }, (k,v)=> typeof v === "number" ? Number(v.toFixed(4)) : v, 2);
   }
