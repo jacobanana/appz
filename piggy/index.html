@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Piggy — our shared expenses</title>
+<meta name="description" content="A shared-expenses piggy bank for two: recurring bills, everyday extras and holiday pots, with a running tally of who owes whom.">
+<meta name="theme-color" content="#F2F4FF">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🐷</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* palette is swapped at runtime — see THEMES in the script */
+  --ink:#23264F;
+  --ink-soft:#6E739B;
+  --paper:#F2F4FF;
+  --paperA:rgba(242,244,255,.85);
+  --glow1:#DDE4FF; --glow2:#D9F3F2; --glow3:#FFF0D6;
+  --tint:#EEF1FF; --tint2:#FAFBFF;
+  --card:#FFFFFF;
+  --line:#DFE3F2;
+  --accent:#5A67E8;
+  --mint:#17B39A;
+  --butter:#FFB43D;
+  --sky:#3EA7E8;
+  --grape:#9B6DFF;
+  --shadow:0 3px 0 rgba(43,36,64,.14);
+  --hard:3px 3px 0 var(--ink);
+  --r:18px;
+  --display:'Fredoka', ui-rounded, 'Segoe UI Rounded', 'Trebuchet MS', system-ui, sans-serif;
+  --body:'Nunito', ui-rounded, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--body);
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 12% 8%, var(--glow1) 0, transparent 45%),
+    radial-gradient(circle at 88% 4%, var(--glow2) 0, transparent 40%),
+    radial-gradient(circle at 60% 92%, var(--glow3) 0, transparent 45%),
+    var(--paper);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:96px;
+}
+h1,h2,h3,h4{font-family:var(--display);font-weight:600;margin:0;letter-spacing:.1px}
+button{font-family:inherit;color:inherit}
+input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px;border-radius:8px}
+
+/* ---------- layout ---------- */
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+.topbar{position:sticky;top:0;z-index:40;backdrop-filter:blur(10px);background:var(--paperA);border-bottom:2px solid var(--line)}
+.topbar-in{max-width:760px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:20px;font-weight:700}
+.brand .pig{font-size:22px;display:inline-block;transform:rotate(-6deg)}
+.spacer{flex:1}
+.icon-btn{width:38px;height:38px;border-radius:12px;border:2px solid var(--ink);background:var(--card);cursor:pointer;font-size:16px;display:grid;place-items:center;box-shadow:2px 2px 0 var(--ink);transition:transform .12s ease, box-shadow .12s ease}
+.icon-btn:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.ledger-bar{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 12px;max-width:760px;margin:0 auto;scrollbar-width:none}
+.ledger-bar::-webkit-scrollbar{display:none}
+.pill{white-space:nowrap;border:2px solid var(--ink);background:var(--card);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:transform .12s ease}
+.pill:hover{transform:translateY(-1px)}
+.pill.on{background:var(--ink);color:#fff}
+.pill.ghost{border-style:dashed;font-weight:600;color:var(--ink-soft);border-color:var(--ink-soft)}
+
+/* ---------- cards ---------- */
+.card{background:var(--card);border:2px solid var(--ink);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card.flat{box-shadow:none;border-color:var(--line)}
+.card-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.card-head h2{font-size:17px;flex:1;display:flex;align-items:center;gap:8px}
+.sub{color:var(--ink-soft);font-size:13px;font-weight:600}
+
+/* ---------- month nav ---------- */
+.monthnav{display:flex;align-items:center;gap:8px;margin:4px 0 14px}
+.monthnav h2{flex:1;text-align:center;font-size:19px}
+.today-link{display:block;text-align:center;margin:-8px 0 14px;font-size:12px;font-weight:700;color:var(--accent);background:none;border:0;cursor:pointer}
+
+/* ---------- receipt (signature) ---------- */
+.receipt{position:relative;background:#fff;border:2px solid var(--ink);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.receipt::before{content:"";position:absolute;top:0;left:0;right:0;height:6px;
+  background:repeating-linear-gradient(90deg,var(--accent) 0 14px,var(--butter) 14px 28px,var(--mint) 28px 42px,var(--sky) 42px 56px)}
+.tear{border-top:2px dashed var(--line);margin:14px -18px 12px}
+.receipt-title{font-family:var(--mono);font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink-soft);text-align:center;margin-bottom:12px}
+.rrow{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:13px;padding:5px 0}
+.rrow .dots{flex:1;border-bottom:2px dotted var(--line);transform:translateY(-3px)}
+.rrow .val{font-weight:700}
+.pos{color:var(--mint)}
+.neg{color:var(--accent)}
+.debt{display:flex;align-items:center;gap:10px;padding:12px;border:2px dashed var(--line);border-radius:14px;margin-top:10px;background:var(--tint2)}
+.debt .amt{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:16px}
+.arrow{font-size:18px;color:var(--ink-soft)}
+.stamp{margin:14px auto 2px;width:max-content;transform:rotate(-7deg);border:3px double var(--mint);color:var(--mint);border-radius:10px;padding:6px 16px;font-family:var(--display);font-weight:700;letter-spacing:2px;font-size:15px;opacity:.9}
+
+/* ---------- people ---------- */
+.avatar{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;border:2px solid var(--ink);flex:none;background:#eee}
+.avatar.lg{width:38px;height:38px;font-size:18px}
+.avatar.sm{width:20px;height:20px;font-size:10px;border-width:1.5px}
+.who{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px}
+.stack{display:flex}
+.stack .avatar+.avatar{margin-left:-8px}
+
+/* ---------- list items ---------- */
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;gap:11px;padding:10px 12px;border:2px solid var(--line);border-radius:14px;background:#fff;cursor:pointer;transition:border-color .12s ease, transform .12s ease}
+.item:hover{border-color:var(--ink);transform:translateY(-1px)}
+.item.skip{opacity:.45}
+.item.skip .name{text-decoration:line-through}
+.emo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;flex:none;background:var(--tint)}
+.item-main{min-width:0;flex:1}
+.name{font-weight:800;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;color:var(--ink-soft);font-size:12px;font-weight:600}
+.amount{font-family:var(--mono);font-weight:700;font-size:15px;text-align:right;flex:none}
+.amount small{display:block;font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px}
+.tag{border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800;border:1.5px solid currentColor;line-height:1.5}
+.t-dd{color:var(--sky)}
+.t-joint{color:var(--grape)}
+.t-freq{color:var(--butter);filter:brightness(.85)}
+.t-plan{color:var(--mint)}
+.daygroup{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-soft);margin:14px 0 6px}
+.empty{text-align:center;padding:22px 10px;color:var(--ink-soft);font-weight:600;font-size:14px}
+.empty .big{font-size:30px;display:block;margin-bottom:6px}
+
+/* ---------- totals strip ---------- */
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.tot{border:2px solid var(--line);border-radius:14px;padding:10px;text-align:center;background:#fff}
+.tot .k{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft)}
+.tot .v{font-family:var(--mono);font-weight:700;font-size:15px;margin-top:3px}
+
+/* ---------- buttons ---------- */
+.btn{border:2px solid var(--ink);background:#fff;border-radius:12px;padding:9px 14px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:2px 2px 0 var(--ink);transition:transform .1s ease, box-shadow .1s ease}
+.btn:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.mint{background:var(--mint);color:#fff}
+.btn.soft{box-shadow:none;border-color:var(--line);font-weight:700}
+.btn.danger{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:2px 2px 0 var(--accent)}
+.btn.wide{width:100%}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:10px}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap}
+.fab{position:fixed;right:max(16px,calc(50% - 380px + 16px));bottom:20px;z-index:35;border:2.5px solid var(--ink);background:var(--accent);color:#fff;border-radius:999px;padding:14px 20px;font-family:var(--display);font-weight:700;font-size:16px;cursor:pointer;box-shadow:var(--hard);display:flex;align-items:center;gap:8px}
+.fab:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+
+/* ---------- modal ---------- */
+.backdrop{position:fixed;inset:0;background:rgba(43,36,64,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0;overflow-y:auto;animation:fade .15s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:var(--card);border:2.5px solid var(--ink);border-radius:22px 22px 0 0;width:100%;max-width:560px;padding:18px 16px 26px;animation:up .2s cubic-bezier(.2,.9,.3,1);max-height:94vh;overflow-y:auto}
+@keyframes up{from{transform:translateY(28px)}to{transform:translateY(0)}}
+@media(min-width:620px){
+  .backdrop{align-items:center;padding:20px}
+  .modal{border-radius:22px}
+}
+.modal-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.modal-head h3{font-size:19px;flex:1}
+.grab{width:44px;height:5px;border-radius:99px;background:var(--line);margin:-6px auto 12px}
+.field{margin-bottom:13px}
+.field>label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin-bottom:5px}
+.input,select.input,textarea.input{width:100%;border:2px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--tint2);font-weight:600}
+.input:focus{border-color:var(--sky);background:#fff}
+select.input{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' stroke='%236C6484' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.amt-row{display:grid;grid-template-columns:1fr 108px;gap:10px}
+.amt-row .input{font-family:var(--mono);font-size:18px;font-weight:700}
+.seg{display:flex;border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--tint2);padding:9px 6px;font-weight:800;font-size:13px;cursor:pointer;border-right:2px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:#fff}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px 6px 6px;display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;cursor:pointer}
+.chip.on{border-color:var(--ink);background:var(--tint)}
+.chip .tick{font-size:12px;color:var(--mint);width:12px}
+.emopick{display:flex;gap:6px;flex-wrap:wrap;max-height:118px;overflow-y:auto;padding:4px;border:2px solid var(--line);border-radius:12px;background:var(--tint2)}
+.emopick button{border:2px solid transparent;background:#fff;border-radius:10px;width:38px;height:38px;font-size:18px;cursor:pointer;line-height:1}
+.emopick button.on{border-color:var(--ink);background:var(--tint)}
+.hint{font-size:12px;color:var(--ink-soft);font-weight:600;margin-top:6px;line-height:1.45}
+.splitrow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.splitrow .input{width:100px;font-family:var(--mono)}
+.splitrow .who{flex:1}
+.divider{height:2px;background:var(--line);border-radius:2px;margin:18px 0}
+.rate-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;margin-bottom:8px}
+.rate-row .code{font-family:var(--mono);font-weight:700}
+.bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;display:flex;margin-top:10px}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 6px 20px rgba(43,36,64,.3);animation:up .2s ease}
+.center{text-align:center}
+.mono{font-family:var(--mono)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="pig">🐷</span><span id="brandName">Piggy</span></div>
+    <div class="spacer"></div>
+    <button class="icon-btn" data-act="rules" title="Recurring bills">🔁</button>
+    <button class="icon-btn" data-act="settings" title="Settings">⚙️</button>
+  </div>
+  <div class="ledger-bar" id="ledgerBar"></div>
+</header>
+<main class="wrap" id="main"></main>
+<button class="fab" id="fab" data-act="add">＋ Add</button>
+<div id="modalRoot"></div>
+<script>
+(function(){
+"use strict";
+var booted=false;
+function fatal(msg){
+  try{
+    if(booted){ console.error(msg); return; }   // app is up and usable: log, don't wipe it
+    var m=document.getElementById('main'); if(!m) return;
+    m.innerHTML='<div class="card" style="margin-top:20px"><h2>Something broke 🙈</h2>'+
+      '<p class="sub" style="margin:10px 0;line-height:1.5">The app hit an error while starting up. '+
+      'Reloading usually fixes it. If it keeps happening, send this line along:</p>'+
+      '<div class="mono" style="font-size:12px;background:var(--tint);border-radius:10px;padding:10px;word-break:break-word">'+
+      String(msg).replace(/</g,'&lt;')+'</div></div>';
+  }catch(e){}
+}
+window.addEventListener('error', function(e){ fatal(e.message||e); });
+window.addEventListener('unhandledrejection', function(e){ fatal((e.reason&&e.reason.message)||e.reason); });
+/* =======================================================================
+   PIGGY — shared household expenses
+   Flat, relational data model so it maps 1:1 to SQL tables later:
+   people | accounts | ledgers | rules | overrides | expenses | settlements
+   Money = decimal amount + ISO currency code + fx snapshot.
+   ======================================================================= */
+
+const KEY = 'piggy.ledger.v1';
+const SCHEMA = 1;
+
+/* ---------- storage adapter (artifact-safe + localStorage fallback) ---- */
+const Store = {
+  async load(){
+    if (typeof window !== 'undefined' && window.storage) {
+      try { const r = await window.storage.get(KEY); return r && r.value ? JSON.parse(r.value) : null; }
+      catch(e){ return null; }
+    }
+    try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; }
+    catch(e){ return null; }
+  },
+  async save(data){
+    const json = JSON.stringify(data);
+    if (typeof window !== 'undefined' && window.storage) {
+      try { await window.storage.set(KEY, json); return true; } catch(e){}
+    }
+    try { localStorage.setItem(KEY, json); return true; } catch(e){ return false; }
+  }
+};
+
+/* ---------- tiny utils ---------- */
+const uid = p => (p||'') + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const $ = (s,r) => (r||document).querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2 = n => Math.round((Number(n)||0)*100)/100;
+const cents = n => Math.round((Number(n)||0)*100);
+const fromCents = c => c/100;
+const todayISO = () => new Date().toISOString().slice(0,10);
+const monthOf = iso => String(iso).slice(0,7);
+const thisMonth = () => todayISO().slice(0,7);
+const addMonths = (key,n) => { const [y,m]=key.split('-').map(Number); const d=new Date(y, m-1+n, 1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+const monthIndex = key => { const [y,m]=key.split('-').map(Number); return y*12+(m-1); };
+const daysInMonth = key => { const [y,m]=key.split('-').map(Number); return new Date(y,m,0).getDate(); };
+const monthLabel = key => { const [y,m]=key.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString(undefined,{month:'long',year:'numeric'}); };
+const dayLabel = iso => { const d=new Date(iso+'T12:00:00'); return d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}); };
+
+function money(amount, code){
+  const n = r2(amount);
+  try { return new Intl.NumberFormat(undefined,{style:'currency',currency:code,currencyDisplay:'code',minimumFractionDigits:2}).format(n).replace(/\u00a0/g,' '); }
+  catch(e){ return code+' '+n.toFixed(2); }
+}
+const CATEGORIES = [
+  ['🏠','Home & rent'],['💡','Utilities'],['🛒','Groceries'],['🌐','Internet & phone'],
+  ['🛡️','Insurance'],['🚆','Transport'],['📺','Subscriptions'],['💊','Health'],
+  ['🧹','Cleaning'],['🍜','Eating out'],['🎉','Fun'],['✈️','Travel'],['🏨','Stay'],
+  ['🎁','Gifts'],['🐾','Pets'],['👶','Kids'],['🛋️','Furniture'],['💅','Personal'],
+  ['🍷','Drinks'],['⛽','Car'],['📦','Other']
+];
+const THEMES = {
+  blueberry:{ label:'Blueberry', ink:'#23264F', inkSoft:'#6E739B', paper:'#F2F4FF', paperA:'rgba(242,244,255,.85)',
+    glow1:'#DDE4FF', glow2:'#D9F3F2', glow3:'#FFF0D6', tint:'#EEF1FF', tint2:'#FAFBFF', line:'#DFE3F2',
+    accent:'#5A67E8', mint:'#17B39A', butter:'#FFB43D', sky:'#3EA7E8', grape:'#9B6DFF' },
+  citrus:{ label:'Citrus', ink:'#3A2A1E', inkSoft:'#8A7259', paper:'#FFF8EE', paperA:'rgba(255,248,238,.85)',
+    glow1:'#FFE6C9', glow2:'#DDF3EC', glow3:'#FFF3C9', tint:'#FFF1DE', tint2:'#FFFCF6', line:'#F0E3D2',
+    accent:'#F2683C', mint:'#1EA98D', butter:'#F5B400', sky:'#3FA9C9', grape:'#C07BE8' },
+  meadow:{ label:'Meadow', ink:'#1E3A2E', inkSoft:'#5F7D6C', paper:'#F3FBF3', paperA:'rgba(243,251,243,.85)',
+    glow1:'#D8F0DC', glow2:'#E9F7CF', glow3:'#FFF1D8', tint:'#EAF6EA', tint2:'#FAFDF9', line:'#DCE9DC',
+    accent:'#1FA968', mint:'#0FA3A3', butter:'#F2A93B', sky:'#3E8BD8', grape:'#8E7BE8' },
+  midnight:{ label:'Midnight', ink:'#1B2440', inkSoft:'#6A7495', paper:'#EDF1F7', paperA:'rgba(237,241,247,.85)',
+    glow1:'#DCE6F5', glow2:'#E4DEF7', glow3:'#D9F0EA', tint:'#E9EEF7', tint2:'#F9FBFE', line:'#D9E0EC',
+    accent:'#2F3E64', mint:'#12A594', butter:'#E0A02C', sky:'#4A90D9', grape:'#7C6BD4' },
+  bubblegum:{ label:'Bubblegum', ink:'#2B2440', inkSoft:'#6C6484', paper:'#FFF1F4', paperA:'rgba(255,241,244,.82)',
+    glow1:'#FFE3EC', glow2:'#E4F6F1', glow3:'#FFF6DE', tint:'#FDF1F5', tint2:'#FFFBFC', line:'#E7DFEA',
+    accent:'#FF5C8A', mint:'#18BFA0', butter:'#FFCB47', sky:'#6C8CFF', grape:'#A97BFF' }
+};
+let COLORS = ['#5A67E8','#3EA7E8','#17B39A','#FFB43D','#9B6DFF','#F2683C','#4FC3F7','#E86A9B'];
+function applyTheme(name){
+  const t = THEMES[name] || THEMES.blueberry;
+  const s = document.documentElement.style;
+  s.setProperty('--ink',t.ink); s.setProperty('--ink-soft',t.inkSoft);
+  s.setProperty('--paper',t.paper); s.setProperty('--paperA',t.paperA);
+  s.setProperty('--glow1',t.glow1); s.setProperty('--glow2',t.glow2); s.setProperty('--glow3',t.glow3);
+  s.setProperty('--tint',t.tint); s.setProperty('--tint2',t.tint2); s.setProperty('--line',t.line);
+  s.setProperty('--accent',t.accent); s.setProperty('--mint',t.mint);
+  s.setProperty('--butter',t.butter); s.setProperty('--sky',t.sky); s.setProperty('--grape',t.grape);
+  COLORS = [t.accent,t.sky,t.mint,t.butter,t.grape,'#E86A9B','#4FC3F7','#8FBF3F'];
+}
+const METHODS = [
+  ['card','💳 Card'],['direct-debit','🔁 Direct debit'],['transfer','🏦 Bank transfer'],
+  ['cash','💵 Cash / on the spot'],['twint','📲 Twint / app'],['other','✨ Other']
+];
+const FREQS = [['monthly','Every month'],['bimonthly','Every 2 months'],['quarterly','Every 3 months'],['semiannual','Every 6 months'],['yearly','Once a year']];
+const FREQ_STEP = {monthly:1,bimonthly:2,quarterly:3,semiannual:6,yearly:12};
+const FREQ_TAG = {monthly:'monthly',bimonthly:'2-monthly',quarterly:'quarterly',semiannual:'6-monthly',yearly:'yearly'};
+const DEFAULT_RATES = { CHF:1, EUR:0.94, USD:0.81, GBP:1.09, JPY:0.0053, SEK:0.085, NOK:0.077, DKK:0.126, CZK:0.037, PLN:0.22, HUF:0.0024, THB:0.024, TRY:0.021, CAD:0.59, AUD:0.53 };
+
+/* ---------- state ---------- */
+let S = null;
+let UI = { ledgerId:null, month:thisMonth(), scope:'month' };
+
+function blankState(){
+  return {
+    schemaVersion: SCHEMA,
+    meta:{ appName:'Piggy', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() },
+    settings:{ theme:'blueberry', baseCurrency:'CHF', currencies:['CHF','EUR','USD'], rates:{...DEFAULT_RATES}, ratesUpdatedAt:null },
+    people:[], accounts:[], ledgers:[], rules:[], overrides:[], expenses:[], settlements:[]
+  };
+}
+
+let saveTimer = null;
+function save(){
+  S.meta.updatedAt = new Date().toISOString();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=> Store.save(S), 120);
+}
+function commit(){ save(); render(); }
+
+/* ---------- lookups ---------- */
+const person = id => S.people.find(p=>p.id===id);
+const account = id => S.accounts.find(a=>a.id===id);
+const ledger = id => S.ledgers.find(l=>l.id===id);
+const rule = id => S.rules.find(r=>r.id===id);
+const activeLedger = () => ledger(UI.ledgerId) || S.ledgers[0];
+const baseCur = () => S.settings.baseCurrency;
+const rateOf = code => { const v = Number(S.settings.rates[code]); return isFinite(v) && v>0 ? v : 1; };
+function personalAccount(personId){
+  return S.accounts.find(a=>a.kind==='personal' && a.ownership[personId]===1) || S.accounts[0];
+}
+function accountLabel(id){
+  const a = account(id); if(!a) return '—';
+  if(a.kind==='personal'){ const p=person(Object.keys(a.ownership)[0]); return p ? p.name : a.name; }
+  return a.name;
+}
+function accountEmoji(id){
+  const a = account(id); if(!a) return '💰';
+  if(a.kind==='joint') return '💞';
+  const p = person(Object.keys(a.ownership)[0]); return p ? p.emoji : '💰';
+}
+
+/* ---------- fx ---------- */
+function toBase(amount, currency, fxRate){
+  const rate = (fxRate != null && isFinite(Number(fxRate)) && Number(fxRate)>0) ? Number(fxRate) : rateOf(currency);
+  return r2((Number(amount)||0) * rate);
+}
+
+/* ---------- splitting ---------- */
+function splitCents(split, totalCents){
+  const all = S.people.map(p=>p.id);
+  let parts = (split && split.participants && split.participants.length ? split.participants : all).filter(id=>person(id));
+  if(!parts.length) parts = all.slice();
+  const out = {};
+  const mode = (split && split.mode) || 'equal';
+  const vals = (split && split.values) || {};
+  if(mode==='exact'){
+    let sum=0; parts.forEach(id=>{ const c=cents(vals[id]); out[id]=c; sum+=c; });
+    const diff = totalCents - sum;
+    if(diff!==0) out[parts[0]] = (out[parts[0]]||0) + diff;
+    return out;
+  }
+  let w = parts.map(id => mode==='shares' ? (Number(vals[id])||0) : 1);
+  if(w.reduce((a,b)=>a+b,0) <= 0) w = parts.map(()=>1);
+  const tw = w.reduce((a,b)=>a+b,0);
+  let acc=0;
+  parts.forEach((id,i)=>{
+    const c = (i===parts.length-1) ? totalCents-acc : Math.round(totalCents*w[i]/tw);
+    out[id]=c; acc+=c;
+  });
+  return out;
+}
+
+/* ---------- recurring occurrences ---------- */
+function ruleHitsMonth(r, monthKey){
+  if(!r.active) return false;
+  if(r.startMonth && monthIndex(monthKey) < monthIndex(r.startMonth)) return false;
+  if(r.endMonth && monthIndex(monthKey) > monthIndex(r.endMonth)) return false;
+  const step = FREQ_STEP[r.frequency] || 1;
+  const anchor = monthIndex(r.startMonth || monthKey);
+  return (((monthIndex(monthKey) - anchor) % step) + step) % step === 0;
+}
+const overrideOf = (ruleId, period) => S.overrides.find(o=>o.ruleId===ruleId && o.period===period);
+
+function occurrence(r, monthKey){
+  const ov = overrideOf(r.id, monthKey) || {};
+  const day = Math.min(r.dueDay || 1, daysInMonth(monthKey));
+  return {
+    kind:'recurring',
+    id: r.id+'|'+monthKey,
+    ruleId: r.id, period: monthKey, ledgerId: r.ledgerId,
+    date: ov.date || (monthKey+'-'+String(day).padStart(2,'0')),
+    name: r.name, emoji: r.emoji,
+    amount: ov.amount != null ? ov.amount : r.amount,
+    currency: ov.currency || r.currency,
+    fxRate: null,
+    accountId: ov.accountId || r.accountId,
+    method: r.method,
+    split: ov.split || r.split,
+    frequency: r.frequency,
+    skipped: !!ov.skipped,
+    notes: r.notes || ''
+  };
+}
+function occurrencesFor(ledgerId, monthKey){
+  return S.rules.filter(r=>r.ledgerId===ledgerId && ruleHitsMonth(r, monthKey))
+                .map(r=>occurrence(r, monthKey))
+                .sort((a,b)=> (a.date<b.date?-1:1));
+}
+function upcomingRules(ledgerId, fromMonth, months){
+  const out=[];
+  for(let i=1;i<=months;i++){
+    const mk = addMonths(fromMonth,i);
+    S.rules.filter(r=>r.ledgerId===ledgerId && r.frequency!=='monthly' && ruleHitsMonth(r,mk))
+      .forEach(r=>{ const o=occurrence(r,mk); if(!o.skipped) out.push(o); });
+  }
+  return out.slice(0,4);
+}
+
+/* ---------- items in scope ---------- */
+function allOccurrencesEver(ledgerId){
+  const rs = S.rules.filter(r=>r.ledgerId===ledgerId);
+  if(!rs.length) return [];
+  const from = Math.min(...rs.map(r=>monthIndex(r.startMonth||thisMonth())));
+  const to = Math.max(from, monthIndex(thisMonth()));
+  const out=[];
+  for(let i=from;i<=to;i++){
+    const mk = Math.floor(i/12)+'-'+String(i%12+1).padStart(2,'0');
+    occurrencesFor(ledgerId, mk).forEach(o=>{ if(!o.skipped) out.push(o); });
+  }
+  return out;
+}
+function itemsInScope(ledgerId, monthKey){
+  const ad = S.expenses.filter(e=>e.ledgerId===ledgerId && (!monthKey || monthOf(e.date)===monthKey))
+                       .map(e=>({...e, kind:'adhoc'}));
+  const rec = monthKey ? occurrencesFor(ledgerId, monthKey).filter(o=>!o.skipped)
+                       : allOccurrencesEver(ledgerId);
+  return [...rec, ...ad];
+}
+
+/* ---------- balances ---------- */
+function computeBalances(ledgerId, monthKey){
+  const bal = {}; S.people.forEach(p=>bal[p.id]=0);
+  itemsInScope(ledgerId, monthKey).forEach(it=>{
+    const tc = cents(toBase(it.amount, it.currency, it.fxRate));
+    const acc = account(it.accountId);
+    if(acc){ Object.entries(acc.ownership).forEach(([pid,share])=>{ if(bal[pid]!=null) bal[pid] += tc*Number(share); }); }
+    const owed = splitCents(it.split, tc);
+    Object.entries(owed).forEach(([pid,c])=>{ if(bal[pid]!=null) bal[pid] -= c; });
+  });
+  S.settlements.filter(s=>s.ledgerId===ledgerId && (!monthKey || monthOf(s.date)===monthKey)).forEach(s=>{
+    const c = cents(toBase(s.amount, s.currency, s.fxRate));
+    if(bal[s.fromPersonId]!=null) bal[s.fromPersonId] += c;
+    if(bal[s.toPersonId]!=null) bal[s.toPersonId] -= c;
+  });
+  Object.keys(bal).forEach(k=>bal[k]=Math.round(bal[k]));
+  return bal;
+}
+function simplifyDebts(bal){
+  const cred=[],deb=[];
+  Object.entries(bal).forEach(([id,c])=>{ if(c>1) cred.push([id,c]); else if(c<-1) deb.push([id,-c]); });
+  cred.sort((a,b)=>b[1]-a[1]); deb.sort((a,b)=>b[1]-a[1]);
+  const out=[]; let i=0,j=0;
+  while(i<deb.length && j<cred.length){
+    const amt=Math.min(deb[i][1],cred[j][1]);
+    if(amt>0) out.push({from:deb[i][0],to:cred[j][0],cents:amt});
+    deb[i][1]-=amt; cred[j][1]-=amt;
+    if(deb[i][1]<=0)i++; if(cred[j][1]<=0)j++;
+  }
+  return out;
+}
+function paidByTotals(ledgerId, monthKey){
+  const out={}; S.people.forEach(p=>out[p.id]=0);
+  itemsInScope(ledgerId, monthKey).forEach(it=>{
+    const tc = cents(toBase(it.amount,it.currency,it.fxRate));
+    const acc = account(it.accountId);
+    if(acc) Object.entries(acc.ownership).forEach(([pid,sh])=>{ if(out[pid]!=null) out[pid]+=tc*Number(sh); });
+  });
+  Object.keys(out).forEach(k=>out[k]=Math.round(out[k]));
+  return out;
+}
+function categoryTotals(ledgerId, monthKey){
+  const map={};
+  itemsInScope(ledgerId, monthKey).forEach(it=>{
+    const k = it.emoji || '📦';
+    map[k] = (map[k]||0) + cents(toBase(it.amount,it.currency,it.fxRate));
+  });
+  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+}
+
+/* =======================  RENDERING  ======================= */
+
+function avatar(p, cls){
+  if(!p) return '';
+  return '<span class="avatar '+(cls||'')+'" style="background:'+p.color+'22;border-color:'+p.color+'">'+esc(p.emoji||p.name[0])+'</span>';
+}
+function whoChip(p, cls){ return p ? '<span class="who">'+avatar(p,cls)+esc(p.name)+'</span>' : ''; }
+
+function render(){
+  if(!S.people.length){ renderOnboarding(); return; }
+  const l = activeLedger();
+  if(!l){ renderNoLedger(); return; }
+  UI.ledgerId = l.id;
+  $('#brandName').textContent = S.meta.appName || 'Piggy';
+  renderLedgerBar();
+  $('#main').innerHTML = l.kind==='trip' ? tripView(l) : householdView(l);
+  $('#fab').style.display = 'flex';
+}
+
+function renderLedgerBar(){
+  const bar = S.ledgers.filter(l=>!l.archived).map(l=>
+    '<button class="pill '+(l.id===UI.ledgerId?'on':'')+'" data-act="ledger" data-id="'+l.id+'">'+esc(l.emoji)+' '+esc(l.name)+'</button>'
+  ).join('');
+  $('#ledgerBar').innerHTML = bar + '<button class="pill ghost" data-act="new-ledger">＋ New list</button>';
+}
+
+function renderOnboarding(){
+  $('#ledgerBar').innerHTML=''; $('#fab').style.display='none';
+  $('#main').innerHTML = `
+  <div class="card" style="margin-top:20px">
+    <h2 style="font-size:22px">Hello you two 👋</h2>
+    <p class="sub" style="margin:8px 0 18px;line-height:1.5">Piggy keeps your shared spending tidy: recurring bills, everyday extras, and holidays — with a running tally of who owes whom.</p>
+    <div class="two">
+      <div class="field"><label>First name</label><input class="input" id="ob1" placeholder="e.g. Léa" autocomplete="off"></div>
+      <div class="field"><label>Second name</label><input class="input" id="ob2" placeholder="e.g. Marc" autocomplete="off"></div>
+    </div>
+    <div class="field"><label>Main currency</label>
+      <select class="input" id="obCur">${['CHF','EUR','USD','GBP'].map(c=>'<option '+(c==='CHF'?'selected':'')+'>'+c+'</option>').join('')}</select>
+    </div>
+    <button class="btn primary wide" data-act="ob-go">Start our piggy bank 🐷</button>
+  </div>`;
+}
+function renderNoLedger(){
+  $('#main').innerHTML = '<div class="card center"><div class="empty"><span class="big">📒</span>No lists yet.</div><button class="btn primary" data-act="new-ledger">Create one</button></div>';
+}
+
+/* ---------- receipt ---------- */
+function receiptCard(l, monthKey){
+  const bal = computeBalances(l.id, monthKey);
+  const paid = paidByTotals(l.id, monthKey);
+  const debts = simplifyDebts(bal);
+  const scopeLabel = monthKey ? monthLabel(monthKey) : 'everything so far';
+  const rows = S.people.map(p=>{
+    const b = bal[p.id]||0;
+    return '<div class="rrow"><span>'+esc(p.emoji)+' '+esc(p.name)+'</span><span class="dots"></span>'+
+      '<span class="val '+(b>1?'pos':b<-1?'neg':'')+'">'+(b>1?'+':'')+fromCents(b).toFixed(2)+'</span></div>';
+  }).join('');
+  const paidRows = S.people.map(p=>'<div class="rrow" style="color:var(--ink-soft)"><span>paid by '+esc(p.name)+'</span><span class="dots"></span><span>'+fromCents(paid[p.id]||0).toFixed(2)+'</span></div>').join('');
+  const body = debts.length ? debts.map(d=>{
+    const a=person(d.from), b=person(d.to);
+    return '<div class="debt">'+avatar(a,'lg')+'<div><div style="font-weight:800">'+esc(a.name)+' owes '+esc(b.name)+'</div><div class="sub">'+esc(scopeLabel)+'</div></div>'+
+      '<span class="amt">'+money(fromCents(d.cents), baseCur())+'</span></div>';
+  }).join('') : '<div class="stamp">ALL SQUARE ✨</div>';
+
+  const scopeSeg = l.kind==='trip' ? '' :
+    '<div class="seg" style="margin-bottom:14px"><button data-act="scope" data-v="month" class="'+(UI.scope==='month'?'on':'')+'">This month</button>'+
+    '<button data-act="scope" data-v="all" class="'+(UI.scope==='all'?'on':'')+'">All time</button></div>';
+
+  return '<div class="receipt" style="padding-top:22px">'+scopeSeg+
+    '<div class="receipt-title">the tally · '+esc(baseCur())+'</div>'+
+    rows + '<div class="tear"></div>' + paidRows + '<div class="tear"></div>' + body +
+    (debts.length ? '<button class="btn mint wide" style="margin-top:14px" data-act="settle">Settle up 🤝</button>' : '')+
+  '</div>';
+}
+
+/* ---------- item row ---------- */
+function itemRow(it){
+  const acc = account(it.accountId);
+  const base = toBase(it.amount, it.currency, it.fxRate);
+  const foreign = it.currency !== baseCur();
+  const tags = [];
+  if(it.kind==='recurring') tags.push('<span class="tag t-freq">'+FREQ_TAG[it.frequency]+'</span>');
+  if(it.method==='direct-debit') tags.push('<span class="tag t-dd">direct debit</span>');
+  if(acc && acc.kind==='joint') tags.push('<span class="tag t-joint">joint</span>');
+  const split = it.split||{};
+  const parts = (split.participants&&split.participants.length?split.participants:S.people.map(p=>p.id));
+  const splitTxt = parts.length===S.people.length && (split.mode||'equal')==='equal' ? 'split evenly'
+    : (split.mode==='exact'?'custom amounts':split.mode==='shares'?'by shares':'for '+parts.map(id=>(person(id)||{}).name).filter(Boolean).join(' & '));
+  return '<div class="item '+(it.skipped?'skip':'')+'" data-act="open" data-kind="'+it.kind+'" data-id="'+it.id+'">'+
+    '<div class="emo">'+esc(it.emoji||'📦')+'</div>'+
+    '<div class="item-main"><div class="name">'+esc(it.name)+'</div>'+
+      '<div class="meta">'+(acc?'<span>'+accountEmoji(it.accountId)+' '+esc(accountLabel(it.accountId))+'</span>':'')+
+      '<span>·</span><span>'+esc(splitTxt)+'</span>'+tags.join('')+'</div></div>'+
+    '<div class="amount">'+(it.skipped?'—':money(base, baseCur()))+
+      (foreign?'<small>'+money(it.amount,it.currency)+'</small>':'')+'</div></div>';
+}
+
+/* ---------- household ---------- */
+function householdView(l){
+  const mk = UI.month;
+  const recs = occurrencesFor(l.id, mk);
+  const ad = S.expenses.filter(e=>e.ledgerId===l.id && monthOf(e.date)===mk)
+                       .sort((a,b)=> a.date===b.date ? (b.createdAt||'').localeCompare(a.createdAt||'') : (a.date<b.date?1:-1));
+  const scope = UI.scope==='all' ? null : mk;
+  const recTotal = recs.filter(o=>!o.skipped).reduce((s,o)=>s+cents(toBase(o.amount,o.currency,o.fxRate)),0);
+  const adTotal = ad.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
+  const soon = upcomingRules(l.id, mk, 12);
+
+  let out = `
+  <div class="monthnav">
+    <button class="icon-btn" data-act="month" data-v="-1">‹</button>
+    <h2>${monthLabel(mk)}</h2>
+    <button class="icon-btn" data-act="month" data-v="1">›</button>
+  </div>`;
+  if(mk!==thisMonth()) out += '<button class="today-link" data-act="month" data-v="0">jump back to today</button>';
+
+  out += `<div class="totals">
+    <div class="tot"><div class="k">Recurring</div><div class="v">${fromCents(recTotal).toFixed(0)}</div></div>
+    <div class="tot"><div class="k">Extras</div><div class="v">${fromCents(adTotal).toFixed(0)}</div></div>
+    <div class="tot" style="border-color:var(--ink)"><div class="k">Total ${esc(baseCur())}</div><div class="v">${fromCents(recTotal+adTotal).toFixed(0)}</div></div>
+  </div>`;
+
+  out += receiptCard(l, scope);
+
+  out += '<div class="card"><div class="card-head"><h2>🔁 Recurring</h2>'+
+    '<button class="btn soft sm" data-act="rules">Manage</button></div>'+
+    (recs.length ? '<div class="list">'+recs.map(itemRow).join('')+'</div>'
+      : '<div class="empty"><span class="big">🗓️</span>No recurring bills land in this month.<br><button class="btn soft sm" style="margin-top:10px" data-act="new-rule">Add a recurring bill</button></div>')+
+    '</div>';
+
+  out += '<div class="card"><div class="card-head"><h2>🧾 Extras this month</h2>'+
+    '<span class="sub">'+ad.length+' item'+(ad.length===1?'':'s')+'</span></div>'+
+    (ad.length ? '<div class="list">'+ad.map(e=>itemRow({...e,kind:'adhoc'})).join('')+'</div>'
+      : '<div class="empty"><span class="big">🌸</span>Nothing extra yet — a clean month!</div>')+
+    '</div>';
+
+  out += catCard(l.id, mk);
+
+  if(soon.length){
+    out += '<div class="card flat"><div class="card-head"><h2>👀 Coming up</h2></div><div class="list">'+
+      soon.map(o=>'<div class="item" data-act="open" data-kind="recurring" data-id="'+o.id+'"><div class="emo">'+esc(o.emoji)+'</div>'+
+        '<div class="item-main"><div class="name">'+esc(o.name)+'</div><div class="meta">'+monthLabel(o.period)+' · '+FREQ_TAG[o.frequency]+'</div></div>'+
+        '<div class="amount">'+money(toBase(o.amount,o.currency,null),baseCur())+'</div></div>').join('')+
+      '</div></div>';
+  }
+  return out;
+}
+
+function catCard(ledgerId, mk){
+  const cats = categoryTotals(ledgerId, mk);
+  if(!cats.length) return '';
+  const total = cats.reduce((s,c)=>s+c[1],0) || 1;
+  const bar = cats.slice(0,8).map((c,i)=>'<span style="width:'+(c[1]/total*100)+'%;background:'+COLORS[i%COLORS.length]+'"></span>').join('');
+  const leg = cats.slice(0,8).map((c,i)=>'<span><i style="background:'+COLORS[i%COLORS.length]+'"></i>'+c[0]+' '+fromCents(c[1]).toFixed(0)+'</span>').join('');
+  return '<div class="card flat"><div class="card-head"><h2>🍰 Where it went</h2><span class="sub">'+money(fromCents(total),baseCur())+'</span></div>'+
+    '<div class="bar">'+bar+'</div><div class="legend">'+leg+'</div></div>';
+}
+
+/* ---------- trip ---------- */
+function tripView(l){
+  const items = S.expenses.filter(e=>e.ledgerId===l.id).sort((a,b)=> a.date<b.date?1:-1);
+  const total = items.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
+  const days = {};
+  items.forEach(e=>{ (days[e.date] = days[e.date]||[]).push(e); });
+  const range = [l.startDate,l.endDate].filter(Boolean).map(dayLabel).join(' → ');
+
+  let out = '<div class="card" style="margin-top:16px"><div class="card-head">'+
+    '<h2 style="font-size:21px">'+esc(l.emoji)+' '+esc(l.name)+'</h2>'+
+    '<button class="icon-btn" data-act="edit-ledger" data-id="'+l.id+'">✏️</button></div>'+
+    '<div class="sub">'+(range||'no dates set')+' · '+items.length+' expenses</div>'+
+    '<div class="mono" style="font-size:30px;font-weight:700;margin-top:10px">'+money(fromCents(total),baseCur())+'</div>'+
+    '</div>';
+
+  out += receiptCard(l, null);
+
+  if(!items.length){
+    out += '<div class="card"><div class="empty"><span class="big">🧳</span>No expenses yet. Tap ＋ Add after the first coffee.</div></div>';
+  } else {
+    out += '<div class="card"><div class="card-head"><h2>🧾 Expenses</h2></div>'+
+      Object.keys(days).sort().reverse().map(d=>
+        '<div class="daygroup">'+dayLabel(d)+'</div><div class="list">'+days[d].map(e=>itemRow({...e,kind:'adhoc'})).join('')+'</div>'
+      ).join('')+'</div>';
+    out += catCard(l.id, null);
+  }
+  return out;
+}
+
+/* =======================  MODALS & FORMS  ======================= */
+let F = {};   // transient form state (emoji + split being edited)
+
+function openModal(html, onMount){
+  $('#modalRoot').innerHTML = '<div class="backdrop" data-act="backdrop"><div class="modal" data-stop>'+
+    '<div class="grab"></div>'+html+'</div></div>';
+  document.body.style.overflow='hidden';
+  if(onMount) onMount();
+}
+function closeModal(){ $('#modalRoot').innerHTML=''; document.body.style.overflow=''; F={}; }
+function toast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
+}
+function head(title, extra){
+  return '<div class="modal-head"><h3>'+title+'</h3>'+(extra||'')+'<button class="icon-btn" data-act="close">✕</button></div>';
+}
+function emojiPicker(sel){
+  return '<div class="emopick" id="emoPick">'+CATEGORIES.map(c=>
+    '<button type="button" data-act="emo" data-v="'+c[0]+'" class="'+(c[0]===sel?'on':'')+'" title="'+c[1]+'">'+c[0]+'</button>').join('')+'</div>';
+}
+function curOptions(sel){
+  const list = Array.from(new Set([baseCur(), ...S.settings.currencies, ...Object.keys(S.settings.rates)]));
+  return list.map(c=>'<option value="'+c+'" '+(c===sel?'selected':'')+'>'+c+'</option>').join('');
+}
+function accountOptions(sel){
+  return S.accounts.map(a=>'<option value="'+a.id+'" '+(a.id===sel?'selected':'')+'>'+accountEmoji(a.id)+' '+esc(accountLabel(a.id))+'</option>').join('');
+}
+function methodOptions(sel){ return METHODS.map(m=>'<option value="'+m[0]+'" '+(m[0]===sel?'selected':'')+'>'+m[1]+'</option>').join(''); }
+
+/* ---------- split editor ---------- */
+function splitBox(){
+  const sp = F.split, mode = sp.mode;
+  let inner;
+  if(mode==='equal'){
+    inner = '<div class="chips">'+S.people.map(p=>{
+      const on = sp.participants.includes(p.id);
+      return '<button type="button" class="chip '+(on?'on':'')+'" data-act="split-who" data-id="'+p.id+'">'+
+        '<span class="tick">'+(on?'✓':'')+'</span>'+avatar(p,'sm')+esc(p.name)+'</button>';
+    }).join('')+'</div><div class="hint">Split evenly between everyone ticked. Untick one person and the other pays it all.</div>';
+  } else {
+    inner = S.people.map(p=>{
+      const on = sp.participants.includes(p.id);
+      return '<div class="splitrow"><button type="button" class="chip '+(on?'on':'')+'" data-act="split-who" data-id="'+p.id+'" style="flex:1">'+
+        '<span class="tick">'+(on?'✓':'')+'</span>'+avatar(p,'sm')+esc(p.name)+'</button>'+
+        '<input class="input" inputmode="decimal" data-act="split-val" data-id="'+p.id+'" value="'+(sp.values[p.id]!=null?sp.values[p.id]:'')+'" placeholder="'+(mode==='shares'?'1':'0.00')+'"></div>';
+    }).join('') + '<div class="hint">'+(mode==='shares'
+      ? 'Weights, not money — 2 and 1 means two thirds / one third.'
+      : 'Exact amounts in the expense currency. Any rounding difference goes to the first person.')+'</div>';
+  }
+  return '<div class="seg" style="margin-bottom:10px">'+
+    [['equal','Evenly'],['shares','By shares'],['exact','Exact']].map(m=>
+      '<button type="button" data-act="split-mode" data-v="'+m[0]+'" class="'+(mode===m[0]?'on':'')+'">'+m[1]+'</button>').join('')+
+    '</div>'+inner;
+}
+function refreshSplit(){ const el=$('#splitBox'); if(el) el.innerHTML = splitBox(); }
+function readSplit(){
+  const sp = { mode:F.split.mode, participants:F.split.participants.slice(), values:{} };
+  if(sp.mode!=='equal'){ Object.entries(F.split.values).forEach(([k,v])=>{ if(sp.participants.includes(k)) sp.values[k]=Number(v)||0; }); }
+  if(!sp.participants.length) sp.participants = S.people.map(p=>p.id);
+  return sp;
+}
+function initSplit(split){
+  F.split = {
+    mode:(split&&split.mode)||'equal',
+    participants:(split&&split.participants&&split.participants.length?split.participants.slice():S.people.map(p=>p.id)),
+    values:Object.assign({}, split&&split.values)
+  };
+}
+
+/* ---------- shared money fields ---------- */
+function moneyFields(amount, currency, fxRate, withRate){
+  const foreign = currency !== baseCur() && withRate!==false;
+  return `<div class="field"><label>Amount</label>
+    <div class="amt-row">
+      <input class="input" id="fAmount" inputmode="decimal" value="${amount!=null?amount:''}" placeholder="0.00">
+      <select class="input" id="fCur">${curOptions(currency)}</select>
+    </div></div>
+    ${withRate===false?'<div class="hint" style="margin-top:-6px">Foreign bills use the live rate from settings, so they follow the exchange rate over time.</div>':''}
+    <div class="field" id="rateRow" style="${(withRate===false)?'display:none':(foreign?'':'display:none')}">
+      <label>Rate — 1 <span id="rateCode">${esc(currency)}</span> = ? ${esc(baseCur())}</label>
+      <input class="input mono" id="fRate" inputmode="decimal" value="${fxRate!=null?fxRate:rateOf(currency)}">
+      <div class="hint">Saved with the expense so old months never change.</div>
+    </div>`;
+}
+function wireMoney(){
+  const cur=$('#fCur');
+  if(cur) cur.addEventListener('change',()=>{
+    if(!$('#rateRow')) return;
+    const foreign = cur.value!==baseCur();
+    $('#rateRow').style.display = foreign?'':'none';
+    $('#rateCode').textContent = cur.value;
+    $('#fRate').value = rateOf(cur.value);
+  });
+}
+const readAmount = () => Number($('#fAmount').value.replace(',','.'))||0;
+const readRate = () => { const c=$('#fCur').value; return c===baseCur()?1:(Number($('#fRate').value.replace(',','.'))||rateOf(c)); };
+
+/* ---------- expense form ---------- */
+function expenseForm(exp){
+  const l = activeLedger();
+  const isNew = !exp;
+  exp = exp || { emoji:'🛒', name:'', amount:'', currency: l.kind==='trip' ? (l.currency||baseCur()) : baseCur(),
+    date: l.kind==='trip' ? clampToTrip(l) : defaultDate(), accountId:(S.accounts[0]||{}).id, method:'card', split:null, notes:'' };
+  F.emoji = exp.emoji || '🛒';
+  initSplit(exp.split);
+  openModal(head(isNew?'New expense':'Edit expense')+`
+    <div class="field"><label>What was it?</label><input class="input" id="fName" value="${esc(exp.name)}" placeholder="Groceries at Coop" autocomplete="off"></div>
+    <div class="field"><label>Icon</label>${emojiPicker(F.emoji)}</div>
+    ${moneyFields(exp.amount, exp.currency, exp.fxRate)}
+    <div class="two">
+      <div class="field"><label>Date</label><input class="input" id="fDate" type="date" value="${exp.date}"></div>
+      <div class="field"><label>Paid from</label><select class="input" id="fAcc">${accountOptions(exp.accountId)}</select></div>
+    </div>
+    <div class="field"><label>How</label><select class="input" id="fMethod">${methodOptions(exp.method)}</select></div>
+    <div class="field"><label>Who's it for?</label><div id="splitBox">${splitBox()}</div></div>
+    <div class="field"><label>Note (optional)</label><input class="input" id="fNotes" value="${esc(exp.notes||'')}" placeholder="—"></div>
+    <div class="row-btns">
+      <button class="btn primary" style="flex:1" data-act="save-exp" data-id="${exp.id||''}">${isNew?'Add it 🎉':'Save changes'}</button>
+      ${exp.id?'<button class="btn danger" data-act="del-exp" data-id="'+exp.id+'">Delete</button>':''}
+    </div>`, ()=>{ wireMoney(); if(isNew) setTimeout(()=>{ const n=$('#fName'); if(n) n.focus(); },80); });
+}
+function defaultDate(){
+  const t = todayISO();
+  return monthOf(t)===UI.month ? t : UI.month+'-15';
+}
+function clampToTrip(l){
+  const t=todayISO();
+  if(l.startDate && t<l.startDate) return l.startDate;
+  if(l.endDate && t>l.endDate) return l.endDate;
+  return t;
+}
+function saveExpense(id){
+  const l = activeLedger();
+  const name = $('#fName').value.trim() || 'Expense';
+  const data = {
+    ledgerId: l.id, name, emoji:F.emoji,
+    amount: r2(readAmount()), currency: $('#fCur').value, fxRate: readRate(),
+    date: $('#fDate').value || todayISO(),
+    accountId: $('#fAcc').value, method: $('#fMethod').value,
+    split: readSplit(), notes: $('#fNotes').value.trim()
+  };
+  if(id){ const e=S.expenses.find(x=>x.id===id); Object.assign(e,data); }
+  else { S.expenses.push(Object.assign({id:uid('exp_'), createdAt:new Date().toISOString()}, data)); }
+  if(!id && monthOf(data.date)!==UI.month && l.kind!=='trip') UI.month = monthOf(data.date);
+  closeModal(); commit(); toast(id?'Saved':'Added '+F_last(name));
+}
+const F_last = n => n.length>18 ? n.slice(0,18)+'…' : n;
+
+/* ---------- rule form ---------- */
+function ruleForm(r){
+  const l = activeLedger(); const isNew=!r;
+  r = r || { emoji:'🏠', name:'', amount:'', currency:baseCur(), frequency:'monthly',
+    startMonth:UI.month, dueDay:1, accountId:(S.accounts[0]||{}).id, method:'direct-debit', split:null, active:true, notes:'' };
+  F.emoji = r.emoji||'🏠';
+  initSplit(r.split);
+  openModal(head(isNew?'New recurring bill':'Edit recurring bill')+`
+    <div class="field"><label>Name</label><input class="input" id="fName" value="${esc(r.name)}" placeholder="Rent, Netflix, insurance…" autocomplete="off"></div>
+    <div class="field"><label>Icon</label>${emojiPicker(F.emoji)}</div>
+    ${moneyFields(r.amount, r.currency, null, false)}
+    <div class="two">
+      <div class="field"><label>How often</label><select class="input" id="fFreq">${FREQS.map(f=>'<option value="'+f[0]+'" '+(f[0]===r.frequency?'selected':'')+'>'+f[1]+'</option>').join('')}</select></div>
+      <div class="field"><label>Day of month</label><input class="input" id="fDay" type="number" min="1" max="31" value="${r.dueDay||1}"></div>
+    </div>
+    <div class="two">
+      <div class="field"><label>First charge</label><input class="input" id="fStart" type="month" value="${r.startMonth}"></div>
+      <div class="field"><label>Last charge (optional)</label><input class="input" id="fEnd" type="month" value="${r.endMonth||''}"></div>
+    </div>
+    <div class="two">
+      <div class="field"><label>Paid from</label><select class="input" id="fAcc">${accountOptions(r.accountId)}</select></div>
+      <div class="field"><label>How</label><select class="input" id="fMethod">${methodOptions(r.method)}</select></div>
+    </div>
+    <div class="field"><label>Who's it for?</label><div id="splitBox">${splitBox()}</div></div>
+    <div class="field"><label>Note (optional)</label><input class="input" id="fNotes" value="${esc(r.notes||'')}" placeholder="—"></div>
+    ${r.id?'<div class="field"><label>Status</label><div class="seg"><button type="button" data-act="rule-active" data-v="1" class="'+(r.active?'on':'')+'">Active</button><button type="button" data-act="rule-active" data-v="0" class="'+(!r.active?'on':'')+'">Paused</button></div></div>':''}
+    <div class="row-btns">
+      <button class="btn primary" style="flex:1" data-act="save-rule" data-id="${r.id||''}">${isNew?'Add bill 🔁':'Save changes'}</button>
+      ${r.id?'<button class="btn danger" data-act="del-rule" data-id="'+r.id+'">Delete</button>':''}
+    </div>
+    ${r.id?'<div class="hint">Deleting removes it from every month, past included. To stop it going forward, set a last charge or pause it.</div>':''}
+  `, ()=>{ wireMoney(); F.active = r.active!==false; if(isNew) setTimeout(()=>{ const n=$('#fName'); if(n) n.focus(); },80); });
+}
+function saveRule(id){
+  const l = activeLedger();
+  const data = {
+    ledgerId:l.id, name:$('#fName').value.trim()||'Bill', emoji:F.emoji,
+    amount:r2(readAmount()), currency:$('#fCur').value,
+    frequency:$('#fFreq').value, dueDay:Math.max(1,Math.min(31,Number($('#fDay').value)||1)),
+    startMonth:$('#fStart').value||UI.month, endMonth:$('#fEnd').value||null,
+    accountId:$('#fAcc').value, method:$('#fMethod').value,
+    split:readSplit(), notes:$('#fNotes').value.trim(),
+    active: F.active!==false
+  };
+  if(id){ Object.assign(rule(id), data); }
+  else { S.rules.push(Object.assign({id:uid('rule_'), createdAt:new Date().toISOString()}, data)); }
+  closeModal(); commit(); toast(id?'Saved':'Recurring bill added');
+}
+
+/* ---------- occurrence (one month of a rule) ---------- */
+function occurrenceModal(occId){
+  const [ruleId, period] = occId.split('|');
+  const r = rule(ruleId); if(!r) return;
+  const o = occurrence(r, period);
+  const ov = overrideOf(ruleId, period);
+  openModal(head(esc(o.emoji)+' '+esc(o.name))+`
+    <div class="sub" style="margin:-8px 0 14px">${monthLabel(period)} · ${FREQ_TAG[r.frequency]} · normally ${money(r.amount, r.currency)}</div>
+    <div class="field"><label>This month it is</label>
+      <div class="amt-row">
+        <input class="input" id="oAmount" inputmode="decimal" value="${o.amount}">
+        <select class="input" id="oCur">${curOptions(o.currency)}</select>
+      </div>
+    </div>
+    <div class="two">
+      <div class="field"><label>Paid from</label><select class="input" id="oAcc">${accountOptions(o.accountId)}</select></div>
+      <div class="field"><label>Date</label><input class="input" id="oDate" type="date" value="${o.date}"></div>
+    </div>
+    <div class="field"><label>Skip it this month?</label>
+      <div class="seg"><button type="button" data-act="occ-skip" data-v="0" class="${o.skipped?'':'on'}">Counts</button>
+      <button type="button" data-act="occ-skip" data-v="1" class="${o.skipped?'on':''}">Skipped</button></div>
+      <div class="hint">Handy when a bill didn't come, or you paused a subscription for a month.</div>
+    </div>
+    <div class="row-btns">
+      <button class="btn primary" style="flex:1" data-act="save-occ" data-id="${occId}">Save this month</button>
+      ${ov?'<button class="btn soft" data-act="reset-occ" data-id="'+occId+'">Reset</button>':''}
+    </div>
+    <div class="divider"></div>
+    <button class="btn soft wide" data-act="edit-rule" data-id="${ruleId}">Edit the whole bill 🔁</button>
+  `, ()=>{ F.skip = o.skipped; });
+}
+function saveOccurrence(occId){
+  const [ruleId, period] = occId.split('|');
+  let ov = overrideOf(ruleId, period);
+  if(!ov){ ov = {id:uid('ovr_'), ruleId, period}; S.overrides.push(ov); }
+  ov.amount = r2(Number($('#oAmount').value.replace(',','.'))||0);
+  ov.currency = $('#oCur').value;
+  ov.accountId = $('#oAcc').value;
+  ov.date = $('#oDate').value;
+  ov.skipped = !!F.skip;
+  closeModal(); commit(); toast('Updated for '+monthLabel(period));
+}
+
+/* ---------- rules manager ---------- */
+function rulesModal(){
+  const l = activeLedger();
+  const rs = S.rules.filter(r=>r.ledgerId===l.id);
+  const body = rs.length ? '<div class="list">'+rs.map(r=>
+    '<div class="item '+(r.active?'':'skip')+'" data-act="edit-rule" data-id="'+r.id+'">'+
+    '<div class="emo">'+esc(r.emoji)+'</div><div class="item-main"><div class="name">'+esc(r.name)+'</div>'+
+    '<div class="meta">'+FREQ_TAG[r.frequency]+' · day '+r.dueDay+' · '+accountEmoji(r.accountId)+' '+esc(accountLabel(r.accountId))+
+    (r.method==='direct-debit'?'<span class="tag t-dd">direct debit</span>':'')+(r.active?'':'<span class="tag">paused</span>')+'</div></div>'+
+    '<div class="amount">'+money(r.amount,r.currency)+'</div></div>').join('')+'</div>'
+    : '<div class="empty"><span class="big">🔁</span>No recurring bills in this list yet.</div>';
+  openModal(head('Recurring bills')+
+    '<div class="sub" style="margin:-8px 0 14px">Rent, insurance, quarterly water, yearly Spotify — anything that repeats.</div>'+
+    body+'<button class="btn primary wide" style="margin-top:14px" data-act="new-rule">＋ New recurring bill</button>');
+}
+
+/* ---------- settle up ---------- */
+function settleModal(){
+  const l = activeLedger();
+  const scope = l.kind==='trip' ? null : (UI.scope==='all'?null:UI.month);
+  const debts = simplifyDebts(computeBalances(l.id, scope));
+  const body = debts.length ? debts.map(d=>{
+    const a=person(d.from), b=person(d.to);
+    return '<div class="debt">'+avatar(a,'lg')+'<span class="arrow">→</span>'+avatar(b,'lg')+
+      '<span class="amt">'+money(fromCents(d.cents),baseCur())+'</span>'+
+      '<button class="btn mint sm" data-act="do-settle" data-from="'+d.from+'" data-to="'+d.to+'" data-c="'+d.cents+'">Paid</button></div>';
+  }).join('') : '<div class="empty"><span class="big">🎉</span>Nothing to settle.</div>';
+  openModal(head('Settle up')+
+    '<div class="sub" style="margin:-8px 0 14px">Tap Paid once the money has actually moved — it gets logged so the next tally starts fresh.</div>'+
+    body);
+}
+function doSettle(from,to,c){
+  const l = activeLedger();
+  const inMonth = l.kind!=='trip' && UI.scope==='month' && UI.month!==thisMonth();
+  const date = inMonth ? UI.month+'-'+daysInMonth(UI.month) : todayISO();
+  S.settlements.push({ id:uid('set_'), ledgerId:activeLedger().id, date:date,
+    fromPersonId:from, toPersonId:to, amount:fromCents(Number(c)), currency:baseCur(), fxRate:1, note:'Settle up' });
+  closeModal(); commit(); toast('Logged 🤝');
+}
+
+/* ---------- ledger form ---------- */
+function ledgerForm(l){
+  const isNew=!l;
+  l = l || { emoji:'✈️', name:'', kind:'trip', currency:baseCur(), startDate:'', endDate:'' };
+  F.emoji=l.emoji; F.kind=l.kind;
+  openModal(head(isNew?'New list':'Edit list')+`
+    <div class="field"><label>Name</label><input class="input" id="lName" value="${esc(l.name)}" placeholder="Lisbon in May, Wedding, Home" autocomplete="off"></div>
+    <div class="field"><label>Icon</label><div class="emopick" id="emoPick">${['✈️','🏠','🏝️','⛷️','🎒','🎄','💍','🍼','🚗','🏨','🎪','🎁','🛠️','🎂'].map(e=>'<button type="button" data-act="emo" data-v="'+e+'" class="'+(e===l.emoji?'on':'')+'">'+e+'</button>').join('')}</div></div>
+    <div class="field"><label>Type</label>
+      <div class="seg"><button type="button" data-act="ledger-kind" data-v="household" class="${l.kind==='household'?'on':''}">Household (monthly)</button>
+      <button type="button" data-act="ledger-kind" data-v="trip" class="${l.kind==='trip'?'on':''}">Trip / one-off</button></div>
+      <div class="hint">Household lists have recurring bills and a month-by-month view. Trip lists are one flat pot with their own tally.</div>
+    </div>
+    <div class="two" id="tripDates" style="${l.kind==='trip'?'':'display:none'}">
+      <div class="field"><label>From</label><input class="input" id="lStart" type="date" value="${l.startDate||''}"></div>
+      <div class="field"><label>To</label><input class="input" id="lEnd" type="date" value="${l.endDate||''}"></div>
+    </div>
+    <div class="row-btns">
+      <button class="btn primary" style="flex:1" data-act="save-ledger" data-id="${l.id||''}">${isNew?'Create list':'Save'}</button>
+      ${l.id&&S.ledgers.length>1?'<button class="btn danger" data-act="del-ledger" data-id="'+l.id+'">Delete</button>':''}
+    </div>`);
+}
+function saveLedger(id){
+  const data = { name:$('#lName').value.trim()||'New list', emoji:F.emoji, kind:F.kind,
+    startDate:$('#lStart')?$('#lStart').value:'', endDate:$('#lEnd')?$('#lEnd').value:'' };
+  if(id){ Object.assign(ledger(id), data); }
+  else { const l = Object.assign({id:uid('led_'), currency:baseCur(), archived:false, createdAt:new Date().toISOString()}, data);
+    S.ledgers.push(l); UI.ledgerId=l.id; }
+  closeModal(); commit();
+}
+
+/* ---------- settings ---------- */
+function settingsModal(){
+  const rates = Array.from(new Set([...S.settings.currencies, ...Object.keys(S.settings.rates)])).filter(c=>c!==baseCur());
+  openModal(head('Settings')+`
+    <div class="field"><label>Piggy bank name</label><input class="input" id="sName" value="${esc(S.meta.appName)}"></div>
+    <div class="divider"></div>
+    <div class="card-head"><h2>👫 Us</h2><button class="btn soft sm" data-act="new-person">＋ Add</button></div>
+    <div class="list">${S.people.map(p=>
+      '<div class="item" data-act="edit-person" data-id="'+p.id+'">'+avatar(p,'lg')+
+      '<div class="item-main"><div class="name">'+esc(p.name)+'</div><div class="meta">'+
+      S.accounts.filter(a=>a.ownership[p.id]).map(a=>esc(a.name)).join(' · ')+'</div></div><span class="sub">edit</span></div>').join('')}</div>
+    <div class="divider"></div>
+    <div class="card-head"><h2>🏦 Accounts</h2><button class="btn soft sm" data-act="new-account">＋ Add</button></div>
+    <div class="list">${S.accounts.map(a=>
+      '<div class="item" data-act="edit-account" data-id="'+a.id+'"><div class="emo">'+accountEmoji(a.id)+'</div>'+
+      '<div class="item-main"><div class="name">'+esc(a.name)+'</div><div class="meta">'+
+      (a.kind==='joint'?'joint · ':'personal · ')+Object.entries(a.ownership).map(([pid,sh])=>((person(pid)||{}).name||'?')+' '+Math.round(sh*100)+'%').join(' / ')+
+      '</div></div><span class="sub">edit</span></div>').join('')}</div>
+    <div class="hint">Money paid from an account is credited to its owners. A 50/50 joint account means joint spending needs no settling.</div>
+    <div class="field"><label>Colour mood</label><div class="chips" id="themePick">${
+      Object.entries(THEMES).map(([k,t])=>'<button type="button" class="chip '+(k===(S.settings.theme||'blueberry')?'on':'')+'" data-act="theme" data-v="'+k+'">'+
+        '<span class="avatar sm" style="background:'+t.accent+';border-color:'+t.ink+'"></span>'+t.label+'</button>').join('')
+    }</div><div class="hint">Changes right away — no saving needed.</div></div>
+    <div class="divider"></div>
+    <div class="card-head"><h2>💱 Currencies</h2><button class="btn soft sm" data-act="fetch-rates">Refresh</button></div>
+    <div class="field"><label>Main currency</label><select class="input" id="sBase">${curOptions(baseCur())}</select></div>
+    ${rates.map(c=>'<div class="rate-row"><span class="code">'+c+'</span>'+
+      '<input class="input mono" data-act="rate" data-id="'+c+'" inputmode="decimal" value="'+S.settings.rates[c]+'">'+
+      '<span class="sub">= 1 '+c+'</span></div>').join('')}
+    <div class="rate-row"><input class="input" id="sNewCur" placeholder="THB" maxlength="3" style="grid-column:span 2;text-transform:uppercase">
+      <button class="btn soft sm" data-act="add-cur">Add</button></div>
+    <div class="hint">${S.settings.ratesUpdatedAt?'Rates updated '+dayLabel(S.settings.ratesUpdatedAt.slice(0,10)):'Rates are editable estimates — set them to whatever your bank gave you.'}</div>
+    <div class="divider"></div>
+    <div class="card-head"><h2>💾 Your data</h2></div>
+    <div class="row-btns"><button class="btn soft" data-act="export">Export JSON</button>
+      <button class="btn soft" data-act="import">Import JSON</button>
+      <button class="btn soft" data-act="export-csv">Export CSV</button></div>
+    <div class="hint">Everything lives on this device only. Export gives you the full, portable data model — people, accounts, lists, bills, expenses, settlements.</div>
+    <div style="margin-top:14px"><button class="btn danger wide" data-act="reset">Erase everything</button></div>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+    <div class="divider"></div>
+    <button class="btn primary wide" data-act="save-settings">Save settings</button>`);
+}
+function saveSettings(){
+  S.meta.appName = $('#sName').value.trim() || 'Piggy';
+  const nb = $('#sBase').value;
+  if(nb !== S.settings.baseCurrency){
+    const old = S.settings.baseCurrency, f = rateOf(nb);
+    const nr = {}; Object.keys(S.settings.rates).forEach(c=>{ nr[c] = r2(rateOf(c)/f*10000)/10000; });
+    nr[nb]=1; nr[old]=r2(1/f*10000)/10000; S.settings.rates=nr; S.settings.baseCurrency=nb;
+  }
+  closeModal(); commit(); toast('Saved');
+}
+
+/* ---------- person / account forms ---------- */
+function personForm(p){
+  const isNew=!p;
+  p = p || { name:'', emoji:'🙂', color:COLORS[S.people.length%COLORS.length] };
+  F.emoji=p.emoji; F.color=p.color;
+  const faces=['🙂','😎','🐰','🦊','🐻','🐼','🐨','🦁','🌻','🌙','⭐','🍀','🐧','🦉','🍓','🫐'];
+  openModal(head(isNew?'Add someone':'Edit '+esc(p.name))+`
+    <div class="field"><label>Name</label><input class="input" id="pName" value="${esc(p.name)}" autocomplete="off"></div>
+    <div class="field"><label>Face</label><div class="emopick" id="emoPick">${faces.map(e=>'<button type="button" data-act="emo" data-v="'+e+'" class="'+(e===p.emoji?'on':'')+'">'+e+'</button>').join('')}</div></div>
+    <div class="field"><label>Colour</label><div class="chips" id="colorPick">${COLORS.map(c=>'<button type="button" data-act="color" data-v="'+c+'" class="chip '+(c===p.color?'on':'')+'"><span class="avatar sm" style="background:'+c+'"></span></button>').join('')}</div></div>
+    <div class="row-btns"><button class="btn primary" style="flex:1" data-act="save-person" data-id="${p.id||''}">Save</button>
+    ${p.id&&S.people.length>1?'<button class="btn danger" data-act="del-person" data-id="'+p.id+'">Remove</button>':''}</div>`);
+}
+function savePerson(id){
+  const name=$('#pName').value.trim()||'Someone';
+  if(id){ Object.assign(person(id),{name,emoji:F.emoji,color:F.color}); }
+  else {
+    const p={id:uid('per_'),name,emoji:F.emoji,color:F.color};
+    S.people.push(p);
+    S.accounts.push({id:uid('acc_'),name:name+"'s money",kind:'personal',ownership:{[p.id]:1}});
+    S.accounts.filter(a=>a.kind==='joint').forEach(a=>{
+      const ids=Object.keys(a.ownership).concat(p.id); const sh=r2(1/ids.length);
+      a.ownership={}; ids.forEach((i,k)=>a.ownership[i]= k===ids.length-1 ? r2(1-sh*(ids.length-1)) : sh);
+    });
+  }
+  closeModal(); commit(); settingsModal();
+}
+function accountForm(a){
+  const isNew=!a;
+  a = a || { name:'Joint account', kind:'joint', ownership:evenOwnership() };
+  F.kind=a.kind; F.own=Object.assign({},a.ownership);
+  openModal(head(isNew?'Add account':'Edit account')+`
+    <div class="field"><label>Name</label><input class="input" id="aName" value="${esc(a.name)}" placeholder="Joint account, Léa's Revolut…"></div>
+    <div class="field"><label>Type</label><div class="seg">
+      <button type="button" data-act="acc-kind" data-v="personal" class="${a.kind==='personal'?'on':''}">One person</button>
+      <button type="button" data-act="acc-kind" data-v="joint" class="${a.kind==='joint'?'on':''}">Shared</button></div></div>
+    <div class="field"><label>Owned by (%)</label><div id="ownBox">${ownBox()}</div>
+      <div class="hint">Whoever owns the account gets credited when it pays for something.</div></div>
+    <div class="row-btns"><button class="btn primary" style="flex:1" data-act="save-account" data-id="${a.id||''}">Save</button>
+    ${a.id&&S.accounts.length>1?'<button class="btn danger" data-act="del-account" data-id="'+a.id+'">Delete</button>':''}</div>`);
+}
+function evenOwnership(){ const o={}; const n=S.people.length||1; S.people.forEach((p,i)=>o[p.id]= i===n-1 ? r2(1-r2(1/n)*(n-1)) : r2(1/n)); return o; }
+function ownBox(){
+  return S.people.map(p=>'<div class="splitrow"><span class="who" style="flex:1">'+avatar(p,'sm')+esc(p.name)+'</span>'+
+    '<input class="input" data-act="own" data-id="'+p.id+'" inputmode="decimal" value="'+Math.round((F.own[p.id]||0)*100)+'"></div>').join('');
+}
+function saveAccount(id){
+  let tot=0; Object.values(F.own).forEach(v=>tot+=Number(v)||0);
+  if(tot<=0){ toast('Give someone a share first'); return; }
+  const own={}; Object.entries(F.own).forEach(([k,v])=>{ const s=(Number(v)||0)/tot; if(s>0) own[k]=r2(s*10000)/10000; });
+  const data={ name:$('#aName').value.trim()||'Account', kind:F.kind, ownership:own };
+  if(id) Object.assign(account(id),data); else S.accounts.push(Object.assign({id:uid('acc_')},data));
+  closeModal(); commit(); settingsModal();
+}
+
+/* ---------- import / export ---------- */
+function download(name, text, type){
+  const b=new Blob([text],{type:type||'application/json'});
+  const u=URL.createObjectURL(b), a=document.createElement('a');
+  a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1500);
+}
+function exportCSV(){
+  const rows=[['list','type','date','name','amount','currency','amount_'+baseCur(),'paid_from','method','split_mode','participants']];
+  S.ledgers.forEach(l=>{
+    itemsInScope(l.id, null).forEach(it=>{
+      const sp=it.split||{};
+      rows.push([l.name, it.kind, it.date, it.name, r2(it.amount), it.currency, toBase(it.amount,it.currency,it.fxRate),
+        accountLabel(it.accountId), it.method||'', sp.mode||'equal',
+        (sp.participants||S.people.map(p=>p.id)).map(i=>(person(i)||{}).name||'').join('+')]);
+    });
+  });
+  download('piggy-expenses.csv', rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'), 'text/csv');
+}
+async function fetchRates(){
+  const codes = Object.keys(S.settings.rates).filter(c=>c!==baseCur());
+  try{
+    const res = await fetch('https://api.frankfurter.dev/v1/latest?base='+baseCur()+'&symbols='+codes.join(','));
+    const j = await res.json();
+    Object.entries(j.rates||{}).forEach(([c,v])=>{ if(v>0) S.settings.rates[c] = r2(1/v*10000)/10000; });
+    S.settings.ratesUpdatedAt = new Date().toISOString();
+    save(); closeModal(); settingsModal(); toast('Rates updated');
+  }catch(e){ toast("Couldn't reach the rate service — type them in"); }
+}
+
+/* =======================  EVENTS  ======================= */
+document.addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const act = el.dataset.act, id = el.dataset.id, v = el.dataset.v;
+  if(!S){ return; }
+  const l = activeLedger();
+  switch(act){
+    case 'backdrop': if(e.target===el) closeModal(); return;
+    case 'close': closeModal(); return;
+    case 'ledger': UI.ledgerId=id; UI.month=thisMonth(); render(); return;
+    case 'new-ledger': ledgerForm(); return;
+    case 'edit-ledger': ledgerForm(ledger(id)); return;
+    case 'ledger-kind': F.kind=v; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+      $('#tripDates').style.display = v==='trip'?'':'none'; return;
+    case 'save-ledger': saveLedger(id); return;
+    case 'del-ledger': if(confirm('Delete this list and everything in it?')){
+        S.ledgers=S.ledgers.filter(x=>x.id!==id); S.expenses=S.expenses.filter(x=>x.ledgerId!==id);
+        S.rules=S.rules.filter(x=>x.ledgerId!==id); S.settlements=S.settlements.filter(x=>x.ledgerId!==id);
+        UI.ledgerId=(S.ledgers[0]||{}).id; closeModal(); commit(); } return;
+    case 'month': UI.month = v==='0' ? thisMonth() : addMonths(UI.month, Number(v)); render(); return;
+    case 'scope': UI.scope=v; render(); return;
+    case 'add': l.kind==='trip' ? expenseForm() : addChooser(); return;
+    case 'new-exp': expenseForm(); return;
+    case 'new-rule': ruleForm(); return;
+    case 'rules': rulesModal(); return;
+    case 'edit-rule': ruleForm(rule(id)); return;
+    case 'settings': settingsModal(); return;
+    case 'save-settings': saveSettings(); return;
+    case 'open':
+      if(el.dataset.kind==='recurring') occurrenceModal(id);
+      else expenseForm(S.expenses.find(x=>x.id===id));
+      return;
+    case 'emo': F.emoji=v; $('#emoPick').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'color': F.color=v; $('#colorPick').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'split-mode': F.split.mode=v; refreshSplit(); return;
+    case 'split-who': {
+      const i=F.split.participants.indexOf(id);
+      if(i>=0){ if(F.split.participants.length>1) F.split.participants.splice(i,1); }
+      else F.split.participants.push(id);
+      refreshSplit(); return; }
+    case 'rule-active': F.active = v==='1'; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'occ-skip': F.skip = v==='1'; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'save-exp': saveExpense(id); return;
+    case 'del-exp': if(confirm('Delete this expense?')){ S.expenses=S.expenses.filter(x=>x.id!==id); closeModal(); commit(); } return;
+    case 'save-rule': saveRule(id); return;
+    case 'del-rule': if(confirm('Delete this bill from every month?')){ S.rules=S.rules.filter(x=>x.id!==id); S.overrides=S.overrides.filter(o=>o.ruleId!==id); closeModal(); commit(); } return;
+    case 'save-occ': saveOccurrence(id); return;
+    case 'reset-occ': { const [rid,per]=id.split('|'); S.overrides=S.overrides.filter(o=>!(o.ruleId===rid&&o.period===per)); closeModal(); commit(); } return;
+    case 'settle': settleModal(); return;
+    case 'do-settle': doSettle(el.dataset.from, el.dataset.to, el.dataset.c); return;
+    case 'new-person': personForm(); return;
+    case 'edit-person': personForm(person(id)); return;
+    case 'save-person': savePerson(id); return;
+    case 'del-person': if(confirm('Remove this person? Their past entries stay but stop counting.')){
+        S.people=S.people.filter(x=>x.id!==id); S.accounts=S.accounts.filter(a=>!(a.kind==='personal'&&a.ownership[id]));
+        S.accounts.forEach(a=>{ delete a.ownership[id]; }); closeModal(); commit(); settingsModal(); } return;
+    case 'new-account': accountForm(); return;
+    case 'edit-account': accountForm(account(id)); return;
+    case 'acc-kind': F.kind=v; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'save-account': saveAccount(id); return;
+    case 'del-account': if(S.expenses.some(x=>x.accountId===id)||S.rules.some(x=>x.accountId===id)){ toast('Still used by some expenses'); return; }
+      S.accounts=S.accounts.filter(a=>a.id!==id); closeModal(); commit(); settingsModal(); return;
+    case 'add-cur': { const c=$('#sNewCur').value.trim().toUpperCase(); if(c.length===3){
+        if(!S.settings.rates[c]) S.settings.rates[c]=DEFAULT_RATES[c]||1;
+        if(!S.settings.currencies.includes(c)) S.settings.currencies.push(c);
+        save(); closeModal(); settingsModal(); } return; }
+    case 'theme': S.settings.theme=v; applyTheme(v); save();
+      $('#themePick').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+      return;
+    case 'fetch-rates': fetchRates(); return;
+    case 'export': download('piggy-'+todayISO()+'.json', JSON.stringify(S,null,2)); return;
+    case 'export-csv': exportCSV(); return;
+    case 'import': $('#importFile').click(); return;
+    case 'reset': if(confirm('Erase everything and start over?')){ S=blankState(); UI={ledgerId:null,month:thisMonth(),scope:'month'}; closeModal(); commit(); } return;
+    case 'ob-go': onboard(); return;
+  }
+});
+document.addEventListener('input', e=>{
+  const el=e.target.closest('[data-act]'); if(!el) return;
+  if(el.dataset.act==='split-val') F.split.values[el.dataset.id]=el.value;
+  if(el.dataset.act==='own') F.own[el.dataset.id]=Number(el.value)||0;
+  if(el.dataset.act==='rate'){ const v=Number(String(el.value).replace(',','.')); if(v>0){ S.settings.rates[el.dataset.id]=v; save(); } }
+});
+document.addEventListener('change', e=>{
+  if(e.target.id==='importFile' && e.target.files[0]){
+    const fr=new FileReader();
+    fr.onload=()=>{ try{ const d=JSON.parse(fr.result);
+        if(!d.schemaVersion||!d.people) throw 0;
+        S=d; UI.ledgerId=(S.ledgers[0]||{}).id; closeModal(); commit(); toast('Imported');
+      }catch(err){ toast("That file isn't a Piggy export"); } };
+    fr.readAsText(e.target.files[0]);
+  }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+function addChooser(){
+  openModal(head('Add to '+esc(activeLedger().name))+
+    '<div class="list"><div class="item" data-act="new-exp"><div class="emo">🧾</div>'+
+    '<div class="item-main"><div class="name">One-off expense</div><div class="meta">groceries, dinner, the cleaner, a lamp</div></div></div>'+
+    '<div class="item" data-act="new-rule"><div class="emo">🔁</div>'+
+    '<div class="item-main"><div class="name">Recurring bill</div><div class="meta">monthly, quarterly or yearly, on repeat</div></div></div></div>');
+}
+
+/* ---------- onboarding ---------- */
+function onboard(){
+  const n1=$('#ob1').value.trim()||'Me', n2=$('#ob2').value.trim()||'You';
+  S.settings.baseCurrency=$('#obCur').value;
+  S.settings.rates[S.settings.baseCurrency]=1;
+  [[n1,'🐰',COLORS[0]],[n2,'🦊',COLORS[1]]].forEach(([name,emoji,color])=>{
+    const p={id:uid('per_'),name,emoji,color}; S.people.push(p);
+    S.accounts.push({id:uid('acc_'),name:name+"'s money",kind:'personal',ownership:{[p.id]:1}});
+  });
+  S.accounts.push({id:uid('acc_'),name:'Joint account',kind:'joint',ownership:evenOwnership()});
+  const home={id:uid('led_'),name:'Home',emoji:'🏠',kind:'household',currency:S.settings.baseCurrency,archived:false,createdAt:new Date().toISOString()};
+  S.ledgers.push(home); UI.ledgerId=home.id;
+  commit(); toast('Welcome in 🐷');
+}
+
+/* ---------- boot ---------- */
+function hydrate(loaded){
+  S = (loaded && loaded.people) ? loaded : blankState();
+  if(!S.meta) S.meta={appName:'Piggy'};
+  if(!S.settings) S.settings=blankState().settings;
+  if(!S.settings.rates) S.settings.rates={...DEFAULT_RATES};
+  ['people','accounts','ledgers','rules','overrides','expenses','settlements'].forEach(k=>{ if(!Array.isArray(S[k])) S[k]=[]; });
+  if(!S.settings.rates[S.settings.baseCurrency]) S.settings.rates[S.settings.baseCurrency]=1;
+  applyTheme(S.settings.theme);
+  UI.ledgerId = (S.ledgers.find(l=>!l.archived)||{}).id;
+  UI.month = thisMonth();
+  try{ render(); booted = S.people.length>0; }catch(err){ booted=false; fatal(err.message); }
+}
+
+/* Boot immediately with an empty book, then swap in saved data once storage
+   answers. A slow or blocked storage layer can never leave the app dead. */
+hydrate(null);
+(function(){
+  let done=false;
+  const finish = data => { if(done) return; done=true; if(data) hydrate(data); };
+  setTimeout(()=>finish(null), 2500);
+  Promise.resolve().then(Store.load).then(finish).catch(()=>finish(null));
+})();
+})();
+</script>
+</body>
+</html>
