@@ -11,6 +11,8 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🍬 Beadie | [`candy-beads/`](candy-beads/) | Candy-bead whiteboard — place beads on a hex board, lace the thread bead by bead, tie knots, preview the finished piece in 3D, and get a shopping list of beads + cord length. |
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
+| 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
+| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and a settle-up log. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
 
@@ -19,6 +21,8 @@ index.html              # the landing page — lists every app
 candy-beads/index.html  # one app, one folder, one HTML file
 yaniv/index.html
 breathing-flow-log/index.html
+sensor-readout/index.html
+piggy/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
@@ -66,6 +70,30 @@ wipes the key; clearing the browser's site data does the same.
 The green / amber / red bands are the common 80% / 50%-of-personal-best
 rule of thumb, computed from the highest reading in the log. It's a log, not
 medical advice — if there's an action plan with its own numbers, that wins.
+
+### What Piggy remembers
+
+`piggy/` keeps one `localStorage` key, `piggy.ledger.v1`, holding the whole
+book in a flat, relational shape — `people`, `accounts`, `ledgers`, `rules`,
+`overrides`, `expenses`, `settlements` — so it maps onto database tables if it
+ever grows a backend. Nothing is uploaded and there's no account; **Settings →
+Your data** exports the lot as JSON (or a flat CSV of every entry) and imports
+it back on another device. **Erase everything** wipes the key.
+
+Amounts are stored as a decimal plus an ISO currency code. A one-off expense
+also snapshots the exchange rate it was entered at, so re-reading an old month
+never rewrites its numbers; recurring bills use the live rate from settings
+instead, so a foreign standing order follows the currency. **Settings →
+Currencies → Refresh** pulls rates from `api.frankfurter.dev` — the only
+network call the app makes, and everything works with hand-typed rates if it's
+blocked.
+
+Who paid is derived from the account an entry came out of: an account credits
+its owners in proportion to their share, so a 50/50 joint account means joint
+spending never needs settling. Who owes is the split — evenly, by weighted
+shares, or exact amounts, with rounding pennies going to the first person.
+**Settle up** logs a payment between two people rather than editing history,
+so the tally starts fresh from there.
 
 ## Adding a new app
 
