@@ -12,6 +12,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
+| 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Every stop is a dot sized by its monthly boardings — drag through the year and the canton breathes. Then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
@@ -23,6 +24,7 @@ yaniv/index.html
 breathing-flow-log/index.html
 sensor-readout/index.html
 piggy/index.html
+tpg-pulse/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
@@ -113,6 +115,38 @@ delete (deleting puts the amount back on the tally), with a per-pair subtotal
 once money has moved both ways. The receipt shows a *paid back by* line
 per person alongside *paid by*, so the balance at the top is the visible sum of
 what each person put in, owes, and has since handed over.
+
+### What Pulse reads, and the trick it plays
+
+`tpg-pulse/` is the only app here with no local state at all — it stores
+nothing, and every figure on the page is fetched from the
+[Explore v2.1 API](https://opendata.tpg.ch/api/explore/v2.1/console) at
+`opendata.tpg.ch` when you open it, straight from the browser. Three datasets:
+
+| Dataset | What it gives Pulse |
+| --- | --- |
+| `montees-mensuelles-par-arret-par-ligne` | boardings per stop per month — the whole chart |
+| `arrets` | the coordinates that turn stop names into a map |
+| `frequentation-journaliere-par-tranche-horaire` | the 24-hour clock at the bottom |
+
+It asks each dataset for its *own field list* first and resolves what it needs
+by name and type, then builds every query from that — so a renamed column shows
+up as a specific message rather than a blank page. The stop reference and the
+day-part chart are both optional: lose the coordinates and it falls back to the
+rhythm arrangement alone; lose the day-part dataset and that section just
+doesn't appear.
+
+**The trick.** Take each stop's last 18 months of boardings and divide by its
+own total, so what's left is only the *shape* of its year — a big terminus and a
+sleepy village stop become directly comparable. Run a two-component PCA over
+those shapes and use the result as x and y. Press **Rhythm** and the dots leave
+their coordinates behind and fly to that position instead: stops that fill and
+empty at the same times of year end up neighbours, whatever end of the canton
+they're at. Dot colour is the first component in both views, which is the point
+— on the map those colours look scattered at random, because when a stop is busy
+has very little to do with where it is. Click one and dashed threads join it to
+the five stops whose year looks most like its own; in map view they run clean
+across Geneva.
 
 ## Adding a new app
 

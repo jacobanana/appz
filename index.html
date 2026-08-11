@@ -304,6 +304,45 @@ const APPS = [
         <path d="M126 43v9" stroke="#17B39A" stroke-width="2.4" stroke-linecap="round"/>
         <path d="M121.5 48.5l4.5 5.5 4.5-5.5" fill="none" stroke="#17B39A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>`,
+  },
+  {
+    slug: 'tpg-pulse',
+    name: 'Pulse',
+    emoji: '🚊',
+    desc: 'Geneva’s public transport, drawn from the tpg open data live. Every stop is a dot sized by how many people got on there; drag the year and the canton breathes. Then hit Rhythm and the map dissolves — the stops re-arrange by the shape of their year, so the ones that breathe alike end up side by side however far apart they really are.',
+    tags: ['open data', 'geneva', 'maps', 'dataviz'],
+    thumb: `
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A scatter of blue and red dots with dashed threads joining distant pairs">
+        <defs>
+          <linearGradient id="tpBg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#04161d"/><stop offset="100%" stop-color="#021018"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#tpBg)"/>
+        <g stroke="#94d2bd" stroke-opacity=".55" stroke-width=".8" stroke-dasharray="3 3">
+          <path d="M112 30 L38 62"/><path d="M112 30 L58 26"/><path d="M112 30 L74 70"/>
+        </g>
+        <g id="tpDots"></g>
+        <circle cx="112" cy="30" r="10" fill="none" stroke="#94d2bd" stroke-width="1.6"/>
+      </svg>`,
+    paint(svg){
+      // Same diverging ramp the app uses: cool ← neutral → warm.
+      const mix = (t) => {
+        const cool = [57,135,229], warm = [230,103,103], mid = [125,134,140];
+        const end = t < 0 ? cool : warm, a = Math.abs(t);
+        return 'rgb(' + mid.map((m,i)=>Math.round(m+(end[i]-m)*a)).join(',') + ')';
+      };
+      const dots = [
+        [112,30,7,-.9],[58,26,5,-.7],[38,62,4.5,-.85],[74,70,4,-.6],
+        [26,34,3,.1],[46,44,5.5,-.3],[66,50,3.5,.15],[88,18,4,-.2],
+        [96,58,6,.75],[126,52,5,.9],[140,34,3.5,.8],[132,72,4.5,.65],
+        [104,76,3,.35],[80,38,2.6,-.1],[18,52,2.4,.2],[150,60,2.8,.55],
+      ];
+      const g = svg.querySelector('#tpDots');
+      for (const [x,y,r,t] of dots)
+        g.insertAdjacentHTML('beforeend',
+          `<circle cx="${x}" cy="${y}" r="${r}" fill="${mix(t)}" fill-opacity=".88" stroke="#04161d" stroke-width="1.2"/>`);
+    }
   }
 ];
 

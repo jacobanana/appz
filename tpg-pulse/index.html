@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pulse — Geneva's network, breathing</title>
+<meta name="description" content="A live look at the Transports publics genevois open data: every stop on the map, sized by how many people got on, and then re-arranged by the shape of its year." />
+<meta name="theme-color" content="#021018" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23021018'/><circle cx='11' cy='13' r='4' fill='%233987e5'/><circle cx='21' cy='19' r='5' fill='%23e66767'/><circle cx='20' cy='10' r='2.4' fill='%237d868c'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    /* Page + chart surfaces. The categorical and diverging steps below were
+       validated against #04161d (the chart surface) with the dataviz palette
+       validator — lightness band, chroma floor, CVD separation, contrast. */
+    --plane:#021018;
+    --surface:#04161d;
+    --panel:#062028;
+    --line:#0f3540;
+    --line-soft:#0a2831;
+
+    --ink:#eef5f1;
+    --ink-2:#b6cfcb;
+    --muted:#7e9b9b;
+
+    --accent:#94d2bd;
+    --accent-2:#ee9b00;
+
+    /* diverging: cool ↔ warm with a neutral midpoint (never a rainbow) */
+    --cool:#3987e5;
+    --warm:#e66767;
+    --neutral:#7d868c;
+
+    /* categorical, fixed order, never cycled */
+    --series-1:#3987e5;
+    --series-2:#d95926;
+
+    --shadow:0 18px 44px -22px rgba(0,0,0,.9);
+    --r:18px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--plane);color:var(--ink);
+    font-family:'Nunito',system-ui,'Segoe UI',sans-serif;font-weight:600;line-height:1.55;
+    background-image:
+      radial-gradient(70% 50% at 8% -10%, rgba(57,135,229,.20), transparent 68%),
+      radial-gradient(60% 45% at 96% 2%, rgba(230,103,103,.15), transparent 70%);
+    background-repeat:no-repeat;
+  }
+  h1,h2,h3,.f{font-family:'Fredoka',system-ui,sans-serif;font-weight:600;margin:0}
+  a{color:var(--accent)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:12px}
+  .wrap{max-width:1120px;margin:0 auto;padding:clamp(22px,5vw,48px) clamp(14px,3.5vw,26px) 80px}
+
+  /* ── header ───────────────────────────────────────────── */
+  header.top{display:flex;align-items:center;gap:11px;margin-bottom:clamp(22px,5vw,40px);flex-wrap:wrap}
+  .dots{display:flex;gap:3px}
+  .dots i{width:12px;height:12px;border-radius:50%}
+  .home{font-size:13px;font-weight:800;color:var(--muted);text-decoration:none;
+    border:1.5px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:11px}
+  .home:hover{color:var(--accent);border-color:var(--accent)}
+  .grow{flex:1}
+
+  .hero h1{font-size:clamp(30px,6.4vw,50px);line-height:1.06;letter-spacing:-.5px}
+  .hero h1 em{font-style:normal;background:linear-gradient(110deg,var(--cool),var(--neutral) 46%,var(--warm));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{max-width:62ch;color:var(--ink-2);font-size:clamp(14.5px,2.1vw,17px);margin:14px 0 0;font-weight:600}
+  .hero p.small{color:var(--muted);font-size:13.5px;max-width:70ch;margin-top:10px}
+
+  /* ── boot / error ─────────────────────────────────────── */
+  .boot{margin-top:34px;background:var(--panel);border:1.5px solid var(--line);border-radius:var(--r);padding:22px 22px 24px}
+  .boot h2{font-size:19px;margin-bottom:12px}
+  .bar{height:8px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin:14px 0 12px}
+  .bar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--cool),var(--warm));transition:width .35s ease}
+  .steps{list-style:none;margin:0;padding:0;font-size:13.5px;color:var(--muted);display:grid;gap:5px}
+  .steps li[data-on]{color:var(--ink-2)}
+  .steps li[data-done] b{color:var(--accent)}
+  .steps b{display:inline-block;width:1.4em;color:var(--muted)}
+  .err{border-color:rgba(230,103,103,.55)}
+  .err h2{color:var(--warm)}
+  .err pre{white-space:pre-wrap;word-break:break-all;font-size:12px;background:var(--surface);
+    border:1px solid var(--line);border-radius:11px;padding:11px;color:var(--ink-2);margin:12px 0 0;font-weight:400}
+  .btn{appearance:none;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);
+    font:inherit;font-size:13.5px;font-weight:800;padding:8px 14px;border-radius:11px;cursor:pointer}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn[aria-pressed="true"]{background:var(--accent);color:#022;border-color:var(--accent)}
+
+  /* ── stat tiles ───────────────────────────────────────── */
+  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:30px 0 26px}
+  .tile{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px 15px}
+  .tile .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800}
+  .tile .v{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:clamp(22px,3.4vw,30px);
+    font-weight:700;line-height:1.15;margin-top:5px;color:var(--ink)}
+  .tile .s{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+  /* ── panels ───────────────────────────────────────────── */
+  section.panel{background:var(--panel);border:1.5px solid var(--line);border-radius:var(--r);
+    padding:clamp(16px,3vw,24px);margin-bottom:24px;box-shadow:var(--shadow)}
+  .head{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px}
+  .head h2{font-size:clamp(19px,3vw,24px)}
+  .head p{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:64ch}
+  .kicker{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-2);font-weight:800}
+
+  /* ── viz controls ─────────────────────────────────────── */
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 12px}
+  .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:13.5px;
+    font-weight:800;padding:8px 15px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#022}
+  .scrub{display:flex;align-items:center;gap:10px;flex:1;min-width:240px}
+  .scrub input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+  .scrub .mo{font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13.5px;
+    color:var(--ink);min-width:6.5em;font-weight:700}
+
+  /* ── canvas stage ─────────────────────────────────────── */
+  .stage{position:relative;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+  .stage canvas{display:block;width:100%;height:min(64vh,560px);touch-action:pan-y}
+  .stage.small canvas{height:min(52vh,420px)}
+  .tip{position:absolute;pointer-events:none;opacity:0;transform:translate(-50%,-120%);
+    background:#02141a;border:1.5px solid var(--line);border-radius:11px;padding:8px 11px;
+    font-size:12.5px;line-height:1.45;color:var(--ink);box-shadow:var(--shadow);max-width:230px;
+    transition:opacity .12s ease;z-index:4;font-family:system-ui,sans-serif}
+  .tip b{font-weight:700}
+  .tip .n{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  .tip[data-show]{opacity:1}
+
+  /* ── legends ──────────────────────────────────────────── */
+  .legends{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin-top:14px}
+  .leg{font-size:12px;color:var(--muted);font-weight:700}
+  .leg .lt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block}
+  .ramp{height:10px;width:190px;border-radius:99px;
+    background:linear-gradient(90deg,var(--cool),var(--neutral) 50%,var(--warm))}
+  .ramp-lb{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11.5px;max-width:220px}
+  .ramp-lb span{max-width:9em;line-height:1.3}
+  .sizes{display:flex;align-items:flex-end;gap:11px}
+  .sizes i{display:block;border-radius:50%;background:var(--neutral);opacity:.75}
+  .sizes span{font-variant-numeric:tabular-nums}
+
+  /* ── side / detail ────────────────────────────────────── */
+  .split{display:grid;gap:16px;grid-template-columns:1fr;margin-top:16px}
+  @media (min-width:900px){.split{grid-template-columns:1.55fr 1fr}}
+  .card{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 15px}
+  .card h3{font-size:15.5px;margin-bottom:8px}
+  .card .hint{color:var(--muted);font-size:12.5px}
+  .rank{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+  .rank li{display:flex;gap:9px;align-items:center;font-size:13px;padding:4px 6px;border-radius:8px;cursor:pointer}
+  .rank li:hover{background:var(--line-soft)}
+  .rank li[data-sel]{background:var(--line-soft);outline:1.5px solid var(--accent)}
+  .rank .i{width:1.6em;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11.5px}
+  .rank .sw{width:9px;height:9px;border-radius:50%;flex:none}
+  .rank .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rank .vv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px}
+
+  .twins{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
+  .twins li{display:flex;justify-content:space-between;gap:10px}
+  .twins .d{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+
+  .spark{width:100%;height:62px;display:block;margin-top:6px}
+  .loadings{display:grid;gap:14px;grid-template-columns:1fr;margin-top:6px}
+  @media (min-width:620px){.loadings{grid-template-columns:1fr 1fr}}
+
+  /* ── surprise callout ─────────────────────────────────── */
+  .surprise{background:linear-gradient(120deg,rgba(57,135,229,.15),rgba(230,103,103,.15));
+    border:1.5px solid var(--line);border-radius:14px;padding:15px 16px;margin-top:16px}
+  .surprise .kicker{color:var(--accent)}
+  .surprise p{margin:6px 0 0;font-size:14.5px;color:var(--ink)}
+  .surprise .pair{font-family:'Fredoka',sans-serif;font-size:clamp(17px,2.6vw,21px);margin-top:4px}
+
+  /* ── table view (accessibility fallback) ──────────────── */
+  details.tbl{margin-top:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface)}
+  details.tbl>summary{cursor:pointer;padding:11px 14px;font-size:13.5px;font-weight:800;color:var(--ink-2)}
+  details.tbl>summary:hover{color:var(--accent)}
+  .tblwrap{max-height:340px;overflow:auto;border-top:1.5px solid var(--line)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;font-family:system-ui,sans-serif}
+  th,td{padding:6px 11px;text-align:left;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-size:11px;
+    text-transform:uppercase;letter-spacing:.05em;z-index:1}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+
+  .note{font-size:12.5px;color:var(--muted);margin-top:12px}
+  .note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+    background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 5px;color:var(--accent-2)}
+
+  footer{margin-top:44px;padding-top:20px;border-top:1.5px solid var(--line);color:var(--muted);font-size:13px;
+    display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+  footer a{font-weight:800;text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  [hidden]{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="dots" aria-hidden="true">
+      <i style="background:#3987e5"></i><i style="background:#7d868c"></i><i style="background:#e66767"></i>
+    </span>
+    <span class="f" style="font-size:20px;font-weight:700">Pulse</span>
+    <span class="grow"></span>
+    <a class="home" href="../">← all apps</a>
+    <a class="home" href="https://opendata.tpg.ch/" rel="noopener">tpg open data ↗</a>
+  </header>
+
+  <section class="hero">
+    <h1>Geneva's network, <em>breathing</em>.</h1>
+    <p>Every dot is a tpg stop. How big it is, is how many people got on there last month. Drag the year and watch the whole canton inhale and exhale.</p>
+    <p class="small">Then press <strong>Rhythm</strong> — and the map dissolves. The stops re-arrange themselves not by where they are, but by <em>the shape of their year</em>. Geography evaporates; a school stop in Vernier lands next to a school stop in Carouge, and the lake shore drifts off on its own.</p>
+  </section>
+
+  <!-- ── boot ─────────────────────────────────────────── -->
+  <div class="boot" id="boot">
+    <h2>Waking up the network…</h2>
+    <div class="bar"><i id="bootbar"></i></div>
+    <ol class="steps" id="bootsteps"></ol>
+  </div>
+
+  <!-- ── error ────────────────────────────────────────── -->
+  <div class="boot err" id="fail" hidden>
+    <h2>Couldn't reach the open data</h2>
+    <p id="failmsg" style="margin:8px 0 0;color:var(--ink-2);font-size:14px"></p>
+    <p style="margin:10px 0 0;color:var(--muted);font-size:13px">
+      The whole app talks to <code style="font-size:11.5px">opendata.tpg.ch</code> straight from your browser —
+      no server in between. If you're offline, behind a filter, or the portal renamed a field, this is where it shows up.
+    </p>
+    <pre id="faildetail"></pre>
+    <p style="margin-top:14px"><button class="btn" id="retry">Try again</button></p>
+  </div>
+
+  <!-- ── app ──────────────────────────────────────────── -->
+  <main id="app" hidden>
+
+    <div class="tiles" id="tiles"></div>
+
+    <!-- MAIN VIZ -->
+    <section class="panel">
+      <div class="head">
+        <div>
+          <span class="kicker">The unusual one</span>
+          <h2>The map that forgets where it is</h2>
+          <p>Same dots, two arrangements. <strong>Map</strong> puts each stop at its real coordinates.
+             <strong>Rhythm</strong> throws the coordinates away and places each stop by how its ridership
+             is spread across the year — so neighbours in this view are stops that <em>breathe alike</em>.</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Layout">
+          <button id="bMap" aria-pressed="true">Map</button>
+          <button id="bRhythm" aria-pressed="false">Rhythm</button>
+        </div>
+        <div class="scrub">
+          <button class="btn" id="play" aria-label="Play through the months">▶ Play</button>
+          <input type="range" id="month" min="0" max="0" value="0" aria-label="Month" />
+          <span class="mo" id="molabel">—</span>
+        </div>
+      </div>
+
+      <p class="note" id="geoNote" hidden>No usable coordinates came back from the stop reference, so the map
+        half of this is off — you're looking at the rhythm arrangement only.</p>
+
+      <div class="stage" id="stage">
+        <canvas id="cv" aria-label="Stops of the tpg network, positioned by geography or by the shape of their year, sized by monthly boardings"></canvas>
+        <div class="tip" id="tip"></div>
+      </div>
+
+      <div class="legends">
+        <div class="leg">
+          <span class="lt">Colour — shape of the year</span>
+          <div class="ramp"></div>
+          <div class="ramp-lb"><span id="lbCool">—</span><span id="lbWarm" style="text-align:right">—</span></div>
+        </div>
+        <div class="leg">
+          <span class="lt">Size — boardings that month</span>
+          <div class="sizes" id="sizeleg"></div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="card">
+          <h3 id="detTitle">Pick a stop</h3>
+          <p class="hint" id="detHint">Hover a dot to read it; click one to lock it, see its year drawn out, and light up the stops whose year looks the same.</p>
+          <svg class="spark" id="detSpark" hidden></svg>
+          <div id="detTwins" hidden>
+            <h3 style="margin-top:12px;font-size:14px">Breathes like…</h3>
+            <ol class="twins" id="twinList"></ol>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Busiest stops <span id="rankMonth" class="hint"></span></h3>
+          <ol class="rank" id="rank"></ol>
+        </div>
+      </div>
+
+      <div class="surprise" id="surprise" hidden>
+        <span class="kicker">Furthest apart, same heartbeat</span>
+        <div class="pair" id="surprisePair"></div>
+        <p id="surpriseText"></p>
+      </div>
+
+      <div class="loadings">
+        <div class="card">
+          <h3 style="font-size:14px">What the horizontal axis means</h3>
+          <p class="hint" id="pc1txt"></p>
+          <svg class="spark" id="pc1spark"></svg>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px">What the vertical axis means</h3>
+          <p class="hint" id="pc2txt"></p>
+          <svg class="spark" id="pc2spark"></svg>
+        </div>
+      </div>
+
+      <details class="tbl">
+        <summary>Show the numbers as a table</summary>
+        <div class="tblwrap"><table id="dataTable"></table></div>
+      </details>
+    </section>
+
+    <!-- CLOCK -->
+    <section class="panel" id="clockPanel" hidden>
+      <div class="head">
+        <div>
+          <span class="kicker">The shape of a day</span>
+          <h2 id="clockTitle">Twenty-four hours, drawn round</h2>
+          <p id="clockLede">A day laid out as a clock face instead of a line — midnight at the top, noon at the bottom.
+             The further the trace is from the centre, the busier the network is at that time.</p>
+        </div>
+      </div>
+      <div class="stage small" id="clockStage">
+        <canvas id="clockCv" aria-label="Polar chart of network activity through the day"></canvas>
+        <div class="tip" id="clockTip"></div>
+      </div>
+      <div class="legends" id="clockLegend"></div>
+      <details class="tbl">
+        <summary>Show the numbers as a table</summary>
+        <div class="tblwrap"><table id="clockTable"></table></div>
+      </details>
+    </section>
+
+    <!-- PROVENANCE -->
+    <section class="panel">
+      <div class="head"><div>
+        <span class="kicker">Where this comes from</span>
+        <h2>Straight from the portal, nothing cached</h2>
+      </div></div>
+      <p class="note" style="font-size:13.5px;color:var(--ink-2)">
+        Every number on this page was fetched from the
+        <a href="https://opendata.tpg.ch/api/explore/v2.1/console" rel="noopener">Explore v2.1 API</a>
+        when you opened it. The app reads each dataset's own field list first and uses the portal's own labels,
+        so it keeps working if tpg renames a column.
+      </p>
+      <div id="prov"></div>
+      <p class="note">
+        Boardings are counted by sensors above the vehicle doors and cleaned up by tpg afterwards — which is
+        why they come out with decimals. Stops that tpg counts but that aren't in the stop reference (or that
+        moved) can't be drawn on the map; the count is in the table above.
+      </p>
+    </section>
+
+    <footer>
+      <span>Built for fun · data © <a href="https://www.tpg.ch/en/open-data" rel="noopener">Transports publics genevois</a>, open licence</span>
+      <span class="grow"></span>
+      <a href="https://github.com/jacobanana/appz" rel="noopener">github.com/jacobanana/appz</a>
+    </footer>
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Pulse — tpg open data, visualised in the browser.
+
+   Nothing is pre-baked: on load the app asks opendata.tpg.ch what fields
+   each dataset actually has, resolves the ones it needs by name/type, and
+   builds every query from that. If tpg renames `montees` tomorrow, the
+   resolver finds the new name instead of the app going blank.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const API = 'https://opendata.tpg.ch/api/explore/v2.1/catalog/datasets';
+
+const DS = {
+  stops:   'arrets',
+  monthly: 'montees-mensuelles-par-arret-par-ligne',
+  daypart: 'frequentation-journaliere-par-tranche-horaire',
+};
+
+const MONTHS_WANTED = 18;   // how far back to pull, in months
+const STOPS_PER_MONTH = 200; // top-N stops fetched per month (2 pages of 100)
+const PAGE = 100;            // Explore v2.1 caps a page at 100 rows
+
+const nf  = new Intl.NumberFormat('de-CH');
+const nf1 = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 1 });
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const $ = id => document.getElementById(id);
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── tiny fetch layer ─────────────────────────────────────────────────── */
+
+async function getJSON(url) {
+  let res;
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/json' } });
+  } catch (e) {
+    throw new FetchError('The browser could not reach the portal at all (network, offline, or blocked).', url, e.message);
+  }
+  if (!res.ok) {
+    let body = '';
+    try { body = (await res.text()).slice(0, 400); } catch {}
+    throw new FetchError(`The portal answered ${res.status} ${res.statusText}.`, url, body);
+  }
+  return res.json();
+}
+
+class FetchError extends Error {
+  constructor(msg, url, detail) { super(msg); this.url = url; this.detail = detail || ''; }
+}
+
+function recordsURL(ds, params) {
+  const u = new URL(`${API}/${encodeURIComponent(ds)}/records`);
+  for (const [k, v] of Object.entries(params)) if (v != null && v !== '') u.searchParams.set(k, v);
+  return u.toString();
+}
+const records = (ds, params) => getJSON(recordsURL(ds, params));
+
+/** Run promise-returning thunks a few at a time so we stay polite. */
+async function pool(thunks, width, onTick) {
+  const out = new Array(thunks.length);
+  let next = 0, done = 0;
+  await Promise.all(Array.from({ length: Math.min(width, thunks.length) }, async () => {
+    while (next < thunks.length) {
+      const i = next++;
+      out[i] = await thunks[i]();
+      if (onTick) onTick(++done, thunks.length);
+    }
+  }));
+  return out;
+}
+
+/* ── schema resolution ────────────────────────────────────────────────── */
+
+const NUMERIC = ['int', 'double', 'decimal', 'long', 'float'];
+const DATEY   = ['date', 'datetime'];
+
+async function describe(ds) {
+  const meta = await getJSON(`${API}/${encodeURIComponent(ds)}`);
+  const fields = meta.fields || [];
+  return {
+    id: ds,
+    title: meta?.metas?.default?.title || ds,
+    fields,
+    labelOf(name) {
+      const f = fields.find(x => x.name === name);
+      return (f && (f.label || f.name)) || name;
+    },
+    /** First field whose name (then label) matches `re`, optionally typed. */
+    find(re, { types, not } = {}) {
+      const ok = f =>
+        (!types || types.includes(f.type)) &&
+        (!not || !not.test(f.name));
+      return (fields.find(f => ok(f) && re.test(f.name)) ||
+              fields.find(f => ok(f) && re.test(f.label || '')) || {}).name;
+    },
+    firstOfType(types) {
+      return (fields.find(f => types.includes(f.type)) || {}).name;
+    },
+    /** Every field matching any of `regexes`, in the order the regexes are given —
+        so `/tranche/` beats a looser `/horaire/` that would also match a sibling. */
+    candidates(regexes, { types, not } = {}) {
+      const ok = f => (!types || types.includes(f.type)) && (!not || !not.test(f.name));
+      const out = [];
+      for (const re of regexes)
+        for (const f of fields)
+          if (ok(f) && (re.test(f.name) || re.test(f.label || '')) && !out.includes(f.name)) out.push(f.name);
+      return out;
+    },
+  };
+}
+
+function need(value, what, ds) {
+  if (!value) throw new FetchError(
+    `The dataset “${ds}” no longer has a field that looks like ${what}.`,
+    `${API}/${ds}`,
+    'Field list: ' + (window.__lastFields || []).join(', '));
+  return value;
+}
+
+/* ── month keys ───────────────────────────────────────────────────────── */
+
+const monthKey = v => String(v).slice(0, 7);                       // "2025-06-01" → "2025-06"
+const monthNum = k => parseInt(k.slice(5, 7), 10);                 // "2025-06" → 6
+const monthName = k => `${MONTH_ABBR[monthNum(k) - 1]} ${k.slice(2, 4)}`;
+
+/** Rebuild the month *n* steps before `sample`, in the exact shape the API gave us. */
+function shiftMonth(sample, n) {
+  const s = String(sample).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s);
+  if (!m) return null;
+  let y = +m[1], mo = +m[2] - 1 - n;
+  y += Math.floor(mo / 12);
+  mo = ((mo % 12) + 12) % 12;
+  const head = `${y}-${String(mo + 1).padStart(2, '0')}`;
+  return m[3] ? `${head}-${m[3]}` : head;
+}
+
+/** An ODSQL equality clause that works whether the field is a date or text. */
+const monthWhere = (field, type, literal) =>
+  DATEY.includes(type) ? `${field}=date'${String(literal).slice(0, 10)}'`
+                       : `${field}="${literal}"`;
+
+/* ── name matching between the two datasets ───────────────────────────── */
+
+const normName = s => String(s || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase().replace(/[^A-Z0-9]+/g, '');
+
+/* ── linear algebra: 2-component PCA on the monthly profiles ──────────── */
+
+function pca2(rows) {
+  const n = rows.length, T = rows[0].length;
+  const mean = new Array(T).fill(0);
+  for (const r of rows) for (let i = 0; i < T; i++) mean[i] += r[i] / n;
+  const X = rows.map(r => r.map((v, i) => v - mean[i]));
+
+  const C = Array.from({ length: T }, () => new Float64Array(T));
+  for (const r of X)
+    for (let i = 0; i < T; i++) {
+      const ri = r[i];
+      for (let j = i; j < T; j++) C[i][j] += ri * r[j];
+    }
+  for (let i = 0; i < T; i++) for (let j = i; j < T; j++) {
+    C[i][j] /= Math.max(1, n - 1); C[j][i] = C[i][j];
+  }
+
+  const v1 = powerIterate(C, T);
+  deflate(C, T, v1, rayleigh(C, T, v1));
+  const v2 = powerIterate(C, T);
+
+  return { mean, v1, v2 };
+}
+
+function powerIterate(C, T, iters = 400) {
+  // Deterministic seed — the same data must always give the same picture.
+  let v = Array.from({ length: T }, (_, i) => Math.sin(i * 1.7 + 0.6));
+  normalise(v);
+  for (let k = 0; k < iters; k++) {
+    const w = new Array(T).fill(0);
+    for (let i = 0; i < T; i++) { let s = 0; for (let j = 0; j < T; j++) s += C[i][j] * v[j]; w[i] = s; }
+    if (!normalise(w)) break;
+    v = w;
+  }
+  return v;
+}
+function normalise(v) {
+  const n = Math.hypot(...v);
+  if (!isFinite(n) || n < 1e-12) return false;
+  for (let i = 0; i < v.length; i++) v[i] /= n;
+  return true;
+}
+function rayleigh(C, T, v) {
+  let s = 0;
+  for (let i = 0; i < T; i++) for (let j = 0; j < T; j++) s += v[i] * C[i][j] * v[j];
+  return s;
+}
+function deflate(C, T, v, lambda) {
+  for (let i = 0; i < T; i++) for (let j = 0; j < T; j++) C[i][j] -= lambda * v[i] * v[j];
+}
+const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+
+/* ── colour ───────────────────────────────────────────────────────────── */
+
+const COOL = [0x39, 0x87, 0xe5], WARM = [0xe6, 0x67, 0x67], MID = [0x7d, 0x86, 0x8c];
+/** Diverging ramp: cool ← neutral → warm, for t in [-1, 1]. */
+function divergingColor(t, alpha = 1) {
+  const k = Math.max(-1, Math.min(1, t));
+  const end = k < 0 ? COOL : WARM, a = Math.abs(k);
+  const c = MID.map((m, i) => Math.round(m + (end[i] - m) * a));
+  return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+}
+
+/* ── boot progress ────────────────────────────────────────────────────── */
+
+const STEPS = [
+  'Asking the portal what it has',
+  'Finding the newest month on file',
+  'Fetching the stop reference',
+  `Pulling ${MONTHS_WANTED} months of boardings`,
+  'Working out the shape of each stop’s year',
+  'Asking about the shape of a day',
+];
+function paintSteps() {
+  $('bootsteps').innerHTML = STEPS.map((s, i) => `<li id="st${i}"><b>${i + 1}.</b> ${s}</li>`).join('');
+}
+function stepOn(i) {
+  for (let k = 0; k < i; k++) { const el = $('st' + k); if (el) { el.dataset.done = '1'; el.removeAttribute('data-on'); } }
+  const el = $('st' + i); if (el) el.dataset.on = '1';
+  $('bootbar').style.width = Math.round((i / STEPS.length) * 100) + '%';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LOAD
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const state = {
+  stops: [],        // {name, lat, lon, commune, series[], total, pc1, pc2, gx, gy, rx, ry, x, y, r}
+  months: [],       // month keys, oldest → newest
+  monthLiterals: [],
+  monthIdx: 0,
+  morph: 0,         // 0 = map, 1 = rhythm
+  targetMorph: 0,
+  mode: 'map',
+  playing: false,
+  selected: null,
+  hover: null,
+  twins: [],
+  hasGeo: true,
+  labels: {},
+};
+
+async function load() {
+  /* 1 ─ schemas. The boardings dataset is the app; the stop reference only
+     supplies coordinates, so losing it costs the map, not the page. */
+  stepOn(0);
+  const [sMonthly, sStops] = await Promise.all([
+    describe(DS.monthly),
+    describe(DS.stops).catch(() => null),
+  ]);
+  window.__lastFields = sMonthly.fields.map(f => f.name);
+
+  const monthF = need(
+    sMonthly.find(/^mois$|month|periode|^date$/i, { types: [...DATEY, 'text'] }) || sMonthly.firstOfType(DATEY),
+    'a month', DS.monthly);
+  const monthType = (sMonthly.fields.find(f => f.name === monthF) || {}).type;
+  const stopF = need(
+    sMonthly.find(/arret|arrêt|stop/i, { types: ['text'], not: /code|didoc|id$/i }),
+    'a stop name', DS.monthly);
+  const measF = need(
+    sMonthly.find(/mont[ée]e|boarding|frequent|nombre|^nb/i, { types: NUMERIC }) || sMonthly.firstOfType(NUMERIC),
+    'a boardings count', DS.monthly);
+
+  state.labels = {
+    measure: sMonthly.labelOf(measF),
+    month: sMonthly.labelOf(monthF),
+    stop: sMonthly.labelOf(stopF),
+    monthlyTitle: sMonthly.title,
+    stopsTitle: sStops?.title,
+  };
+
+  /* 2 ─ newest month, then the window back from it */
+  stepOn(1);
+  const newestRow = await records(DS.monthly, { select: monthF, order_by: `${monthF} DESC`, limit: 1 });
+  const newestLit = newestRow?.results?.[0]?.[monthF];
+  if (!newestLit) throw new FetchError('The monthly dataset came back empty.', recordsURL(DS.monthly, { limit: 1 }), '');
+
+  const literals = [];
+  for (let i = MONTHS_WANTED - 1; i >= 0; i--) literals.push(shiftMonth(newestLit, i));
+
+  /* headline numbers, in parallel with everything else */
+  const headline = Promise.all([
+    records(DS.monthly, { select: `sum(${measF}) as v`, where: monthWhere(monthF, monthType, newestLit), limit: 1 })
+      .then(r => r?.results?.[0]?.v).catch(() => null),
+    records(DS.monthly, { select: monthF, order_by: `${monthF} ASC`, limit: 1 })
+      .then(r => r?.results?.[0]?.[monthF]).catch(() => null),
+    records(DS.stops, { select: 'count(*) as v', limit: 1 })
+      .then(r => r?.results?.[0]?.v).catch(() => null),
+  ]);
+
+  /* 3 ─ stop reference */
+  stepOn(2);
+  const geoF = sStops?.firstOfType(['geo_point_2d']);
+  const nameF = sStops && (
+    sStops.find(/nom|libell|arret|arrêt|stop|name/i, { types: ['text'], not: /code|didoc|commune|pays|country/i })
+    || sStops.find(/./, { types: ['text'] }));
+  const communeF = sStops?.find(/commune|municipal|city|ville/i, { types: ['text'] });
+
+  const stopRefs = geoF && nameF
+    ? await fetchAllRecords(DS.stops, [nameF, geoF, communeF].filter(Boolean).join(',')).catch(() => [])
+    : [];
+
+  /* 4 ─ the monthly matrix.
+
+     Plan A asks for one month at a time (a `where` clause per month, the top
+     stops of each). If the portal won't take that shape — a renamed field, a
+     date literal it doesn't like — plan B groups by stop *and* month in one
+     paginated sweep and sorts the months out here. */
+  stepOn(3);
+  const onProgress = (done, total) =>
+    $('bootbar').style.width = Math.round(((3 + done / total) / STEPS.length) * 100) + '%';
+
+  const query = async params => {
+    try { return await records(DS.monthly, params); }
+    catch (e) {
+      if (!params.order_by) throw e;
+      const { order_by, ...rest } = params;     // some portals refuse ordering by an alias
+      return records(DS.monthly, rest);
+    }
+  };
+
+  let byStop = new Map();   // stop name → Map(monthKey → value)
+  const add = (name, key, v) => {
+    if (!name || !isFinite(v)) return;
+    let m = byStop.get(name);
+    if (!m) byStop.set(name, m = new Map());
+    m.set(key, (m.get(key) || 0) + v);
+  };
+
+  let planAWorked = false;
+  try {
+    // Probe with the newest month first — if this throws, don't fire 35 more.
+    await query({
+      select: `${stopF}, sum(${measF}) as v`, group_by: stopF,
+      where: monthWhere(monthF, monthType, newestLit), order_by: 'v DESC', limit: 1,
+    });
+    const jobs = [];
+    for (const lit of literals) {
+      for (let p = 0; p < Math.ceil(STOPS_PER_MONTH / PAGE); p++) {
+        jobs.push(() => query({
+          select: `${stopF}, sum(${measF}) as v`,
+          group_by: stopF,
+          where: monthWhere(monthF, monthType, lit),
+          order_by: 'v DESC',
+          limit: PAGE,
+          offset: p * PAGE,
+        }).then(r => ({ key: monthKey(lit), rows: r?.results || [] }))
+          .catch(() => ({ key: monthKey(lit), rows: [] })));
+      }
+    }
+    for (const { key, rows } of await pool(jobs, 6, onProgress))
+      for (const row of rows) add(row[stopF], key, Number(row.v));
+    planAWorked = byStop.size >= 10;
+  } catch { /* fall through to plan B */ }
+
+  if (!planAWorked) {
+    byStop = new Map();
+    const wanted = new Set(literals.map(monthKey));
+    const pages = Array.from({ length: 30 }, (_, p) => () => query({
+      select: `${stopF}, ${monthF}, sum(${measF}) as v`,
+      group_by: `${stopF},${monthF}`,
+      order_by: 'v DESC',
+      limit: PAGE,
+      offset: p * PAGE,
+    }).then(r => r?.results || []).catch(() => []));
+    for (const rows of await pool(pages, 6, onProgress))
+      for (const row of rows) {
+        const key = monthKey(row[monthF]);
+        if (wanted.has(key)) add(row[stopF], key, Number(row.v));
+      }
+  }
+
+  if (byStop.size === 0) {
+    throw new FetchError(
+      'The monthly query came back with no rows — the portal may have changed how months are filtered.',
+      recordsURL(DS.monthly, { select: `${stopF}, sum(${measF}) as v`, group_by: stopF,
+                               where: monthWhere(monthF, monthType, literals.at(-1)), limit: PAGE }),
+      `Resolved fields — month: ${monthF} (${monthType}), stop: ${stopF}, measure: ${measF}`);
+  }
+
+  /* Keep the longest recent run of months that a decent number of stops covers fully. */
+  const present = literals.map(monthKey).filter(k => [...byStop.values()].some(m => m.has(k)));
+  let months = present, complete = [];
+  for (let cut = 0; cut < present.length - 5; cut++) {
+    months = present.slice(cut);
+    complete = [...byStop.entries()].filter(([, m]) => months.every(k => m.has(k)));
+    if (complete.length >= 40) break;
+  }
+  if (complete.length < 8) {
+    months = present.slice(-6);
+    complete = [...byStop.entries()].filter(([, m]) => months.every(k => m.has(k)));
+  }
+  if (complete.length < 3) throw new FetchError(
+    'Not enough stops have an unbroken run of months to compare their rhythms.',
+    recordsURL(DS.monthly, { group_by: stopF, limit: PAGE }),
+    `${byStop.size} stops seen across ${present.length} months.`);
+
+  state.months = months;
+  state.monthLiterals = literals;
+  state.monthIdx = months.length - 1;
+
+  /* 5 ─ join to geography, then PCA on the profiles */
+  stepOn(4);
+  const refByName = new Map();
+  for (const r of stopRefs) {
+    const g = r[geoF];
+    const lat = Array.isArray(g) ? g[0] : g?.lat, lon = Array.isArray(g) ? g[1] : g?.lon;
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    const key = normName(r[nameF]);
+    if (!key || refByName.has(key)) continue;
+    refByName.set(key, { lat: +lat, lon: +lon, commune: communeF ? r[communeF] : '' });
+  }
+
+  let unmatched = 0;
+  const stops = complete.map(([name, m]) => {
+    const series = months.map(k => m.get(k));
+    const total = series.reduce((a, b) => a + b, 0);
+    const ref = refByName.get(normName(name));
+    if (!ref) unmatched++;
+    return { name, series, total, lat: ref?.lat, lon: ref?.lon, commune: ref?.commune || '' };
+  }).filter(s => s.total > 0);
+
+  const mapped = stops.filter(s => isFinite(s.lat));
+  state.hasGeo = mapped.length >= Math.max(10, stops.length * 0.3);
+  state.stops = state.hasGeo ? mapped : stops;
+  state.unmatched = unmatched;
+  state.totalStopsSeen = stops.length;
+
+  const profiles = state.stops.map(s => s.series.map(v => v / s.total));
+  const { v1, v2 } = pca2(profiles);
+
+  // Orient the axes so the labels below are always true of the data:
+  // +x = a bigger-than-average share of the year in the months that load positively.
+  orientBySeason(v1, months);
+  orientByTrend(v2);
+
+  const mean = new Array(months.length).fill(0);
+  for (const p of profiles) for (let i = 0; i < p.length; i++) mean[i] += p[i] / profiles.length;
+  state.stops.forEach((s, i) => {
+    const centred = profiles[i].map((v, k) => v - mean[k]);
+    s.profile = profiles[i];
+    s.pc1 = dot(centred, v1);
+    s.pc2 = dot(centred, v2);
+  });
+  state.pc = { v1, v2, mean };
+
+  /* 6 ─ the day-shape chart (optional; never fatal) */
+  stepOn(5);
+  loadClock().catch(() => { $('clockPanel').hidden = true; });
+
+  const [latestTotal, oldestMonth, stopCount] = await headline;
+  state.headline = { latestTotal, oldestMonth, stopCount, newestKey: monthKey(newestLit) };
+
+  state.provenance = [
+    { ds: DS.monthly, title: sMonthly.title, fields: { month: monthF, stop: stopF, measure: measF } },
+    sStops && { ds: DS.stops, title: sStops.title, fields: { name: nameF, point: geoF, commune: communeF } },
+  ].filter(Boolean);
+
+  $('bootbar').style.width = '100%';
+}
+
+/** Page through a dataset's records until we have them all (or hit the API's window). */
+async function fetchAllRecords(ds, select) {
+  const first = await records(ds, { select, limit: PAGE, offset: 0 });
+  const total = Math.min(first.total_count || 0, 9900);
+  const out = [...(first.results || [])];
+  const pages = [];
+  for (let o = PAGE; o < total; o += PAGE) pages.push(o);
+  const rest = await pool(pages.map(o => () => records(ds, { select, limit: PAGE, offset: o }).catch(() => ({ results: [] }))), 6);
+  for (const r of rest) out.push(...(r.results || []));
+  return out;
+}
+
+/** Flip PC1 so the season it emphasises is the one with the strongest positive loading. */
+function orientBySeason(v, months) {
+  let s = 0;
+  months.forEach((k, i) => { const m = monthNum(k); if (m >= 6 && m <= 8) s += v[i]; });
+  if (s < 0) for (let i = 0; i < v.length; i++) v[i] = -v[i];
+}
+/** Flip PC2 so "later months load higher" — i.e. positive means growing. */
+function orientByTrend(v) {
+  const n = v.length; let s = 0;
+  for (let i = 0; i < n; i++) s += v[i] * (i - (n - 1) / 2);
+  if (s < 0) for (let i = 0; i < n; i++) v[i] = -v[i];
+}
+
+/* ── the day-shape (polar) chart ──────────────────────────────────────── */
+
+const clock = { slots: [], series: [], ok: false, label: '' };
+
+async function loadClock() {
+  const s = await describe(DS.daypart);
+  // `horaire_type` and `horaire_tranche_stop_theo` both say "horaire" — ask for the
+  // time *band* first, and only accept a field that actually comes back with bands in it.
+  const slotFields = s.candidates(
+    [/tranche/i, /cr[ée]neau|slot|plage/i, /heure|hour/i, /horaire/i], { types: ['text'] });
+  const valF  = s.find(/indice|mont|frequent|nombre|^nb|voyage/i, { types: NUMERIC }) || s.firstOfType(NUMERIC);
+  const dayF  = s.find(/jour.?semaine|weekday/i, { types: ['text'] }) || s.find(/jour|day/i, { types: ['text'] });
+  if (!slotFields.length || !valF) throw new Error('no usable fields');
+
+  const isWeekend = v => /sam|dim|sat|sun|week ?end/i.test(String(v || ''));
+  let slotF = null, acc = null;
+
+  for (const cand of slotFields) {
+    const groups = dayF ? `${cand},${dayF}` : cand;
+    const sel = dayF ? `${cand}, ${dayF}, avg(${valF}) as v` : `${cand}, avg(${valF}) as v`;
+    let rows = [];
+    try {
+      for (let p = 0; p < 3; p++) {
+        const r = await records(DS.daypart, { select: sel, group_by: groups, limit: PAGE, offset: p * PAGE });
+        rows.push(...(r.results || []));
+        if ((r.results || []).length < PAGE) break;
+      }
+    } catch { continue; }
+
+    const a = new Map();   // slot → {wd:[sum,n], we:[sum,n]}
+    for (const row of rows) {
+      const slot = row[cand], v = Number(row.v);
+      if (slot == null || !isFinite(v)) continue;
+      let e = a.get(slot);
+      if (!e) a.set(slot, e = { wd: [0, 0], we: [0, 0] });
+      const bucket = dayF && isWeekend(row[dayF]) ? e.we : e.wd;
+      bucket[0] += v; bucket[1]++;
+    }
+    // A day needs more than a couple of bands to be worth drawing round.
+    if (a.size >= 4) { slotF = cand; acc = a; break; }
+  }
+  if (!slotF) throw new Error('no field held enough time bands');
+
+  // Order the slots by the first hour we can read out of their label; fall back to as-given.
+  const hourOf = s2 => { const m = /(\d{1,2})/.exec(String(s2)); return m ? +m[1] : NaN; };
+  let slots = [...acc.keys()];
+  if (slots.every(x => isFinite(hourOf(x)))) slots.sort((a, b) => hourOf(a) - hourOf(b));
+
+  clock.slots = slots;
+  clock.hours = slots.map(hourOf);
+  clock.weekday = slots.map(k => { const [s2, n] = acc.get(k).wd; return n ? s2 / n : null; });
+  clock.weekend = slots.map(k => { const [s2, n] = acc.get(k).we; return n ? s2 / n : null; });
+  clock.hasWeekend = clock.weekend.some(v => v != null);
+  clock.label = s.labelOf(valF);
+  clock.slotLabel = s.labelOf(slotF);
+  clock.title = s.title;
+  clock.ok = true;
+
+  $('clockPanel').hidden = false;
+  $('clockLede').innerHTML =
+    `Each spoke is one of the portal's time bands, laid out round a clock face — midnight at the top. ` +
+    `The further the trace is from the centre, the higher the average <strong>${escapeHTML(clock.label)}</strong>` +
+    (clock.hasWeekend ? ` — weekdays and weekends drawn separately.` : `.`);
+  drawClock();
+  buildClockTable();
+  buildClockLegend();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const cv = $('cv'), ctx = cv.getContext('2d');
+const tip = $('tip');
+let W = 0, H = 0, DPR = 1;
+
+function sizeCanvas(c) {
+  const rect = c.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.max(1, Math.round(rect.width * DPR));
+  c.height = Math.max(1, Math.round(rect.height * DPR));
+  return { w: rect.width, h: rect.height, g: c.getContext('2d') };
+}
+
+function computeLayout() {
+  const rect = cv.getBoundingClientRect();
+  W = rect.width; H = rect.height;
+  const pad = 34, inner = { w: W - pad * 2, h: H - pad * 2 };
+
+  /* geographic: equirectangular, longitude squeezed by cos(latitude) */
+  if (state.hasGeo) {
+    const lats = state.stops.map(s => s.lat), lons = state.stops.map(s => s.lon);
+    const lat0 = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const k = Math.cos(lat0 * Math.PI / 180);
+    const xs = lons.map(l => l * k), ys = lats;
+    fit(xs, ys, inner, pad, (s, x, y) => { s.gx = x; s.gy = y; }, true);
+  }
+
+  /* rhythm: PCA coordinates, clipped to a robust range so one outlier
+     can't flatten everything else into a dot */
+  const px = state.stops.map(s => s.pc1), py = state.stops.map(s => s.pc2);
+  const [x0, x1] = robustRange(px), [y0, y1] = robustRange(py);
+  const toX = v => pad + ((clampTo(v, x0, x1) - x0) / (x1 - x0 || 1)) * inner.w;
+  const toY = v => pad + (1 - (clampTo(v, y0, y1) - y0) / (y1 - y0 || 1)) * inner.h;
+  state.stops.forEach(s => { s.rx = toX(s.pc1); s.ry = toY(s.pc2); });
+  state.zeroX = toX(0);
+  state.zeroY = toY(0);
+}
+
+function fit(xs, ys, inner, pad, assign, flipY) {
+  const xmin = Math.min(...xs), xmax = Math.max(...xs);
+  const ymin = Math.min(...ys), ymax = Math.max(...ys);
+  const sx = inner.w / (xmax - xmin || 1), sy = inner.h / (ymax - ymin || 1);
+  const s = Math.min(sx, sy);
+  const ox = pad + (inner.w - (xmax - xmin) * s) / 2;
+  const oy = pad + (inner.h - (ymax - ymin) * s) / 2;
+  state.stops.forEach((st, i) => {
+    const x = ox + (xs[i] - xmin) * s;
+    const y = flipY ? oy + (ymax - ys[i]) * s : oy + (ys[i] - ymin) * s;
+    assign(st, x, y);
+  });
+}
+
+function robustRange(a) {
+  const s = [...a].sort((x, y) => x - y);
+  const q = p => s[Math.max(0, Math.min(s.length - 1, Math.round(p * (s.length - 1))))];
+  const lo = q(0.02), hi = q(0.98), pad = (hi - lo) * 0.08 || 1e-6;
+  return [lo - pad, hi + pad];
+}
+const clampTo = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* dot radius carries magnitude — area-proportional, so √ */
+let rScale = 1;
+function computeRadii() {
+  const max = Math.max(...state.stops.map(s => Math.max(...s.series)));
+  rScale = 17 / Math.sqrt(max || 1);
+}
+const radiusFor = v => Math.max(2.6, Math.sqrt(Math.max(0, v)) * rScale);
+
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+function draw() {
+  const g = ctx;
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== Math.round(W * DPR) || cv.height !== Math.round(H * DPR)) {
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  }
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const m = state.morph, sm = easeInOut(m);
+  const idx = state.monthIdx;
+
+  if (sm > 0.02) drawRhythmAxes(g, sm);
+
+  // positions
+  for (const s of state.stops) {
+    const gx = state.hasGeo ? s.gx : s.rx, gy = state.hasGeo ? s.gy : s.ry;
+    s.x = gx + (s.rx - gx) * sm;
+    s.y = gy + (s.ry - gy) * sm;
+    s.r = radiusFor(s.series[idx]);
+  }
+
+  // twin threads — the punchline: in map view these run right across the canton
+  if (state.selected && state.twins.length) {
+    g.save();
+    g.strokeStyle = 'rgba(148,210,189,.55)'; g.lineWidth = 1.4; g.setLineDash([5, 4]);
+    for (const t of state.twins) {
+      g.beginPath(); g.moveTo(state.selected.x, state.selected.y); g.lineTo(t.stop.x, t.stop.y); g.stroke();
+    }
+    g.restore();
+  }
+
+  // marks, biggest first so small ones stay clickable on top
+  const order = [...state.stops].sort((a, b) => b.r - a.r);
+  for (const s of order) {
+    const dim = state.selected && s !== state.selected && !state.twins.some(t => t.stop === s);
+    g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    g.fillStyle = divergingColor(s.pc1 / (state.pcScale || 1), dim ? 0.3 : 0.86);
+    g.fill();
+    // 2px surface ring keeps overlapping marks separable
+    g.lineWidth = 1.6; g.strokeStyle = dim ? 'rgba(4,22,29,.5)' : '#04161d'; g.stroke();
+  }
+
+  for (const s of [state.hover, state.selected]) {
+    if (!s) continue;
+    g.beginPath(); g.arc(s.x, s.y, s.r + 4, 0, Math.PI * 2);
+    g.lineWidth = 2; g.strokeStyle = s === state.selected ? '#94d2bd' : 'rgba(238,155,0,.9)'; g.stroke();
+  }
+
+  // direct labels for a few marks, so identity is never colour-alone.
+  // Greedy placement: a label that would land on one already drawn is dropped.
+  g.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'bottom';
+  const wanted = state.selected
+    ? [state.selected, ...state.twins.map(t => t.stop)]
+    : [...state.stops].sort((a, b) => b.series[idx] - a.series[idx]).slice(0, 8);
+  const placed = [];
+  for (const s of wanted) {
+    const w = g.measureText(s.name).width, h = 13;
+    const bx = s.x - w / 2 - 3, by = s.y - s.r - 4 - h;
+    const box = { x: bx, y: by, w: w + 6, h: h + 3 };
+    if (box.x < 2 || box.x + box.w > W - 2 || box.y < 2) continue;
+    if (placed.some(p => box.x < p.x + p.w && p.x < box.x + box.w && box.y < p.y + p.h && p.y < box.y + box.h)) continue;
+    placed.push(box);
+    g.lineWidth = 3; g.strokeStyle = 'rgba(4,22,29,.92)';
+    g.strokeText(s.name, s.x, s.y - s.r - 4);
+    g.fillStyle = '#dfeae7';
+    g.fillText(s.name, s.x, s.y - s.r - 4);
+  }
+}
+
+function drawRhythmAxes(g, a) {
+  // The crosshair sits on the *average* rhythm (pc1 = pc2 = 0), not on the middle
+  // of the box — so "left of the line" really does mean "below average".
+  const zx = Math.max(24, Math.min(W - 24, state.zeroX ?? W / 2));
+  const zy = Math.max(24, Math.min(H - 24, state.zeroY ?? H / 2));
+  g.save();
+  g.globalAlpha = a * 0.9;
+  g.strokeStyle = 'rgba(126,155,155,.30)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(20, zy); g.lineTo(W - 20, zy);
+  g.moveTo(zx, 20); g.lineTo(zx, H - 20); g.stroke();
+  g.fillStyle = 'rgba(126,155,155,.85)';
+  g.font = '700 10.5px system-ui, sans-serif';
+  g.textBaseline = 'middle';
+  g.textAlign = 'left';  g.fillText('← ' + (state.axisLabels?.x0 || ''), 16, 14);
+  g.textAlign = 'right'; g.fillText((state.axisLabels?.x1 || '') + ' →', W - 16, 14);
+  g.textAlign = 'left';  g.fillText('↑ ' + (state.axisLabels?.y1 || ''), 16, 32);
+  g.fillText('↓ ' + (state.axisLabels?.y0 || ''), 16, H - 14);
+  g.restore();
+}
+
+/* ── animation loop ───────────────────────────────────────────────────── */
+
+let last = 0, playAcc = 0;
+function frame(t) {
+  const dt = Math.min(0.1, (t - last) / 1000 || 0); last = t;
+
+  if (state.morph !== state.targetMorph) {
+    const step = reducedMotion ? 1 : dt / 0.9;
+    const d = state.targetMorph - state.morph;
+    state.morph += Math.sign(d) * Math.min(Math.abs(d), step);
+  }
+  if (state.playing) {
+    playAcc += dt;
+    if (playAcc > 0.55) {
+      playAcc = 0;
+      setMonth((state.monthIdx + 1) % state.months.length);
+    }
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INTERACTION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function nearest(px, py, maxDist = 22) {
+  let best = null, bestD = maxDist * maxDist;
+  for (const s of state.stops) {
+    const dx = s.x - px, dy = s.y - py;
+    const d = dx * dx + dy * dy;
+    const reach = Math.max(maxDist, s.r + 6);
+    if (d < Math.min(bestD, reach * reach)) { bestD = d; best = s; }
+  }
+  return best;
+}
+
+function bindStage() {
+  const showTip = (s, x, y) => {
+    if (!s) { tip.removeAttribute('data-show'); return; }
+    const v = s.series[state.monthIdx];
+    tip.innerHTML =
+      `<b>${escapeHTML(s.name)}</b>${s.commune ? `<br><span class="n">${escapeHTML(s.commune)}</span>` : ''}` +
+      `<br><span class="n">${nf.format(Math.round(v))} boardings · ${monthName(state.months[state.monthIdx])}</span>` +
+      `<br><span class="n">${describeRhythm(s)}</span>`;
+    tip.style.left = x + 'px';
+    tip.style.top = (y - 10) + 'px';
+    tip.dataset.show = '1';
+  };
+
+  cv.addEventListener('pointermove', e => {
+    const r = cv.getBoundingClientRect();
+    const s = nearest(e.clientX - r.left, e.clientY - r.top);
+    state.hover = s;
+    showTip(s, s ? s.x : 0, s ? s.y : 0);
+    cv.style.cursor = s ? 'pointer' : 'default';
+  });
+  cv.addEventListener('pointerleave', () => { state.hover = null; tip.removeAttribute('data-show'); });
+  cv.addEventListener('click', e => {
+    const r = cv.getBoundingClientRect();
+    const s = nearest(e.clientX - r.left, e.clientY - r.top);
+    select(s === state.selected ? null : s);
+  });
+}
+
+function describeRhythm(s) {
+  const t = s.pc1 / (state.pcScale || 1);
+  const m = state.axisMonths || {};
+  if (t > 0.15) return `puts more of its year into ${m.xHi || '—'}`;
+  if (t < -0.15) return `puts more of its year into ${m.xLo || '—'}`;
+  return 'an average-shaped year';
+}
+
+function select(s) {
+  state.selected = s;
+  state.twins = s ? findTwins(s, 5) : [];
+  paintDetail();
+  paintRank();
+}
+
+/** Nearest neighbours in profile space — "stops whose year has the same shape". */
+function findTwins(s, k) {
+  return state.stops
+    .filter(o => o !== s)
+    .map(o => ({ stop: o, d: profileDistance(s.profile, o.profile) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, k);
+}
+function profileDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; sum += d * d; }
+  return Math.sqrt(sum);
+}
+
+/* haversine, for the "how far apart are these twins" line */
+function kmBetween(a, b) {
+  if (!isFinite(a.lat) || !isFinite(b.lat)) return null;
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PANELS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const escapeHTML = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function paintTiles() {
+  const h = state.headline || {};
+  const busiest = [...state.stops].sort((a, b) => b.series.at(-1) - a.series.at(-1))[0];
+  const span = h.oldestMonth ? yearsBetween(monthKey(h.oldestMonth), h.newestKey) : null;
+
+  const tiles = [
+    h.latestTotal != null && {
+      k: `Boardings · ${monthName(h.newestKey)}`,
+      v: nf.format(Math.round(h.latestTotal)),
+      s: 'across the whole network, that month alone',
+    },
+    busiest && {
+      k: 'Busiest stop',
+      v: busiest.name,
+      s: `${nf.format(Math.round(busiest.series.at(-1)))} boardings in ${monthName(state.months.at(-1))}`,
+    },
+    h.stopCount != null && {
+      k: 'Stops on file',
+      v: nf.format(h.stopCount),
+      s: `${nf.format(state.stops.length)} of them charted here`,
+    },
+    span && {
+      k: 'Counted since',
+      v: monthName(monthKey(h.oldestMonth)),
+      s: `${nf1.format(span)} years of people getting on buses`,
+    },
+  ].filter(Boolean);
+
+  $('tiles').innerHTML = tiles.map(t =>
+    `<div class="tile"><div class="k">${escapeHTML(t.k)}</div>
+       <div class="v">${escapeHTML(t.v)}</div><div class="s">${escapeHTML(t.s)}</div></div>`).join('');
+}
+function yearsBetween(a, b) {
+  const [y1, m1] = a.split('-').map(Number), [y2, m2] = b.split('-').map(Number);
+  return ((y2 - y1) * 12 + (m2 - m1)) / 12;
+}
+
+function paintRank() {
+  const idx = state.monthIdx;
+  const top = [...state.stops].sort((a, b) => b.series[idx] - a.series[idx]).slice(0, 12);
+  $('rankMonth').textContent = '· ' + monthName(state.months[idx]);
+  $('rank').innerHTML = top.map((s, i) =>
+    `<li data-name="${escapeHTML(s.name)}"${s === state.selected ? ' data-sel' : ''}>
+       <span class="i">${i + 1}</span>
+       <span class="sw" style="background:${divergingColor(s.pc1 / (state.pcScale || 1))}"></span>
+       <span class="nm">${escapeHTML(s.name)}</span>
+       <span class="vv">${nf.format(Math.round(s.series[idx]))}</span></li>`).join('');
+  for (const li of $('rank').children) {
+    li.onclick = () => {
+      const s = state.stops.find(x => x.name === li.dataset.name);
+      select(s === state.selected ? null : s);
+    };
+  }
+}
+
+function paintDetail() {
+  const s = state.selected;
+  // `hidden` is an HTMLElement property — setting it on an <svg> only makes a
+  // JS expando, so the attribute has to be toggled by hand here.
+  if (!s) {
+    $('detTitle').textContent = 'Pick a stop';
+    $('detHint').hidden = false;
+    $('detSpark').setAttribute('hidden', '');
+    $('detTwins').hidden = true;
+    return;
+  }
+  $('detTitle').textContent = s.name;
+  $('detHint').hidden = true;
+  $('detSpark').removeAttribute('hidden');
+  $('detTwins').hidden = false;
+
+  sparkline($('detSpark'), s.series, state.months, divergingColor(s.pc1 / (state.pcScale || 1)), true);
+
+  $('twinList').innerHTML = state.twins.map(t => {
+    const km = kmBetween(s, t.stop);
+    return `<li><span>${escapeHTML(t.stop.name)}</span>
+              <span class="d">${km != null ? nf1.format(km) + ' km away' : ''}</span></li>`;
+  }).join('');
+}
+
+/** A small line chart in inline SVG — crisper than canvas for a 60px strip. */
+function sparkline(svg, values, labels, color, withEnds) {
+  const w = svg.clientWidth || 260, h = 62, pad = 8, bottom = h - 16;
+  const max = Math.max(...values), min = Math.min(...values);
+  const x = i => pad + (i / Math.max(1, values.length - 1)) * (w - pad * 2);
+  const y = v => bottom - ((v - min) / (max - min || 1)) * (bottom - pad);
+  const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const dots = values.map((v, i) =>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.4" fill="${color}"/>`).join('');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}` +
+    (withEnds ? `<text x="${pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" font-family="system-ui">${monthName(labels[0])}</text>
+                 <text x="${w - pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" text-anchor="end" font-family="system-ui">${monthName(labels.at(-1))}</text>` : '');
+}
+
+/** The PCA loading curves, so the axes are readable rather than magic. */
+function paintLoadings() {
+  const { v1, v2 } = state.pc;
+  const months = state.months;
+  const label = v => {
+    const idx = months.map((k, i) => ({ k, i, v: v[i] })).sort((a, b) => b.v - a.v);
+    const hi = idx.slice(0, 3).map(o => MONTH_ABBR[monthNum(o.k) - 1]);
+    const lo = idx.slice(-3).map(o => MONTH_ABBR[monthNum(o.k) - 1]).reverse();
+    return { hi: [...new Set(hi)].join(' · '), lo: [...new Set(lo)].join(' · ') };
+  };
+  const a = label(v1), b = label(v2);
+
+  state.axisLabels = {
+    x1: `more of its year in ${a.hi}`,
+    x0: `more of its year in ${a.lo}`,
+    y1: `more of its year in ${b.hi}`,
+    y0: `more of its year in ${b.lo}`,
+  };
+  state.axisMonths = { xHi: a.hi, xLo: a.lo, yHi: b.hi, yLo: b.lo };
+  $('lbWarm').textContent = `busier than average in ${a.hi}`;
+  $('lbCool').textContent = `quieter than average in ${a.hi}`;
+  $('pc1txt').innerHTML =
+    `The strongest way stops differ. Dots on the right put more of their year into <strong>${a.hi}</strong>; ` +
+    `dots on the left put it into <strong>${a.lo}</strong>. This is the axis the dot colours follow.`;
+  $('pc2txt').innerHTML =
+    `What's left after that. Dots near the top lean towards <strong>${b.hi}</strong>, ` +
+    `dots near the bottom towards <strong>${b.lo}</strong>.`;
+
+  loadingCurve($('pc1spark'), v1, months);
+  loadingCurve($('pc2spark'), v2, months);
+}
+
+function loadingCurve(svg, v, months) {
+  const w = svg.clientWidth || 300, h = 62, pad = 8;
+  const max = Math.max(...v.map(Math.abs)) || 1;
+  const x = i => pad + (i / Math.max(1, v.length - 1)) * (w - pad * 2);
+  const y = val => h / 2 - (val / max) * (h / 2 - pad - 6);
+  const bars = v.map((val, i) =>
+    `<rect x="${(x(i) - 3).toFixed(1)}" y="${Math.min(y(val), h / 2).toFixed(1)}"
+           width="6" height="${Math.max(1.5, Math.abs(y(val) - h / 2)).toFixed(1)}" rx="2"
+           fill="${divergingColor(val / max)}"/>`).join('');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<line x1="${pad}" y1="${h / 2}" x2="${w - pad}" y2="${h / 2}" stroke="#0f3540" stroke-width="1"/>${bars}` +
+    `<text x="${pad}" y="${h - 1}" font-size="10" fill="#7e9b9b" font-family="system-ui">${monthName(months[0])}</text>
+     <text x="${w - pad}" y="${h - 1}" font-size="10" fill="#7e9b9b" text-anchor="end" font-family="system-ui">${monthName(months.at(-1))}</text>`;
+}
+
+/** The stat this whole page exists for: same heartbeat, opposite ends of the canton. */
+function paintSurprise() {
+  if (!state.hasGeo) return;
+  let best = null;
+  for (let i = 0; i < state.stops.length; i++) {
+    for (let j = i + 1; j < state.stops.length; j++) {
+      const a = state.stops[i], b = state.stops[j];
+      const km = kmBetween(a, b);
+      if (km == null || km < 4) continue;
+      const d = profileDistance(a.profile, b.profile);
+      const score = km / (d + 1e-4);
+      if (!best || score > best.score) best = { a, b, km, d, score };
+    }
+  }
+  if (!best) return;
+  // How far apart the two curves ever get, in percentage points of a stop's own year.
+  let worst = 0;
+  for (let i = 0; i < best.a.profile.length; i++)
+    worst = Math.max(worst, Math.abs(best.a.profile[i] - best.b.profile[i]) * 100);
+  const pp = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(worst);
+
+  $('surprise').hidden = false;
+  $('surprisePair').textContent = `${best.a.name}  ✕  ${best.b.name}`;
+  $('surpriseText').textContent =
+    `${nf1.format(best.km)} km apart, opposite corners of the network — and yet across ` +
+    `${state.months.length} months their share of the year never parts company by more than ` +
+    `${pp} percentage points. Click to light up the threads.`;
+  $('surprise').onclick = () => select(best.a);
+}
+
+function buildTable() {
+  const rows = [...state.stops].sort((a, b) => b.total - a.total);
+  const head = `<thead><tr><th>Stop</th><th>Commune</th>${state.months.map(m =>
+    `<th style="text-align:right">${monthName(m)}</th>`).join('')}</tr></thead>`;
+  const body = '<tbody>' + rows.map(s =>
+    `<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.commune || '—')}</td>` +
+    s.series.map(v => `<td class="n">${nf.format(Math.round(v))}</td>`).join('') + '</tr>').join('') + '</tbody>';
+  $('dataTable').innerHTML = head + body;
+}
+
+function paintProvenance() {
+  $('prov').innerHTML = (state.provenance || []).map(p => `
+    <div class="card" style="margin-top:10px">
+      <h3 style="font-size:14px">${escapeHTML(p.title)}</h3>
+      <p class="hint" style="margin:4px 0 0">
+        <code style="font-family:ui-monospace,monospace">${escapeHTML(p.ds)}</code> —
+        using ${Object.entries(p.fields).filter(([, v]) => v)
+          .map(([k, v]) => `<strong>${escapeHTML(v)}</strong> as ${escapeHTML(k)}`).join(', ')}
+      </p>
+    </div>`).join('') +
+    (state.unmatched
+      ? `<p class="note">${nf.format(state.unmatched)} of ${nf.format(state.totalStopsSeen)} counted stops
+         had no match in the stop reference, so they aren't drawn.</p>` : '');
+}
+
+/* ── the polar day chart ──────────────────────────────────────────────── */
+
+function drawClock() {
+  if (!clock.ok) return;
+  const c = $('clockCv');
+  const { w, h, g } = sizeCanvas(c);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2;
+  const R = Math.min(w, h) / 2 - 42, R0 = Math.max(16, R * 0.16);
+  const n = clock.slots.length;
+  const all = [...clock.weekday, ...clock.weekend].filter(v => v != null);
+  const max = Math.max(...all) || 1;
+
+  const angle = i => {
+    const hr = clock.hours[i];
+    const frac = isFinite(hr) ? hr / 24 : i / n;
+    return frac * Math.PI * 2 - Math.PI / 2;
+  };
+  const rad = v => R0 + (v / max) * (R - R0);
+
+  /* recessive rings + hour spokes */
+  g.strokeStyle = '#0f3540'; g.lineWidth = 1;
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    g.beginPath(); g.arc(cx, cy, R0 + (R - R0) * f, 0, Math.PI * 2); g.stroke();
+  }
+  g.font = '600 10px system-ui, sans-serif';
+  g.fillStyle = '#5f7d7d'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let hr = 0; hr < 24; hr += 3) {
+    const a = hr / 24 * Math.PI * 2 - Math.PI / 2;
+    g.strokeStyle = '#0a2831';
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0);
+    g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke();
+    g.fillText(String(hr).padStart(2, '0') + 'h', cx + Math.cos(a) * (R + 16), cy + Math.sin(a) * (R + 16));
+  }
+
+  // Only join the last band back to the first when the bands really wrap the clock —
+  // otherwise a dataset that starts at 04h would grow a chord across the small hours.
+  const wraps = isFinite(clock.hours[0]) && clock.hours[0] <= 2 && clock.hours[n - 1] >= 21;
+
+  const trace = (vals, color, width) => {
+    const pts = vals.map((v, i) => v == null ? null : {
+      x: cx + Math.cos(angle(i)) * rad(v), y: cy + Math.sin(angle(i)) * rad(v), i, v,
+    }).filter(Boolean);
+    if (pts.length < 2) return pts;
+    g.beginPath();
+    pts.forEach((p, k) => k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y));
+    if (wraps) g.closePath();
+    g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.stroke();
+    g.fillStyle = color.replace('rgb', 'rgba').replace(')', ',.13)');
+    g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1;
+    for (const p of pts) {
+      g.beginPath(); g.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      g.fillStyle = color; g.fill();
+      g.lineWidth = 2; g.strokeStyle = '#04161d'; g.stroke();
+    }
+    return pts;
+  };
+
+  clock.pts = { wd: trace(clock.weekday, 'rgb(57,135,229)', 2) };
+  if (clock.hasWeekend) clock.pts.we = trace(clock.weekend, 'rgb(217,89,38)', 2);
+
+  /* direct labels at each series' peak — identity never rests on colour alone */
+  const labelPeak = (vals, color, text) => {
+    let bi = -1, bv = -Infinity;
+    vals.forEach((v, i) => { if (v != null && v > bv) { bv = v; bi = i; } });
+    if (bi < 0) return;
+    const a = angle(bi), x = cx + Math.cos(a) * (rad(bv) + 14), y = cy + Math.sin(a) * (rad(bv) + 14);
+    g.font = '800 11px system-ui, sans-serif';
+    g.textAlign = Math.cos(a) < -0.2 ? 'right' : Math.cos(a) > 0.2 ? 'left' : 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 3.5; g.strokeStyle = 'rgba(4,22,29,.95)'; g.strokeText(text, x, y);
+    g.fillStyle = color; g.fillText(text, x, y);
+  };
+  labelPeak(clock.weekday, '#3987e5', clock.hasWeekend ? 'weekday' : 'average day');
+  if (clock.hasWeekend) labelPeak(clock.weekend, '#d95926', 'weekend');
+
+  // Outer-ring value, tucked just inside the ring so it clears the 00h hour label.
+  g.font = '600 10px system-ui, sans-serif';
+  g.fillStyle = '#5f7d7d'; g.textAlign = 'center'; g.textBaseline = 'top';
+  g.fillText(nf1.format(max), cx, cy - R + 5);
+}
+
+function buildClockLegend() {
+  const items = [['#3987e5', clock.hasWeekend ? 'Weekday' : 'Average day']];
+  if (clock.hasWeekend) items.push(['#d95926', 'Weekend']);
+  $('clockLegend').innerHTML =
+    `<div class="leg"><span class="lt">${escapeHTML(clock.label)} — average per time band</span>
+      <div style="display:flex;gap:16px;margin-top:2px">` +
+    items.map(([c, t]) =>
+      `<span style="display:inline-flex;align-items:center;gap:7px;color:var(--ink-2)">
+         <i style="width:11px;height:11px;border-radius:50%;background:${c};display:inline-block"></i>${t}</span>`).join('') +
+    `</div></div>`;
+}
+
+function buildClockTable() {
+  const head = `<thead><tr><th>${escapeHTML(clock.slotLabel || 'Time band')}</th>
+    <th style="text-align:right">${clock.hasWeekend ? 'Weekday' : 'Average'}</th>
+    ${clock.hasWeekend ? '<th style="text-align:right">Weekend</th>' : ''}</tr></thead>`;
+  const body = '<tbody>' + clock.slots.map((s, i) =>
+    `<tr><td>${escapeHTML(s)}</td>
+       <td class="n">${clock.weekday[i] == null ? '—' : nf1.format(clock.weekday[i])}</td>
+       ${clock.hasWeekend ? `<td class="n">${clock.weekend[i] == null ? '—' : nf1.format(clock.weekend[i])}</td>` : ''}
+     </tr>`).join('') + '</tbody>';
+  $('clockTable').innerHTML = head + body;
+
+  const cc = $('clockCv');
+  cc.addEventListener('pointermove', e => {
+    const r = cc.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let best = null, bd = 26 * 26;
+    for (const key of ['wd', 'we']) {
+      for (const p of (clock.pts?.[key] || [])) {
+        const d = (p.x - px) ** 2 + (p.y - py) ** 2;
+        if (d < bd) { bd = d; best = { p, key }; }
+      }
+    }
+    const t = $('clockTip');
+    if (!best) { t.removeAttribute('data-show'); return; }
+    const i = best.p.i;
+    t.innerHTML = `<b>${escapeHTML(clock.slots[i])}</b>` +
+      `<br><span class="n">${clock.hasWeekend ? 'weekday' : 'average'}: ${clock.weekday[i] == null ? '—' : nf1.format(clock.weekday[i])}</span>` +
+      (clock.hasWeekend ? `<br><span class="n">weekend: ${clock.weekend[i] == null ? '—' : nf1.format(clock.weekend[i])}</span>` : '');
+    t.style.left = best.p.x + 'px'; t.style.top = (best.p.y - 8) + 'px';
+    t.dataset.show = '1';
+  });
+  cc.addEventListener('pointerleave', () => $('clockTip').removeAttribute('data-show'));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   WIRING
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function setMonth(i) {
+  state.monthIdx = i;
+  $('month').value = String(i);
+  $('molabel').textContent = monthName(state.months[i]);
+  paintRank();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  state.targetMorph = mode === 'rhythm' ? 1 : 0;
+  $('bMap').setAttribute('aria-pressed', String(mode === 'map'));
+  $('bRhythm').setAttribute('aria-pressed', String(mode === 'rhythm'));
+}
+
+function paintSizeLegend() {
+  const max = Math.max(...state.stops.map(s => Math.max(...s.series)));
+  const steps = [max, max / 4, max / 16];
+  $('sizeleg').innerHTML = steps.map(v => {
+    const r = radiusFor(v);
+    return `<span style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <i style="width:${(r * 2).toFixed(0)}px;height:${(r * 2).toFixed(0)}px"></i>
+      <span>${shortNum(v)}</span></span>`;
+  }).join('');
+}
+const shortNum = v => v >= 1e6 ? nf1.format(v / 1e6) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'k' : Math.round(v);
+
+function reveal() {
+  $('boot').hidden = true;
+  $('app').hidden = false;
+
+  state.pcScale = Math.max(...state.stops.map(s => Math.abs(s.pc1))) || 1;
+  // Use a robust scale so a single freak stop doesn't wash the colours out.
+  const sorted = state.stops.map(s => Math.abs(s.pc1)).sort((a, b) => a - b);
+  state.pcScale = sorted[Math.floor(sorted.length * 0.92)] || state.pcScale;
+
+  $('month').max = String(state.months.length - 1);
+  computeLayout();
+  computeRadii();
+  paintTiles();
+  paintLoadings();
+  paintSizeLegend();
+  paintSurprise();
+  paintProvenance();
+  buildTable();
+  setMonth(state.months.length - 1);
+  paintDetail();
+  drawClock();   // the clock may have loaded while #app was still hidden (zero-size canvas)
+
+  if (!state.hasGeo) {
+    setMode('rhythm');
+    $('bMap').disabled = true;
+    $('bMap').title = 'No usable coordinates came back from the stop reference';
+    $('geoNote').hidden = false;
+    state.morph = 1;
+  }
+  requestAnimationFrame(frame);
+}
+
+$('bMap').onclick = () => setMode('map');
+$('bRhythm').onclick = () => setMode('rhythm');
+$('month').oninput = e => { state.playing = false; $('play').textContent = '▶ Play'; setMonth(+e.target.value); };
+$('play').onclick = () => {
+  state.playing = !state.playing;
+  $('play').textContent = state.playing ? '❚❚ Pause' : '▶ Play';
+};
+$('retry').onclick = () => location.reload();
+
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!state.stops.length) return;
+    computeLayout();
+    paintLoadings();
+    if (state.selected) paintDetail();
+    drawClock();
+  }, 120);
+});
+
+function fail(e) {
+  $('boot').hidden = true;
+  $('fail').hidden = false;
+  $('failmsg').textContent = e?.message || String(e);
+  $('faildetail').textContent =
+    (e?.url ? 'Request:\n' + e.url + '\n\n' : '') + (e?.detail || e?.stack || '');
+}
+
+paintSteps();
+bindStage();
+load().then(reveal).catch(fail);
+</script>
+</body>
+</html>
