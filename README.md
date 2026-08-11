@@ -12,7 +12,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
-| 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop and get its whole counted history, every line that calls there and how that mix shifted. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
+| 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
@@ -125,7 +125,7 @@ nothing, and every figure on the page is fetched from the
 
 | Dataset | What it gives Pulse |
 | --- | --- |
-| `montees-mensuelles-par-arret-par-ligne` | boardings per stop **per line** per month — the searchable directory, every stop's history, and which lines call where |
+| `montees-mensuelles-par-arret-par-ligne` | boardings per stop **per line** per month — both searchable directories, every stop's and every line's history, and the stops-to-lines relation in both directions |
 | `arrets` | the coordinates, commune and Didoc code behind each stop name |
 
 It asks each dataset for its *own field list* first and resolves what it needs
@@ -141,6 +141,21 @@ every row — so grouping by line inside one stop is the answer, and it comes wi
 the passenger numbers attached. That's what the stop page's line list and its
 stacked "how the mix shifted" chart are built from: a line appearing, growing or
 vanishing at a stop shows up as a band changing thickness.
+
+**And the same relation backwards.** Group by *stop* inside one line and you get
+that line's whole call list, which is what the line page is: its stops ranked by
+boardings, its month-by-month total, and where its passengers get on over time.
+The two pages link into each other — tap a line on a stop page or a stop on a
+line page and it opens the other one.
+
+**Drawing a line on the map.** The data says which stops a line calls at but not
+in what order, so the route has to be inferred: project the stops onto their own
+principal axis for a starting order, then 2-opt until no segment reversal
+shortens the walk. On the mock network that cuts the path from 7 674 px to 888.
+It's the line's *reach*, not its timetable — a branch or a loop will thread
+itself into a shape the real route doesn't take, and the page says so. The dots
+are the honest part: those stops really are on that line, and their size really
+is how many people boarded there.
 
 **The trick.** Take each stop's last 18 months of boardings and divide by its
 own total, so what's left is only the *shape* of its year — a big terminus and a
