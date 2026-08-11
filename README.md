@@ -12,7 +12,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
-| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and a settle-up log. Multi-currency, with its own exchange rates. |
+| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
 
@@ -92,8 +92,15 @@ Who paid is derived from the account an entry came out of: an account credits
 its owners in proportion to their share, so a 50/50 joint account means joint
 spending never needs settling. Who owes is the split — evenly, by weighted
 shares, or exact amounts, with rounding pennies going to the first person.
-**Settle up** logs a payment between two people rather than editing history,
-so the tally starts fresh from there.
+
+Repayments are their own thing, not an edit to any expense. **Settle up** logs
+the whole outstanding amount, *Part of it…* logs less than the full amount, and
+**＋ Log a repayment** takes an arbitrary one — either direction, any currency,
+any date, with a note. They're all listed under **Repayments**, each tappable to
+correct or delete (deleting puts the amount back on the tally), with a per-pair
+subtotal once money has moved both ways. The receipt shows a *paid back by* line
+per person alongside *paid by*, so the balance at the top is the visible sum of
+what each person put in, owes, and has since handed over.
 
 ## Adding a new app
 
