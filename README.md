@@ -12,7 +12,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
-| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
+| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
 
@@ -87,6 +87,15 @@ instead, so a foreign standing order follows the currency. **Settings →
 Currencies → Refresh** pulls rates from `api.frankfurter.dev` — the only
 network call the app makes, and everything works with hand-typed rates if it's
 blocked.
+
+An expense can be logged before it's paid — a hotel you've booked, a deposit
+you owe. Flip **Has it been paid?** to *Still to pay* and it lands in a **Still
+to pay** card with its own total and each person's share once it's settled, so
+a trip can be budgeted before a franc moves. Planned entries stay out of the
+tally, out of *where it went* and out of who-paid-what, because nobody is out of
+pocket yet; tapping **Paid** on the row folds it into the real numbers, dating
+it today if it was due in the future. A household month shows what's been paid
+and what's still planned as separate totals.
 
 Who paid is derived from the account an entry came out of: an account credits
 its owners in proportion to their share, so a 50/50 joint account means joint
