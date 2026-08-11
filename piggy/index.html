@@ -130,6 +130,9 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 
 /* ---------- totals strip ---------- */
 .totals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.totals.four{grid-template-columns:repeat(4,1fr)}
+/* four across gets cramped on a phone — pair them up instead of leaving one orphan */
+@media(max-width:440px){.totals.four{grid-template-columns:repeat(2,1fr)}}
 .tot{border:2px solid var(--line);border-radius:14px;padding:10px;text-align:center;background:#fff}
 .tot .k{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft)}
 .tot .v{font-family:var(--mono);font-weight:700;font-size:15px;margin-top:3px}
@@ -317,6 +320,9 @@ const METHODS = [
   ['card','💳 Card'],['direct-debit','🔁 Direct debit'],['transfer','🏦 Bank transfer'],
   ['cash','💵 Cash / on the spot'],['twint','📲 Twint / app'],['other','✨ Other']
 ];
+/* how a repayment actually travelled — person to person, so no card or direct debit */
+const PAY_METHODS = [['cash','💵 Cash'],['transfer','🏦 Transfer'],['twint','📲 Twint / app'],['other','✨ Other']];
+const PAY_LABEL = m => { const f = PAY_METHODS.find(x=>x[0]===m); return f ? f[1] : ''; };
 const FREQS = [['monthly','Every month'],['bimonthly','Every 2 months'],['quarterly','Every 3 months'],['semiannual','Every 6 months'],['yearly','Once a year']];
 const FREQ_STEP = {monthly:1,bimonthly:2,quarterly:3,semiannual:6,yearly:12};
 const FREQ_TAG = {monthly:'monthly',bimonthly:'2-monthly',quarterly:'quarterly',semiannual:'6-monthly',yearly:'yearly'};
@@ -455,12 +461,29 @@ function allOccurrencesEver(ledgerId){
   }
   return out;
 }
-function itemsInScope(ledgerId, monthKey){
-  const ad = S.expenses.filter(e=>e.ledgerId===ledgerId && (!monthKey || monthOf(e.date)===monthKey))
+/* Planned entries are money that hasn't moved yet, so they stay out of every
+   total that describes reality — balances, who paid what, where it went. Pass
+   withPlanned to get the budgeting view instead. */
+function itemsInScope(ledgerId, monthKey, withPlanned){
+  const ad = S.expenses.filter(e=>e.ledgerId===ledgerId && (!monthKey || monthOf(e.date)===monthKey)
+                                  && (withPlanned || !e.planned))
                        .map(e=>({...e, kind:'adhoc'}));
   const rec = monthKey ? occurrencesFor(ledgerId, monthKey).filter(o=>!o.skipped)
                        : allOccurrencesEver(ledgerId);
   return [...rec, ...ad];
+}
+function plannedInScope(ledgerId, monthKey){
+  return S.expenses.filter(e=>e.ledgerId===ledgerId && e.planned && (!monthKey || monthOf(e.date)===monthKey))
+                   .map(e=>({...e, kind:'adhoc'}))
+                   .sort((a,b)=> a.date<b.date?-1:1);   // soonest first — it's a to-pay list
+}
+function plannedShares(list){
+  const out={}; S.people.forEach(p=>out[p.id]=0);
+  list.forEach(it=>{
+    const owed = splitCents(it.split, cents(toBase(it.amount,it.currency,it.fxRate)));
+    Object.entries(owed).forEach(([pid,c])=>{ if(out[pid]!=null) out[pid]+=c; });
+  });
+  return out;
 }
 
 /* ---------- balances ---------- */
@@ -608,6 +631,7 @@ function repaymentRow(s){
     '<div class="stack pair">'+(avatar(a)||'<span class="avatar">?</span>')+(avatar(b)||'<span class="avatar">?</span>')+'</div>'+
     '<div class="item-main"><div class="name">'+esc((a||{}).name||'someone')+' → '+esc((b||{}).name||'someone')+'</div>'+
       '<div class="meta"><span>'+dayLabel(s.date)+'</span>'+
+      (s.method?'<span>·</span><span>'+esc(PAY_LABEL(s.method))+'</span>':'')+
       (s.note?'<span>·</span><span>'+esc(s.note)+'</span>':'')+'</div></div>'+
     '<div class="amount">'+money(base, baseCur())+
       (foreign?'<small>'+money(s.amount,s.currency)+'</small>':'')+'</div></div>';
@@ -634,11 +658,12 @@ function repaymentsCard(l, monthKey){
 }
 
 /* ---------- item row ---------- */
-function itemRow(it){
+function itemRow(it, opts){
   const acc = account(it.accountId);
   const base = toBase(it.amount, it.currency, it.fxRate);
   const foreign = it.currency !== baseCur();
   const tags = [];
+  if(it.planned) tags.push('<span class="tag t-plan">planned</span>');
   if(it.kind==='recurring') tags.push('<span class="tag t-freq">'+FREQ_TAG[it.frequency]+'</span>');
   if(it.method==='direct-debit') tags.push('<span class="tag t-dd">direct debit</span>');
   if(acc && acc.kind==='joint') tags.push('<span class="tag t-joint">joint</span>');
@@ -652,18 +677,38 @@ function itemRow(it){
       '<div class="meta">'+(acc?'<span>'+accountEmoji(it.accountId)+' '+esc(accountLabel(it.accountId))+'</span>':'')+
       '<span>·</span><span>'+esc(splitTxt)+'</span>'+tags.join('')+'</div></div>'+
     '<div class="amount">'+(it.skipped?'—':money(base, baseCur()))+
-      (foreign?'<small>'+money(it.amount,it.currency)+'</small>':'')+'</div></div>';
+      (foreign?'<small>'+money(it.amount,it.currency)+'</small>':'')+'</div>'+
+    ((opts&&opts.markPaid)?'<button class="btn mint sm" data-act="mark-paid" data-id="'+it.id+'">Paid</button>':'')+
+    '</div>';
+}
+
+/* ---------- planned (not paid yet) ---------- */
+function plannedCard(l, monthKey){
+  const list = plannedInScope(l.id, monthKey);
+  if(!list.length) return '';
+  const total = list.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
+  const shares = plannedShares(list);
+  return '<div class="card"><div class="card-head"><h2>🗓️ Still to pay</h2>'+
+    '<span class="sub">'+money(fromCents(total),baseCur())+'</span></div>'+
+    '<div class="list">'+list.map(e=>itemRow(e,{markPaid:true})).join('')+'</div>'+
+    '<div class="divider"></div>'+
+    '<div class="receipt-title">whose share, once paid</div>'+
+    S.people.map(p=>'<div class="rrow"><span>'+esc(p.emoji)+' '+esc(p.name)+'</span><span class="dots"></span>'+
+      '<span class="val">'+fromCents(shares[p.id]||0).toFixed(2)+'</span></div>').join('')+
+    '<div class="hint">Nothing here counts towards the tally yet — nobody is out of pocket until it\'s paid. Tap <b>Paid</b> once the money actually goes.</div>'+
+    '</div>';
 }
 
 /* ---------- household ---------- */
 function householdView(l){
   const mk = UI.month;
   const recs = occurrencesFor(l.id, mk);
-  const ad = S.expenses.filter(e=>e.ledgerId===l.id && monthOf(e.date)===mk)
+  const ad = S.expenses.filter(e=>e.ledgerId===l.id && monthOf(e.date)===mk && !e.planned)
                        .sort((a,b)=> a.date===b.date ? (b.createdAt||'').localeCompare(a.createdAt||'') : (a.date<b.date?1:-1));
   const scope = UI.scope==='all' ? null : mk;
   const recTotal = recs.filter(o=>!o.skipped).reduce((s,o)=>s+cents(toBase(o.amount,o.currency,o.fxRate)),0);
   const adTotal = ad.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
+  const planTotal = plannedInScope(l.id, mk).reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
   const soon = upcomingRules(l.id, mk, 12);
 
   let out = `
@@ -674,14 +719,14 @@ function householdView(l){
   </div>`;
   if(mk!==thisMonth()) out += '<button class="today-link" data-act="month" data-v="0">jump back to today</button>';
 
-  out += `<div class="totals">
+  out += `<div class="totals${planTotal?' four':''}">
     <div class="tot"><div class="k">Recurring</div><div class="v">${fromCents(recTotal).toFixed(0)}</div></div>
     <div class="tot"><div class="k">Extras</div><div class="v">${fromCents(adTotal).toFixed(0)}</div></div>
-    <div class="tot" style="border-color:var(--ink)"><div class="k">Total ${esc(baseCur())}</div><div class="v">${fromCents(recTotal+adTotal).toFixed(0)}</div></div>
+    ${planTotal?'<div class="tot" style="border-color:var(--mint)"><div class="k">Planned</div><div class="v" style="color:var(--mint)">'+fromCents(planTotal).toFixed(0)+'</div></div>':''}
+    <div class="tot" style="border-color:var(--ink)"><div class="k">${planTotal?'Paid':'Total'} ${esc(baseCur())}</div><div class="v">${fromCents(recTotal+adTotal).toFixed(0)}</div></div>
   </div>`;
 
   out += receiptCard(l, scope);
-  out += repaymentsCard(l, scope);
 
   out += '<div class="card"><div class="card-head"><h2>🔁 Recurring</h2>'+
     '<button class="btn soft sm" data-act="rules">Manage</button></div>'+
@@ -695,6 +740,8 @@ function householdView(l){
       : '<div class="empty"><span class="big">🌸</span>Nothing extra yet — a clean month!</div>')+
     '</div>';
 
+  out += plannedCard(l, mk);
+  out += repaymentsCard(l, scope);
   out += catCard(l.id, mk);
 
   if(soon.length){
@@ -719,8 +766,10 @@ function catCard(ledgerId, mk){
 
 /* ---------- trip ---------- */
 function tripView(l){
-  const items = S.expenses.filter(e=>e.ledgerId===l.id).sort((a,b)=> a.date<b.date?1:-1);
+  const items = S.expenses.filter(e=>e.ledgerId===l.id && !e.planned).sort((a,b)=> a.date<b.date?1:-1);
   const total = items.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
+  const planned = plannedInScope(l.id, null);
+  const planTotal = planned.reduce((s,e)=>s+cents(toBase(e.amount,e.currency,e.fxRate)),0);
   const days = {};
   items.forEach(e=>{ (days[e.date] = days[e.date]||[]).push(e); });
   const range = [l.startDate,l.endDate].filter(Boolean).map(dayLabel).join(' → ');
@@ -728,22 +777,27 @@ function tripView(l){
   let out = '<div class="card" style="margin-top:16px"><div class="card-head">'+
     '<h2 style="font-size:21px">'+esc(l.emoji)+' '+esc(l.name)+'</h2>'+
     '<button class="icon-btn" data-act="edit-ledger" data-id="'+l.id+'">✏️</button></div>'+
-    '<div class="sub">'+(range||'no dates set')+' · '+items.length+' expenses</div>'+
+    '<div class="sub">'+(range||'no dates set')+' · '+items.length+' expense'+(items.length===1?'':'s')+
+      (planned.length?' · '+planned.length+' still to pay':'')+'</div>'+
     '<div class="mono" style="font-size:30px;font-weight:700;margin-top:10px">'+money(fromCents(total),baseCur())+'</div>'+
+    (planTotal?'<div class="sub" style="margin-top:4px">＋ '+money(fromCents(planTotal),baseCur())+
+      ' planned · <b>'+money(fromCents(total+planTotal),baseCur())+'</b> all in</div>':'')+
     '</div>';
 
   out += receiptCard(l, null);
-  out += repaymentsCard(l, null);
 
   if(!items.length){
-    out += '<div class="card"><div class="empty"><span class="big">🧳</span>No expenses yet. Tap ＋ Add after the first coffee.</div></div>';
+    out += '<div class="card"><div class="empty"><span class="big">🧳</span>'+
+      (planned.length?'Nothing paid yet — just the plan below.':'No expenses yet. Tap ＋ Add after the first coffee.')+'</div></div>';
   } else {
     out += '<div class="card"><div class="card-head"><h2>🧾 Expenses</h2></div>'+
       Object.keys(days).sort().reverse().map(d=>
         '<div class="daygroup">'+dayLabel(d)+'</div><div class="list">'+days[d].map(e=>itemRow({...e,kind:'adhoc'})).join('')+'</div>'
       ).join('')+'</div>';
-    out += catCard(l.id, null);
   }
+  out += plannedCard(l, null);
+  out += repaymentsCard(l, null);
+  if(items.length) out += catCard(l.id, null);
   return out;
 }
 
@@ -852,14 +906,20 @@ function expenseForm(exp){
   exp = exp || { emoji:'🛒', name:'', amount:'', currency: l.kind==='trip' ? (l.currency||baseCur()) : baseCur(),
     date: l.kind==='trip' ? clampToTrip(l) : defaultDate(), accountId:(S.accounts[0]||{}).id, method:'card', split:null, notes:'' };
   F.emoji = exp.emoji || '🛒';
+  F.planned = !!exp.planned;
   initSplit(exp.split);
   openModal(head(isNew?'New expense':'Edit expense')+`
     <div class="field"><label>What was it?</label><input class="input" id="fName" value="${esc(exp.name)}" placeholder="Groceries at Coop" autocomplete="off"></div>
     <div class="field"><label>Icon</label>${emojiPicker(F.emoji)}</div>
     ${moneyFields(exp.amount, exp.currency, exp.fxRate)}
+    <div class="field"><label>Has it been paid?</label>
+      <div class="seg"><button type="button" data-act="exp-planned" data-v="0" class="${exp.planned?'':'on'}">Paid</button>
+      <button type="button" data-act="exp-planned" data-v="1" class="${exp.planned?'on':''}">Still to pay</button></div>
+      <div class="hint">Something booked but not paid — a hotel, a deposit — counts towards the budget and stays out of the tally until the money actually goes.</div>
+    </div>
     <div class="two">
-      <div class="field"><label>Date</label><input class="input" id="fDate" type="date" value="${exp.date}"></div>
-      <div class="field"><label>Paid from</label><select class="input" id="fAcc">${accountOptions(exp.accountId)}</select></div>
+      <div class="field"><label id="dateLbl">${exp.planned?'Due':'Date'}</label><input class="input" id="fDate" type="date" value="${exp.date}"></div>
+      <div class="field"><label id="accLbl">${exp.planned?"Who'll pay":'Paid from'}</label><select class="input" id="fAcc">${accountOptions(exp.accountId)}</select></div>
     </div>
     <div class="field"><label>How</label><select class="input" id="fMethod">${methodOptions(exp.method)}</select></div>
     <div class="field"><label>Who's it for?</label><div id="splitBox">${splitBox()}</div></div>
@@ -887,6 +947,7 @@ function saveExpense(id){
     amount: r2(readAmount()), currency: $('#fCur').value, fxRate: readRate(),
     date: $('#fDate').value || todayISO(),
     accountId: $('#fAcc').value, method: $('#fMethod').value,
+    planned: !!F.planned,
     split: readSplit(), notes: $('#fNotes').value.trim()
   };
   if(id){ const e=S.expenses.find(x=>x.id===id); Object.assign(e,data); }
@@ -1018,20 +1079,31 @@ function settleModal(){
   }).join('') : '<div class="empty"><span class="big">🎉</span>Nothing to settle.</div>';
   openModal(head('Settle up')+
     '<div class="sub" style="margin:-8px 0 14px">Tap Paid in full once the money has actually moved — it gets logged so the next tally starts fresh. Part of it… lets you log a smaller amount.</div>'+
+    (debts.length ? '<div class="field"><label>How it travelled</label>'+payMethodChips(lastPayMethod())+'</div>' : '')+
     body+
     '<div class="divider"></div>'+
-    '<button class="btn soft wide" data-act="new-settle">＋ Log some other repayment</button>');
+    '<button class="btn soft wide" data-act="new-settle">＋ Log some other repayment</button>',
+    ()=>{ F.method = lastPayMethod(); });
 }
 function doSettle(from,to,c){
   const l = activeLedger();
   const inMonth = l.kind!=='trip' && UI.scope==='month' && UI.month!==thisMonth();
   const date = inMonth ? UI.month+'-'+daysInMonth(UI.month) : todayISO();
+  const method = F.method || lastPayMethod();
+  S.settings.lastPayMethod = method;
   S.settlements.push({ id:uid('set_'), ledgerId:activeLedger().id, date:date, createdAt:new Date().toISOString(),
-    fromPersonId:from, toPersonId:to, amount:fromCents(Number(c)), currency:baseCur(), fxRate:1, note:'Settle up' });
+    fromPersonId:from, toPersonId:to, amount:fromCents(Number(c)), currency:baseCur(), fxRate:1,
+    method:method, note:'Settle up' });
   closeModal(); commit(); toast('Logged 🤝');
 }
 
 /* ---------- one repayment ---------- */
+function payMethodChips(sel){
+  return '<div class="chips" id="payPick">'+PAY_METHODS.map(m=>
+    '<button type="button" class="chip '+(m[0]===sel?'on':'')+'" data-act="pay-method" data-v="'+m[0]+'">'+
+    '<span class="tick">'+(m[0]===sel?'✓':'')+'</span>'+m[1]+'</button>').join('')+'</div>';
+}
+const lastPayMethod = () => S.settings.lastPayMethod || 'cash';
 function personOptions(sel){
   return S.people.map(p=>'<option value="'+p.id+'" '+(p.id===sel?'selected':'')+'>'+esc(p.emoji+' '+p.name)+'</option>').join('');
 }
@@ -1042,9 +1114,10 @@ function settlementForm(st, prefill){
     fromPersonId: pre.from || (S.people[0]||{}).id,
     toPersonId: pre.to || other(pre.from || (S.people[0]||{}).id),
     amount: pre.amount != null ? pre.amount : '',
-    currency: baseCur(), fxRate: null,
+    currency: baseCur(), fxRate: null, method: pre.method || lastPayMethod(),
     date: l.kind==='trip' ? clampToTrip(l) : defaultDate(), note:''
   };
+  F.method = st.method || lastPayMethod();
   openModal(head(isNew?'Log a repayment':'Edit repayment')+`
     <div class="sub" style="margin:-8px 0 14px">Money one of you actually handed over — cash, a transfer, a Twint. It cancels out against the tally rather than changing any expense.</div>
     <div class="two">
@@ -1053,6 +1126,7 @@ function settlementForm(st, prefill){
     </div>
     <button class="btn soft sm" data-act="swap-settle" style="margin:-4px 0 12px">⇄ Swap</button>
     ${moneyFields(st.amount, st.currency, st.fxRate)}
+    <div class="field"><label>How it travelled</label>${payMethodChips(F.method)}</div>
     <div class="field"><label>When</label><input class="input" id="sDate" type="date" value="${st.date}"></div>
     <div class="field"><label>Note (optional)</label><input class="input" id="sNote" value="${esc(st.note||'')}" placeholder="Cash at the station"></div>
     <div class="row-btns">
@@ -1072,8 +1146,9 @@ function saveSettlement(id){
     ledgerId:l.id, date:$('#sDate').value || todayISO(),
     fromPersonId:from, toPersonId:to,
     amount, currency:$('#fCur').value, fxRate:readRate(),
-    note:$('#sNote').value.trim()
+    method: F.method || lastPayMethod(), note:$('#sNote').value.trim()
   };
+  S.settings.lastPayMethod = data.method;
   if(id){ Object.assign(S.settlements.find(x=>x.id===id), data); }
   else { S.settlements.push(Object.assign({id:uid('set_'), createdAt:new Date().toISOString()}, data)); }
   if(!id && l.kind!=='trip' && monthOf(data.date)!==UI.month) UI.month = monthOf(data.date);
@@ -1229,15 +1304,15 @@ function download(name, text, type){
 function exportCSV(){
   const rows=[['list','type','date','name','amount','currency','amount_'+baseCur(),'paid_from','method','split_mode','participants']];
   S.ledgers.forEach(l=>{
-    itemsInScope(l.id, null).forEach(it=>{
+    itemsInScope(l.id, null, true).forEach(it=>{
       const sp=it.split||{};
-      rows.push([l.name, it.kind, it.date, it.name, r2(it.amount), it.currency, toBase(it.amount,it.currency,it.fxRate),
+      rows.push([l.name, it.planned?'planned':it.kind, it.date, it.name, r2(it.amount), it.currency, toBase(it.amount,it.currency,it.fxRate),
         accountLabel(it.accountId), it.method||'', sp.mode||'equal',
         (sp.participants||S.people.map(p=>p.id)).map(i=>(person(i)||{}).name||'').join('+')]);
     });
     settlementsInScope(l.id, null).forEach(s=>{
       rows.push([l.name, 'repayment', s.date, s.note||'Repayment', r2(s.amount), s.currency,
-        toBase(s.amount,s.currency,s.fxRate), (person(s.fromPersonId)||{}).name||'', '', '',
+        toBase(s.amount,s.currency,s.fxRate), (person(s.fromPersonId)||{}).name||'', s.method||'', '',
         (person(s.toPersonId)||{}).name||'']);
     });
   });
@@ -1296,6 +1371,20 @@ document.addEventListener('click', e=>{
       refreshSplit(); return; }
     case 'rule-active': F.active = v==='1'; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
     case 'occ-skip': F.skip = v==='1'; el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); return;
+    case 'exp-planned': F.planned = v==='1';
+      el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+      $('#dateLbl').textContent = F.planned ? 'Due' : 'Date';
+      $('#accLbl').textContent = F.planned ? "Who'll pay" : 'Paid from';
+      return;
+    case 'mark-paid': {
+      const e = S.expenses.find(x=>x.id===id); if(!e) return;
+      e.planned = false;
+      /* you can't have paid it on a date that hasn't happened — a booking due
+         next month, paid today, belongs to today */
+      const moved = e.date > todayISO();
+      if(moved) e.date = todayISO();
+      if(activeLedger().kind!=='trip' && monthOf(e.date)!==UI.month) UI.month = monthOf(e.date);
+      commit(); toast(moved ? 'Paid — dated today' : 'Paid 🎉'); return; }
     case 'save-exp': saveExpense(id); return;
     case 'del-exp': if(confirm('Delete this expense?')){ S.expenses=S.expenses.filter(x=>x.id!==id); closeModal(); commit(); } return;
     case 'save-rule': saveRule(id); return;
@@ -1305,7 +1394,11 @@ document.addEventListener('click', e=>{
     case 'settle': settleModal(); return;
     case 'do-settle': doSettle(el.dataset.from, el.dataset.to, el.dataset.c); return;
     case 'new-settle': settlementForm(null, { from:el.dataset.from, to:el.dataset.to,
-      amount: el.dataset.c ? fromCents(Number(el.dataset.c)) : null }); return;
+      amount: el.dataset.c ? fromCents(Number(el.dataset.c)) : null, method:F.method }); return;
+    case 'pay-method': F.method=v; $('#payPick').querySelectorAll('button').forEach(b=>{
+        const on = b.dataset.v===v; b.classList.toggle('on', on);
+        const t = b.querySelector('.tick'); if(t) t.textContent = on?'✓':'';
+      }); return;
     case 'open-settle': settlementForm(S.settlements.find(x=>x.id===id)); return;
     case 'save-settle': saveSettlement(id); return;
     case 'del-settle': if(confirm('Delete this repayment? The amount goes back on the tally.')){
