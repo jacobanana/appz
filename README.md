@@ -96,9 +96,12 @@ shares, or exact amounts, with rounding pennies going to the first person.
 Repayments are their own thing, not an edit to any expense. **Settle up** logs
 the whole outstanding amount, *Part of it…* logs less than the full amount, and
 **＋ Log a repayment** takes an arbitrary one — either direction, any currency,
-any date, with a note. They're all listed under **Repayments**, each tappable to
-correct or delete (deleting puts the amount back on the tally), with a per-pair
-subtotal once money has moved both ways. The receipt shows a *paid back by* line
+any date, with a note. Each one records how the money travelled (cash, bank
+transfer, Twint or app, or other); the picker sits on the settle-up screen too,
+so the one-tap path captures it as well, and it defaults to whatever was used
+last. They're all listed under **Repayments**, each tappable to correct or
+delete (deleting puts the amount back on the tally), with a per-pair subtotal
+once money has moved both ways. The receipt shows a *paid back by* line
 per person alongside *paid by*, so the balance at the top is the visible sum of
 what each person put in, owes, and has since handed over.
 

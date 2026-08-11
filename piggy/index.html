@@ -317,6 +317,9 @@ const METHODS = [
   ['card','💳 Card'],['direct-debit','🔁 Direct debit'],['transfer','🏦 Bank transfer'],
   ['cash','💵 Cash / on the spot'],['twint','📲 Twint / app'],['other','✨ Other']
 ];
+/* how a repayment actually travelled — person to person, so no card or direct debit */
+const PAY_METHODS = [['cash','💵 Cash'],['transfer','🏦 Transfer'],['twint','📲 Twint / app'],['other','✨ Other']];
+const PAY_LABEL = m => { const f = PAY_METHODS.find(x=>x[0]===m); return f ? f[1] : ''; };
 const FREQS = [['monthly','Every month'],['bimonthly','Every 2 months'],['quarterly','Every 3 months'],['semiannual','Every 6 months'],['yearly','Once a year']];
 const FREQ_STEP = {monthly:1,bimonthly:2,quarterly:3,semiannual:6,yearly:12};
 const FREQ_TAG = {monthly:'monthly',bimonthly:'2-monthly',quarterly:'quarterly',semiannual:'6-monthly',yearly:'yearly'};
@@ -608,6 +611,7 @@ function repaymentRow(s){
     '<div class="stack pair">'+(avatar(a)||'<span class="avatar">?</span>')+(avatar(b)||'<span class="avatar">?</span>')+'</div>'+
     '<div class="item-main"><div class="name">'+esc((a||{}).name||'someone')+' → '+esc((b||{}).name||'someone')+'</div>'+
       '<div class="meta"><span>'+dayLabel(s.date)+'</span>'+
+      (s.method?'<span>·</span><span>'+esc(PAY_LABEL(s.method))+'</span>':'')+
       (s.note?'<span>·</span><span>'+esc(s.note)+'</span>':'')+'</div></div>'+
     '<div class="amount">'+money(base, baseCur())+
       (foreign?'<small>'+money(s.amount,s.currency)+'</small>':'')+'</div></div>';
@@ -1018,20 +1022,31 @@ function settleModal(){
   }).join('') : '<div class="empty"><span class="big">🎉</span>Nothing to settle.</div>';
   openModal(head('Settle up')+
     '<div class="sub" style="margin:-8px 0 14px">Tap Paid in full once the money has actually moved — it gets logged so the next tally starts fresh. Part of it… lets you log a smaller amount.</div>'+
+    (debts.length ? '<div class="field"><label>How it travelled</label>'+payMethodChips(lastPayMethod())+'</div>' : '')+
     body+
     '<div class="divider"></div>'+
-    '<button class="btn soft wide" data-act="new-settle">＋ Log some other repayment</button>');
+    '<button class="btn soft wide" data-act="new-settle">＋ Log some other repayment</button>',
+    ()=>{ F.method = lastPayMethod(); });
 }
 function doSettle(from,to,c){
   const l = activeLedger();
   const inMonth = l.kind!=='trip' && UI.scope==='month' && UI.month!==thisMonth();
   const date = inMonth ? UI.month+'-'+daysInMonth(UI.month) : todayISO();
+  const method = F.method || lastPayMethod();
+  S.settings.lastPayMethod = method;
   S.settlements.push({ id:uid('set_'), ledgerId:activeLedger().id, date:date, createdAt:new Date().toISOString(),
-    fromPersonId:from, toPersonId:to, amount:fromCents(Number(c)), currency:baseCur(), fxRate:1, note:'Settle up' });
+    fromPersonId:from, toPersonId:to, amount:fromCents(Number(c)), currency:baseCur(), fxRate:1,
+    method:method, note:'Settle up' });
   closeModal(); commit(); toast('Logged 🤝');
 }
 
 /* ---------- one repayment ---------- */
+function payMethodChips(sel){
+  return '<div class="chips" id="payPick">'+PAY_METHODS.map(m=>
+    '<button type="button" class="chip '+(m[0]===sel?'on':'')+'" data-act="pay-method" data-v="'+m[0]+'">'+
+    '<span class="tick">'+(m[0]===sel?'✓':'')+'</span>'+m[1]+'</button>').join('')+'</div>';
+}
+const lastPayMethod = () => S.settings.lastPayMethod || 'cash';
 function personOptions(sel){
   return S.people.map(p=>'<option value="'+p.id+'" '+(p.id===sel?'selected':'')+'>'+esc(p.emoji+' '+p.name)+'</option>').join('');
 }
@@ -1042,9 +1057,10 @@ function settlementForm(st, prefill){
     fromPersonId: pre.from || (S.people[0]||{}).id,
     toPersonId: pre.to || other(pre.from || (S.people[0]||{}).id),
     amount: pre.amount != null ? pre.amount : '',
-    currency: baseCur(), fxRate: null,
+    currency: baseCur(), fxRate: null, method: pre.method || lastPayMethod(),
     date: l.kind==='trip' ? clampToTrip(l) : defaultDate(), note:''
   };
+  F.method = st.method || lastPayMethod();
   openModal(head(isNew?'Log a repayment':'Edit repayment')+`
     <div class="sub" style="margin:-8px 0 14px">Money one of you actually handed over — cash, a transfer, a Twint. It cancels out against the tally rather than changing any expense.</div>
     <div class="two">
@@ -1053,6 +1069,7 @@ function settlementForm(st, prefill){
     </div>
     <button class="btn soft sm" data-act="swap-settle" style="margin:-4px 0 12px">⇄ Swap</button>
     ${moneyFields(st.amount, st.currency, st.fxRate)}
+    <div class="field"><label>How it travelled</label>${payMethodChips(F.method)}</div>
     <div class="field"><label>When</label><input class="input" id="sDate" type="date" value="${st.date}"></div>
     <div class="field"><label>Note (optional)</label><input class="input" id="sNote" value="${esc(st.note||'')}" placeholder="Cash at the station"></div>
     <div class="row-btns">
@@ -1072,8 +1089,9 @@ function saveSettlement(id){
     ledgerId:l.id, date:$('#sDate').value || todayISO(),
     fromPersonId:from, toPersonId:to,
     amount, currency:$('#fCur').value, fxRate:readRate(),
-    note:$('#sNote').value.trim()
+    method: F.method || lastPayMethod(), note:$('#sNote').value.trim()
   };
+  S.settings.lastPayMethod = data.method;
   if(id){ Object.assign(S.settlements.find(x=>x.id===id), data); }
   else { S.settlements.push(Object.assign({id:uid('set_'), createdAt:new Date().toISOString()}, data)); }
   if(!id && l.kind!=='trip' && monthOf(data.date)!==UI.month) UI.month = monthOf(data.date);
@@ -1237,7 +1255,7 @@ function exportCSV(){
     });
     settlementsInScope(l.id, null).forEach(s=>{
       rows.push([l.name, 'repayment', s.date, s.note||'Repayment', r2(s.amount), s.currency,
-        toBase(s.amount,s.currency,s.fxRate), (person(s.fromPersonId)||{}).name||'', '', '',
+        toBase(s.amount,s.currency,s.fxRate), (person(s.fromPersonId)||{}).name||'', s.method||'', '',
         (person(s.toPersonId)||{}).name||'']);
     });
   });
@@ -1305,7 +1323,11 @@ document.addEventListener('click', e=>{
     case 'settle': settleModal(); return;
     case 'do-settle': doSettle(el.dataset.from, el.dataset.to, el.dataset.c); return;
     case 'new-settle': settlementForm(null, { from:el.dataset.from, to:el.dataset.to,
-      amount: el.dataset.c ? fromCents(Number(el.dataset.c)) : null }); return;
+      amount: el.dataset.c ? fromCents(Number(el.dataset.c)) : null, method:F.method }); return;
+    case 'pay-method': F.method=v; $('#payPick').querySelectorAll('button').forEach(b=>{
+        const on = b.dataset.v===v; b.classList.toggle('on', on);
+        const t = b.querySelector('.tick'); if(t) t.textContent = on?'✓':'';
+      }); return;
     case 'open-settle': settlementForm(S.settlements.find(x=>x.id===id)); return;
     case 'save-settle': saveSettlement(id); return;
     case 'del-settle': if(confirm('Delete this repayment? The amount goes back on the tally.')){
