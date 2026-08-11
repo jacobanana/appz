@@ -151,8 +151,18 @@
     background:var(--neutral);border-radius:7px;padding:2px 8px;min-width:2.6em;text-align:center}
   .lines .track{height:9px;border-radius:99px;background:var(--line-soft);overflow:hidden}
   .lines .track i{display:block;height:100%;border-radius:99px}
-  .lines .vv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px;text-align:right;min-width:7.5em}
+  .lines .vv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px;text-align:right;min-width:6.8em}
   .lines .vv b{color:var(--ink);font-weight:800}
+  .lines.named li{grid-template-columns:auto minmax(7em,1.7fr) 1fr auto}
+  .lines li.click{cursor:pointer;border-radius:9px;padding:3px 5px;margin:-3px -5px}
+  .lines li.click:hover{background:var(--line-soft)}
+  .lines .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .lineBadge{font-family:system-ui,sans-serif;font-weight:800;font-size:clamp(20px,3.4vw,28px);
+    color:#02141a;background:var(--s1);border-radius:12px;padding:2px 15px;display:inline-block;line-height:1.25}
+  .linemap{width:100%;height:min(56vh,420px);display:block;border-radius:11px;background:#03131a;
+    border:1.5px solid var(--line);margin-top:10px;touch-action:pan-y}
+  .maplegend{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--muted)}
 
   .swatches{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--ink-2)}
   .swatches span{display:inline-flex;align-items:center;gap:6px}
@@ -178,7 +188,7 @@
   .stage canvas{display:block;width:100%;height:min(64vh,560px);touch-action:pan-y}
   .tip{position:absolute;pointer-events:none;opacity:0;transform:translate(-50%,-120%);
     background:#02141a;border:1.5px solid var(--line);border-radius:11px;padding:8px 11px;
-    font-size:12.5px;line-height:1.45;color:var(--ink);box-shadow:var(--shadow);max-width:240px;
+    font-size:12.5px;line-height:1.45;color:var(--ink);box-shadow:var(--shadow);max-width:min(230px,62vw);
     transition:opacity .12s ease;z-index:4;font-family:system-ui,sans-serif}
   .tip b{font-weight:700}
   .tip .n{font-variant-numeric:tabular-nums;color:var(--ink-2)}
@@ -265,8 +275,9 @@
   <section class="hero">
     <h1>Geneva's network, <em>breathing</em>.</h1>
     <p>Look up any tpg stop and see everything the open data holds on it — its whole counted history,
-       every line that calls there, and how that mix shifted. Then scroll on and watch the network
-       re-arrange itself by the shape of its year.</p>
+       every line that calls there, and how that mix shifted. Or go the other way and pick a line, and
+       watch it drawn across the network. Then scroll on and watch the whole thing re-arrange itself
+       by the shape of its year.</p>
   </section>
 
   <!-- ── boot ─────────────────────────────────────────── -->
@@ -365,6 +376,84 @@
 
       <p class="note" id="stopBusy" hidden>Fetching…</p>
       <p class="note" id="stopErr" hidden></p>
+    </section>
+
+    <!-- LINE EXPLORER -->
+    <section class="panel" id="lineExplorer">
+      <div class="head"><div>
+        <span class="kicker">Look up a line</span>
+        <h2>Everything on one line</h2>
+        <p>The other way round: pick a line and get every stop it calls at, drawn on the same map.</p>
+      </div></div>
+
+      <div class="search">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/></svg>
+        <input id="ql" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list"
+               aria-controls="suggl" autocomplete="off" spellcheck="false" placeholder="12, 18, D…" />
+        <button class="clear" id="qlclear" type="button" aria-label="Clear search" hidden>✕</button>
+        <ul class="sugg" id="suggl" role="listbox" aria-label="Matching lines" hidden></ul>
+      </div>
+      <div class="chips" id="lchips"></div>
+
+      <div id="lineBody" hidden>
+        <div class="stopHead">
+          <span class="lineBadge" id="lineBadge">—</span>
+          <h3 id="lineName">—</h3>
+          <span class="meta" id="lineMeta"></span>
+        </div>
+
+        <div class="tiles compact" id="lineTiles"></div>
+
+        <div class="expGrid" style="grid-template-columns:1fr">
+          <div class="card">
+            <h4>The line on the map</h4>
+            <p class="hint" id="lineMapHint"></p>
+            <div class="chartbox">
+              <canvas class="linemap" id="lineMap" aria-label="The stops this line calls at, drawn on the network map"></canvas>
+              <div class="tip" id="lineMapTip"></div>
+            </div>
+            <div class="maplegend" id="lineMapLegend"></div>
+          </div>
+        </div>
+
+        <div class="expGrid">
+          <div class="card">
+            <h4>Boardings, month by month</h4>
+            <p class="hint" id="lhistHint"></p>
+            <div class="chartbox">
+              <svg id="lhist" role="img" aria-label="Monthly boardings on this line over its whole recorded history"></svg>
+              <div class="tip" id="lhistTip"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h4 id="lstopsTitle">Stops it calls at</h4>
+            <p class="hint" id="lstopsHint"></p>
+            <ol class="lines" id="lstopList" style="max-height:340px;overflow:auto"></ol>
+          </div>
+        </div>
+
+        <div class="expGrid" id="lmixWrap" style="grid-template-columns:1fr">
+          <div class="card">
+            <h4>Where the passengers get on</h4>
+            <p class="hint">Boardings stacked by stop, month by month — the busiest eight named, everything
+              else pooled. A stop growing or falling away shows up as a band changing thickness.</p>
+            <div class="chartbox">
+              <svg id="lmix" role="img" aria-label="Boardings on this line stacked by stop over time"></svg>
+              <div class="tip" id="lmixTip"></div>
+            </div>
+            <div class="swatches" id="lmixLegend"></div>
+          </div>
+        </div>
+
+        <details class="tbl">
+          <summary>Show this line's numbers as a table</summary>
+          <div class="tblwrap"><table id="lineTable"></table></div>
+        </details>
+      </div>
+
+      <p class="note" id="lineBusy" hidden>Fetching…</p>
+      <p class="note" id="lineErr" hidden></p>
     </section>
 
     <!-- MAIN VIZ -->
@@ -717,7 +806,7 @@ function divergingColor(t, alpha = 1) {
 const STEPS = [
   'Asking the portal what it has',
   'Finding the newest month on file',
-  'Listing every stop it has ever counted',
+  'Listing every stop and line it has ever counted',
   `Pulling ${MONTHS_WANTED} months of boardings`,
   'Working out the shape of each stop’s year',
 ];
@@ -797,8 +886,6 @@ async function load() {
       .then(r => r?.results?.[0]?.v).catch(() => null),
     orderedRecords(DS.monthly, { select: monthF, order_by: `${monthF} ASC`, limit: 1 })
       .then(r => r?.results?.[0]?.[monthF]).catch(() => null),
-    lineF ? records(DS.monthly, { select: `count(distinct ${lineF}) as v`, limit: 1 })
-      .then(r => r?.results?.[0]?.v).catch(() => null) : Promise.resolve(null),
   ]);
 
   /* 3 ─ the searchable directory: every stop with a lifetime total.
@@ -826,6 +913,41 @@ async function load() {
     'The portal returned no stops for the boardings dataset.',
     recordsURL(DS.monthly, { select: dirSelect, group_by: stopF, limit: 10 }),
     `Resolved fields — month: ${monthF} (${monthType}), stop: ${stopF}, measure: ${measF}`);
+
+  /* 3b ─ the lines. `ligne` and `arret` sit on the same row, so a group_by on
+     one, filtered by the other, is the whole stops-to-lines relation. */
+  const typeF = lineF
+    ? sMonthly.candidates([/ligne.?type|type.?ligne|line.?type/i, /type|mode|categ/i], { types: ['text'] })
+        .find(n => n !== lineF)
+    : null;
+  state.lines = [];
+  if (lineF) {
+    try {
+      const r = await orderedRecords(DS.monthly,
+        { select: `${lineF}, sum(${measF}) as v`, group_by: lineF, order_by: 'v DESC', limit: state.groupLimit });
+      state.lines = (r?.results || [])
+        .map(x => ({ line: String(x[lineF] ?? '').trim(), total: Number(x.v) || 0 }))
+        .filter(l => l.line && l.line !== 'null')
+        .sort((a, b) => b.total - a.total);
+    } catch { /* the line half simply won't appear */ }
+    state.lines.forEach((l, i) => { l.rank = i + 1; });
+    state.lineTotal = state.lines.reduce((a, l) => a + l.total, 0);
+    state.lineByName = new Map(state.lines.map(l => [l.line, l]));
+
+    if (typeF && state.lines.length) {
+      try {
+        const r = await orderedRecords(DS.monthly, {
+          select: `${lineF}, ${typeF}, sum(${measF}) as v`, group_by: `${lineF},${typeF}`,
+          order_by: 'v DESC', limit: state.groupLimit });
+        for (const row of (r?.results || [])) {
+          const l = state.lineByName.get(String(row[lineF] ?? '').trim());
+          if (l && !l.type && row[typeF]) l.type = String(row[typeF]);
+        }
+        state.labels.lineType = sMonthly.labelOf(typeF);
+      } catch { /* no type badge, no loss */ }
+    }
+  }
+  state.lineByName = state.lineByName || new Map();
 
   /* 4 ─ stop reference (coordinates) */
   const geoF = sStops?.firstOfType(['geo_point_2d']);
@@ -961,12 +1083,13 @@ async function load() {
   });
   state.pc = { v1, v2, mean };
 
-  const [latestTotal, oldestMonth, lineCount] = await headline;
-  state.headline = { latestTotal, oldestMonth, lineCount, newestKey: monthKey(newestLit) };
+  const [latestTotal, oldestMonth] = await headline;
+  state.headline = { latestTotal, oldestMonth, lineCount: state.lines.length || null,
+                     newestKey: monthKey(newestLit) };
 
   state.provenance = [
     { ds: DS.monthly, title: sMonthly.title,
-      fields: { month: monthF, stop: stopF, line: lineF, measure: measF } },
+      fields: { month: monthF, stop: stopF, line: lineF, 'line type': typeF, measure: measF } },
     sStops && { ds: DS.stops, title: sStops.title,
       fields: { name: nameF, point: geoF, commune: communeF, code: codeF } },
   ].filter(Boolean);
@@ -1059,7 +1182,7 @@ async function openStop(name, { scroll = false } = {}) {
 
   $('q').value = name;
   $('qclear').hidden = false;
-  closeSuggestions();
+  stopPicker?.close();
   $('stopErr').hidden = true;
   $('stopBusy').hidden = false;
   if (scroll) $('explorer').scrollIntoView({ block: 'start' });
@@ -1116,16 +1239,38 @@ function paintStop(entry, data) {
   $('histHint').textContent = months.length
     ? `${months.length} months, ${monthName(months[0].k)} to ${monthName(months.at(-1).k)}.`
     : 'No monthly rows came back for this stop.';
-  historyChart(months);
+  historyChart($('hist'), $('histTip'), months);
 
   drawLocator(entry);
   $('locHint').textContent = isFinite(entry.lat)
     ? `${entry.commune || 'Geneva'} — every other counted stop is drawn faint behind it.`
     : 'This stop has no match in the stop reference, so it can’t be placed.';
 
-  paintLines(lines, entry);
-  paintMix(months, mix, lines);
-  buildStopTable(months, mix, lines);
+  const colours = paletteFor(lines.map(l => l.line));
+  if (!lines.length) {
+    $('linesTitle').textContent = 'Lines calling here';
+    $('linesHint').textContent = state.f.lineF
+      ? 'No line breakdown came back for this stop.'
+      : 'The boardings dataset on this portal has no line column, so this one is unavailable.';
+    $('lineList').innerHTML = '';
+  } else {
+    $('linesTitle').textContent = `${lines.length} line${lines.length > 1 ? 's' : ''} calling here`;
+    $('linesHint').innerHTML =
+      `Every line the boardings dataset has ever recorded a passenger boarding on at ` +
+      `<strong>${escapeHTML(entry.name)}</strong>, by lifetime boardings. Pick one to open it below.`;
+    barList($('lineList'), lines.map(l => ({
+      key: l.line, badge: l.line, v: l.v, color: colours.get(l.line),
+    })), name => openLine(name, { scroll: true }));
+  }
+
+  const keys = months.map(m => m.k);
+  const canStack = mix.size && keys.length >= 2 && lines.length >= 2;
+  $('mixWrap').hidden = !canStack;
+  if (canStack) {
+    stackedChart($('mix'), $('mixTip'), $('mixLegend'), keys,
+      stackSeries(lines.map(l => ({ key: l.line, v: l.v })), keys, mix, 'line'));
+  }
+  matrixTable($('stopTable'), months, mix, lines.slice(0, SERIES.length).map(l => l.line));
 }
 
 function yoy(months) {
@@ -1140,8 +1285,9 @@ const shiftKey = (k, n) => shiftMonth(k + '-01', n).slice(0, 7);
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-function historyChart(months) {
-  const svg = $('hist'), tip = $('histTip');
+/** A month-by-month line chart with a crosshair readout. Used by both explorers. */
+function historyChart(svg, tip, months, noun = 'boardings') {
+  tip.removeAttribute('data-show');   // a redraw invalidates wherever it was pinned
   const w = Math.max(280, svg.clientWidth || 520), h = 210;
   const padL = 46, padR = 12, padT = 12, padB = 26;
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -1184,7 +1330,7 @@ function historyChart(months) {
     const m = months[i];
     dotEl.setAttribute('cx', x(i)); dotEl.setAttribute('cy', y(m.v)); dotEl.setAttribute('opacity', '1');
     rule.setAttribute('x1', x(i)); rule.setAttribute('x2', x(i)); rule.setAttribute('opacity', '.5');
-    tip.innerHTML = `<b>${monthName(m.k)}</b><br><span class="n">${nf.format(Math.round(m.v))} boardings</span>`;
+    tip.innerHTML = `<b>${monthName(m.k)}</b><br><span class="n">${nf.format(Math.round(m.v))} ${noun}</span>`;
     tip.style.left = (x(i) / w * 100) + '%';
     tip.style.top = (y(m.v) / h * r.height) + 'px';
     tip.dataset.show = '1';
@@ -1195,61 +1341,46 @@ function historyChart(months) {
   });
 }
 
-function paintLines(lines, entry) {
-  if (!lines.length) {
-    $('linesTitle').textContent = 'Lines calling here';
-    $('linesHint').textContent = state.f.lineF
-      ? 'No line breakdown came back for this stop.'
-      : 'The boardings dataset on this portal has no line column, so this one is unavailable.';
-    $('lineList').innerHTML = '';
-    return;
-  }
-  const total = lines.reduce((a, l) => a + l.v, 0);
-  $('linesTitle').textContent = `${lines.length} line${lines.length > 1 ? 's' : ''} calling here`;
-  $('linesHint').innerHTML =
-    `Every line the boardings dataset has ever recorded a passenger boarding on at <strong>${escapeHTML(entry.name)}</strong>, ` +
-    `by lifetime boardings. Colours match the chart below.`;
-
-  const colours = lineColours(lines);
-  const max = lines[0].v || 1;
-  $('lineList').innerHTML = lines.map(l => `
-    <li>
-      <span class="badge" style="background:${colours.get(l.line)}">${escapeHTML(l.line)}</span>
-      <span class="track"><i style="width:${Math.max(2, (l.v / max) * 100).toFixed(1)}%;background:${colours.get(l.line)}"></i></span>
-      <span class="vv"><b>${nf.format(Math.round(l.v))}</b> · ${pctOf((l.v / total) * 100)}%</span>
+/** A ranked bar list — the lines calling at a stop, or the stops on a line. */
+function barList(el, items, onPick) {
+  const total = items.reduce((a, i) => a + i.v, 0) || 1;
+  const max = items[0]?.v || 1;
+  el.classList.toggle('named', items.some(i => i.label));
+  el.innerHTML = items.map(it => `
+    <li class="${onPick ? 'click' : ''}" data-key="${escapeHTML(it.key)}">
+      <span class="badge" style="background:${it.color}">${escapeHTML(it.badge)}</span>
+      ${it.label ? `<span class="nm">${escapeHTML(it.label)}</span>` : ''}
+      <span class="track"><i style="width:${Math.max(2, (it.v / max) * 100).toFixed(1)}%;background:${it.color}"></i></span>
+      <span class="vv"><b>${nf.format(Math.round(it.v))}</b> · ${pctOf((it.v / total) * 100)}%</span>
     </li>`).join('');
+  if (onPick) for (const li of el.children) li.onclick = () => onPick(li.dataset.key);
 }
 
-/** One colour per line, fixed for the whole stop view so both charts agree. */
-function lineColours(lines) {
+/** One colour per entity, fixed for a whole view so its charts agree. */
+function paletteFor(names) {
   const m = new Map();
-  lines.forEach((l, i) => m.set(l.line, i < SERIES.length ? SERIES[i] : OTHER));
+  names.forEach((n, i) => m.set(n, i < SERIES.length ? SERIES[i] : OTHER));
   return m;
 }
 
-function paintMix(months, mix, lines) {
-  const svg = $('mix'), tip = $('mixTip');
-  const keys = months.map(m => m.k);
-  const wrap = $('mixWrap');
-  if (!mix.size || keys.length < 2 || lines.length < 2) {
-    wrap.hidden = true;
-    return;
-  }
-  wrap.hidden = false;
-
-  const top = lines.slice(0, SERIES.length).map(l => l.line);
-  const rest = lines.slice(SERIES.length).map(l => l.line);
-  const colours = lineColours(lines);
-
+/** Split ranked parts into the named top slots plus one pooled "other" band. */
+function stackSeries(parts, keys, mix, otherNoun) {
+  const top = parts.slice(0, SERIES.length).map(p => p.key);
+  const rest = parts.slice(SERIES.length).map(p => p.key);
+  const colours = paletteFor(parts.map(p => p.key));
   const series = top.map(name => ({
     name, color: colours.get(name),
     values: keys.map(k => mix.get(name)?.get(k) || 0),
   }));
   if (rest.length) series.push({
-    name: `${rest.length} other line${rest.length > 1 ? 's' : ''}`, color: OTHER,
+    name: `${rest.length} other ${otherNoun}${rest.length > 1 ? 's' : ''}`, color: OTHER,
     values: keys.map(k => rest.reduce((a, n) => a + (mix.get(n)?.get(k) || 0), 0)),
   });
+  return series;
+}
 
+function stackedChart(svg, tip, legend, keys, series) {
+  tip.removeAttribute('data-show');
   const w = Math.max(280, svg.clientWidth || 640), h = 230;
   const padL = 46, padR = 12, padT = 12, padB = 26;
   const totals = keys.map((_, i) => series.reduce((a, s) => a + s.values[i], 0));
@@ -1281,13 +1412,13 @@ function paintMix(months, mix, lines) {
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.style.height = h + 'px';
   svg.innerHTML = `${grid}${ticks}${bands}
-    <line id="mixRule" y1="${padT}" y2="${h - padB}" stroke="#94d2bd" stroke-width="1" opacity="0"/>
-    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="mixHit"/>`;
+    <line class="rule" y1="${padT}" y2="${h - padB}" stroke="#94d2bd" stroke-width="1" opacity="0"/>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" class="hit"/>`;
 
-  $('mixLegend').innerHTML = series.map(s =>
+  legend.innerHTML = series.map(s =>
     `<span><i style="background:${s.color}"></i>${escapeHTML(s.name)}</span>`).join('');
 
-  const hit = svg.querySelector('#mixHit'), rule = svg.querySelector('#mixRule');
+  const hit = svg.querySelector('.hit'), rule = svg.querySelector('.rule');
   hit.addEventListener('pointermove', ev => {
     const r = svg.getBoundingClientRect();
     const px = ((ev.clientX - r.left) / r.width) * w;
@@ -1304,37 +1435,45 @@ function paintMix(months, mix, lines) {
   hit.addEventListener('pointerleave', () => { tip.removeAttribute('data-show'); rule.setAttribute('opacity', '0'); });
 }
 
-function drawLocator(entry) {
-  const c = $('loc');
-  const rect = c.getBoundingClientRect();
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = rect.width || 320, h = rect.height || 190;
-  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-  const g = c.getContext('2d');
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.clearRect(0, 0, w, h);
-
+/** The abstract network map, shared by the stop locator and the line map. */
+function makeProjection(w, h, pad) {
   const pts = state.refPoints || [];
-  if (!pts.length) return;
+  if (!pts.length) return null;
   const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
   const lat0 = (Math.min(...lats) + Math.max(...lats)) / 2;
   const k = Math.cos(lat0 * Math.PI / 180);
   const xs = lons.map(l => l * k);
   const xmin = Math.min(...xs), xmax = Math.max(...xs);
   const ymin = Math.min(...lats), ymax = Math.max(...lats);
-  const pad = 12;
   const s = Math.min((w - pad * 2) / (xmax - xmin || 1), (h - pad * 2) / (ymax - ymin || 1));
   const ox = pad + ((w - pad * 2) - (xmax - xmin) * s) / 2;
   const oy = pad + ((h - pad * 2) - (ymax - ymin) * s) / 2;
-  const px = (lon, lat) => [ox + (lon * k - xmin) * s, oy + (ymax - lat) * s];
+  return { pts, project: (lon, lat) => [ox + (lon * k - xmin) * s, oy + (ymax - lat) * s] };
+}
+
+function sizeFor(canvas, fallbackW, fallbackH) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = rect.width || fallbackW, h = rect.height || fallbackH;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+
+function drawLocator(entry) {
+  const { g, w, h } = sizeFor($('loc'), 320, 190);
+  const proj = makeProjection(w, h, 12);
+  if (!proj) return;
 
   g.fillStyle = 'rgba(126,155,155,.28)';
-  for (const p of pts) {
-    const [a, b] = px(p.lon, p.lat);
+  for (const p of proj.pts) {
+    const [a, b] = proj.project(p.lon, p.lat);
     g.beginPath(); g.arc(a, b, 1.3, 0, Math.PI * 2); g.fill();
   }
   if (!isFinite(entry.lat)) return;
-  const [a, b] = px(entry.lon, entry.lat);
+  const [a, b] = proj.project(entry.lon, entry.lat);
   g.beginPath(); g.arc(a, b, 11, 0, Math.PI * 2);
   g.strokeStyle = '#94d2bd'; g.lineWidth = 2; g.stroke();
   g.beginPath(); g.arc(a, b, 4.5, 0, Math.PI * 2);
@@ -1342,90 +1481,359 @@ function drawLocator(entry) {
   g.lineWidth = 2; g.strokeStyle = '#04161d'; g.stroke();
 }
 
-function buildStopTable(months, mix, lines) {
-  const shown = lines.slice(0, SERIES.length).map(l => l.line);
-  const head = `<thead><tr><th>Month</th><th style="text-align:right">Total</th>${shown.map(l =>
-    `<th style="text-align:right">${escapeHTML(l)}</th>`).join('')}</tr></thead>`;
+/* ═══════════════════════════════════════════════════════════════════════
+   LINE EXPLORER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const lineView = { name: null, token: 0, cache: new Map(), placed: [], radius: () => 4 };
+
+/** Everything the boardings dataset holds about one line, in three queries. */
+async function fetchLine(name) {
+  if (lineView.cache.has(name)) return lineView.cache.get(name);
+  const { stopF, measF, monthF, lineF } = state.f;
+  const where = `${lineF}=${quoted(name)}`;
+
+  const [monthsRes, stopsRes, mixRes] = await Promise.all([
+    orderedRecords(DS.monthly, {
+      select: `${monthF}, sum(${measF}) as v`, group_by: monthF, where, limit: state.groupLimit }),
+    orderedRecords(DS.monthly, {
+      select: `${stopF}, sum(${measF}) as v`, group_by: stopF, where,
+      order_by: 'v DESC', limit: state.groupLimit }),
+    orderedRecords(DS.monthly, {
+      select: `${stopF}, ${monthF}, sum(${measF}) as v`, group_by: `${stopF},${monthF}`, where,
+      limit: state.groupLimit }).catch(() => null),
+  ]);
+
+  const months = (monthsRes?.results || [])
+    .map(r => ({ k: monthKey(r[monthF]), v: Number(r.v) || 0 }))
+    .filter(r => /^\d{4}-\d{2}$/.test(r.k))
+    .sort((a, b) => a.k.localeCompare(b.k));
+
+  const stops = (stopsRes?.results || [])
+    .map(r => {
+      const nm = String(r[stopF] ?? '').trim();
+      const ref = state.byName.get(nm);
+      return { name: nm, v: Number(r.v) || 0, lat: ref?.lat, lon: ref?.lon, commune: ref?.commune || '' };
+    })
+    .filter(s => s.name && s.v > 0)
+    .sort((a, b) => b.v - a.v);
+
+  const mix = new Map();
+  for (const r of (mixRes?.results || [])) {
+    const nm = String(r[stopF] ?? '').trim(), k = monthKey(r[monthF]), v = Number(r.v) || 0;
+    if (!/^\d{4}-\d{2}$/.test(k)) continue;
+    let m = mix.get(nm);
+    if (!m) mix.set(nm, m = new Map());
+    m.set(k, (m.get(k) || 0) + v);
+  }
+
+  const data = { name, months, stops, mix };
+  lineView.cache.set(name, data);
+  return data;
+}
+
+async function openLine(name, { scroll = false } = {}) {
+  const entry = state.lineByName.get(name);
+  if (!entry) return;
+  lineView.name = name;
+  const token = ++lineView.token;
+
+  $('ql').value = name;
+  $('qlclear').hidden = false;
+  linePicker?.close();
+  $('lineErr').hidden = true;
+  $('lineBusy').hidden = false;
+  if (scroll) $('lineExplorer').scrollIntoView({ block: 'start' });
+
+  let data;
+  try { data = await fetchLine(name); }
+  catch (e) {
+    if (token !== lineView.token) return;
+    $('lineBusy').hidden = true;
+    $('lineErr').hidden = false;
+    $('lineErr').textContent = `Couldn't fetch this line — ${e.message}`;
+    return;
+  }
+  if (token !== lineView.token) return;
+
+  $('lineBusy').hidden = true;
+  $('lineBody').hidden = false;
+  paintLine(entry, data);
+}
+
+function paintLine(entry, data) {
+  const { months, stops, mix } = data;
+  const latest = months.at(-1);
+  const share = state.lineTotal ? (entry.total / state.lineTotal) * 100 : 0;
+  const placeable = stops.filter(s => isFinite(s.lat)).length;
+
+  $('lineBadge').textContent = entry.line;
+  $('lineName').textContent = `Line ${entry.line}`;
+  $('lineMeta').textContent = [
+    entry.type ? `${state.labels.lineType || 'type'}: ${entry.type}` : '',
+    `#${entry.rank} of ${state.lines.length} lines by boardings`,
+  ].filter(Boolean).join(' · ');
+
+  const colours = paletteFor(stops.map(s => s.name));
+  const busiest = stops[0];
+
+  $('lineTiles').innerHTML = [
+    { k: 'Boardings counted', v: nf.format(Math.round(entry.total)),
+      s: `${pctOf(share)}% of every boarding on the network` },
+    latest && { k: `Latest month · ${monthName(latest.k)}`, v: nf.format(Math.round(latest.v)),
+      s: months.length > 12 ? yoy(months) : 'first months on record' },
+    { k: 'Stops it calls at', v: nf.format(stops.length),
+      s: placeable === stops.length ? 'all of them on the map'
+        : `${nf.format(stops.length - placeable)} without coordinates` },
+    busiest && { k: 'Busiest stop', v: busiest.name,
+      s: `${pctOf((busiest.v / (entry.total || 1)) * 100)}% of the line's boardings` },
+  ].filter(Boolean).map(t =>
+    `<div class="tile"><div class="k">${escapeHTML(t.k)}</div>
+       <div class="v">${escapeHTML(t.v)}</div><div class="s">${escapeHTML(t.s)}</div></div>`).join('');
+
+  lineView.stops = stops.map(s => ({ ...s, color: colours.get(s.name) }));
+  drawLineMap();
+  $('lineMapHint').innerHTML = placeable
+    ? `The data says <em>which</em> stops this line calls at, but not in what order — so the thread is the
+       shortest walk through them. Read it as the line's reach, not its timetable. Hover a stop to name it,
+       click to open it.`
+    : `None of this line's stops matched the stop reference, so there's nothing to place.`;
+  const dot = c => `<i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>`;
+  $('lineMapLegend').innerHTML = [
+    `${dot(SERIES[0])}${dot(SERIES[2])}${dot(OTHER)} a stop on this line, sized by boardings — the busiest eight keep their colour from the list`,
+    `<i style="width:20px;height:3px;border-radius:2px;background:#3987e5;display:inline-block"></i> the inferred running order`,
+    `${dot('rgba(126,155,155,.45)')} every other stop on the network`,
+  ].map(t => `<span style="display:inline-flex;align-items:center;gap:5px">${t}</span>`).join('');
+
+  $('lhistHint').textContent = months.length
+    ? `${months.length} months, ${monthName(months[0].k)} to ${monthName(months.at(-1).k)}.`
+    : 'No monthly rows came back for this line.';
+  historyChart($('lhist'), $('lhistTip'), months);
+
+  $('lstopsTitle').textContent = `${nf.format(stops.length)} stop${stops.length > 1 ? 's' : ''} it calls at`;
+  $('lstopsHint').textContent = 'By lifetime boardings on this line. Pick one to open it above.';
+  barList($('lstopList'), stops.map((s, i) => ({
+    key: s.name, badge: String(i + 1), label: s.name, v: s.v, color: colours.get(s.name),
+  })), name => openStop(name, { scroll: true }));
+
+  const keys = months.map(m => m.k);
+  const canStack = mix.size && keys.length >= 2 && stops.length >= 2;
+  $('lmixWrap').hidden = !canStack;
+  if (canStack) {
+    stackedChart($('lmix'), $('lmixTip'), $('lmixLegend'), keys,
+      stackSeries(stops.map(s => ({ key: s.name, v: s.v })), keys, mix, 'stop'));
+  }
+  matrixTable($('lineTable'), months, mix, stops.slice(0, SERIES.length).map(s => s.name));
+}
+
+/** The data has no stop order, so thread the stops into the shortest sensible walk:
+    sort along their own principal axis, then 2-opt until nothing shortens. */
+function orderRoute(pts) {
+  const n = pts.length;
+  if (n < 3) return pts.map((_, i) => i);
+  const mx = pts.reduce((a, p) => a + p.x, 0) / n, my = pts.reduce((a, p) => a + p.y, 0) / n;
+  let cxx = 0, cyy = 0, cxy = 0;
+  for (const p of pts) { const dx = p.x - mx, dy = p.y - my; cxx += dx * dx; cyy += dy * dy; cxy += dx * dy; }
+  const th = 0.5 * Math.atan2(2 * cxy, cxx - cyy), ax = Math.cos(th), ay = Math.sin(th);
+  const proj = i => (pts[i].x - mx) * ax + (pts[i].y - my) * ay;
+  const order = pts.map((_, i) => i).sort((a, b) => proj(a) - proj(b));
+
+  const d = (i, j) => Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+  for (let pass = 0; pass < 30; pass++) {
+    let improved = false;
+    for (let i = 0; i < order.length - 2; i++)
+      for (let j = i + 2; j < order.length; j++) {
+        const a = order[i], b = order[i + 1], c = order[j], e = order[j + 1];
+        const before = d(a, b) + (e === undefined ? 0 : d(c, e));
+        const after = d(a, c) + (e === undefined ? 0 : d(b, e));
+        if (after < before - 1e-9) {
+          for (let l = i + 1, r = j; l < r; l++, r--) { const t = order[l]; order[l] = order[r]; order[r] = t; }
+          improved = true;
+        }
+      }
+    if (!improved) break;
+  }
+  return order;
+}
+
+function drawLineMap() {
+  $('lineMapTip').removeAttribute('data-show');
+  const { g, w, h } = sizeFor($('lineMap'), 640, 380);
+  const proj = makeProjection(w, h, 18);
+  lineView.placed = [];
+  if (!proj) return;
+
+  g.fillStyle = 'rgba(126,155,155,.20)';
+  for (const p of proj.pts) {
+    const [a, b] = proj.project(p.lon, p.lat);
+    g.beginPath(); g.arc(a, b, 1.2, 0, Math.PI * 2); g.fill();
+  }
+
+  const placed = (lineView.stops || []).filter(s => isFinite(s.lat))
+    .map(s => { const [x, y] = proj.project(s.lon, s.lat); return { ...s, x, y }; });
+  if (!placed.length) return;
+
+  const order = orderRoute(placed);
+  g.beginPath();
+  order.forEach((i, k) => k ? g.lineTo(placed[i].x, placed[i].y) : g.moveTo(placed[i].x, placed[i].y));
+  g.strokeStyle = '#3987e5'; g.lineWidth = 3.5; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.globalAlpha = 0.8; g.stroke(); g.globalAlpha = 1;
+
+  const max = Math.max(...placed.map(s => s.v)) || 1;
+  const radius = v => Math.max(3, Math.sqrt(v / max) * 13);
+  lineView.radius = radius;
+  for (const s of placed) {
+    g.beginPath(); g.arc(s.x, s.y, radius(s.v), 0, Math.PI * 2);
+    g.fillStyle = s.color; g.fill();
+    g.lineWidth = 1.6; g.strokeStyle = '#03131a'; g.stroke();
+  }
+
+  // name the busiest few, dropping any label that lands on one already drawn
+  g.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'bottom';
+  const boxes = [];
+  for (const s of [...placed].sort((a, b) => b.v - a.v).slice(0, 8)) {
+    const tw = g.measureText(s.name).width, r = radius(s.v);
+    const box = { x: s.x - tw / 2 - 3, y: s.y - r - 4 - 13, w: tw + 6, h: 16 };
+    if (box.x < 2 || box.x + box.w > w - 2 || box.y < 2) continue;
+    if (boxes.some(p => box.x < p.x + p.w && p.x < box.x + box.w && box.y < p.y + p.h && p.y < box.y + box.h)) continue;
+    boxes.push(box);
+    g.lineWidth = 3; g.strokeStyle = 'rgba(3,19,26,.92)';
+    g.strokeText(s.name, s.x, s.y - r - 4);
+    g.fillStyle = '#dfeae7';
+    g.fillText(s.name, s.x, s.y - r - 4);
+  }
+  lineView.placed = placed;
+}
+
+function bindLineMap() {
+  const c = $('lineMap'), t = $('lineMapTip');
+  const pick = e => {
+    const r = c.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let best = null, bd = 24 * 24;
+    for (const s of lineView.placed) {
+      const d = (s.x - px) ** 2 + (s.y - py) ** 2;
+      const reach = Math.max(14, lineView.radius(s.v) + 6);
+      if (d < Math.min(bd, reach * reach)) { bd = d; best = s; }
+    }
+    return best;
+  };
+  c.addEventListener('pointermove', e => {
+    const s = pick(e);
+    c.style.cursor = s ? 'pointer' : 'default';
+    if (!s) { t.removeAttribute('data-show'); return; }
+    t.innerHTML = `<b>${escapeHTML(s.name)}</b>${s.commune ? `<br><span class="n">${escapeHTML(s.commune)}</span>` : ''}` +
+      `<br><span class="n">${nf.format(Math.round(s.v))} boardings on this line</span>`;
+    // percentages, not pixels: a stale layout read can then only nudge it, never
+    // push it off the page, and the clamp keeps the whole box inside the chart.
+    const rw = c.getBoundingClientRect().width || 1;
+    const rh = c.getBoundingClientRect().height || 1;
+    t.style.left = Math.max(15, Math.min(85, (s.x / rw) * 100)) + '%';
+    t.style.top = ((s.y - 8) / rh * 100) + '%';
+    t.dataset.show = '1';
+  });
+  c.addEventListener('pointerleave', () => t.removeAttribute('data-show'));
+  c.addEventListener('click', e => { const s = pick(e); if (s) openStop(s.name, { scroll: true }); });
+}
+
+function matrixTable(table, months, mix, columns) {
+  const head = `<thead><tr><th>Month</th><th style="text-align:right">Total</th>${columns.map(c =>
+    `<th style="text-align:right">${escapeHTML(c)}</th>`).join('')}</tr></thead>`;
   const body = '<tbody>' + months.map(m =>
     `<tr><td>${monthName(m.k)}</td><td class="n">${nf.format(Math.round(m.v))}</td>` +
-    shown.map(l => {
-      const v = mix.get(l)?.get(m.k);
+    columns.map(c => {
+      const v = mix.get(c)?.get(m.k);
       return `<td class="n">${v == null ? '—' : nf.format(Math.round(v))}</td>`;
     }).join('') + '</tr>').join('') + '</tbody>';
-  $('stopTable').innerHTML = head + body;
+  table.innerHTML = head + body;
 }
 
 /* ── search box ───────────────────────────────────────────────────────── */
 
-let suggestions = [], suggIdx = -1;
-
-function searchStops(q) {
+/** A combobox over a list: prefix matches first, then substring, accents folded. */
+function rank(items, q, keyOf) {
   const needle = normName(q);
-  if (!needle) return state.directory.slice(0, 10);
+  if (!needle) return items.slice(0, 10);
   const starts = [], contains = [];
-  for (const s of state.directory) {
-    const n = s._n || (s._n = normName(s.name));
+  for (const it of items) {
+    const n = it._n || (it._n = normName(keyOf(it)));
     const at = n.indexOf(needle);
-    if (at === 0) starts.push(s);
-    else if (at > 0) contains.push(s);
+    if (at === 0) starts.push(it);
+    else if (at > 0) contains.push(it);
     if (starts.length >= 12) break;
   }
   return [...starts, ...contains].slice(0, 12);
 }
 
-function renderSuggestions(list) {
-  suggestions = list; suggIdx = -1;
-  const el = $('sugg');
-  if (!list.length) {
-    el.innerHTML = '<li class="none" role="presentation">No stop by that name</li>';
-  } else {
-    el.innerHTML = list.map((s, i) =>
-      `<li role="option" id="sg${i}" aria-selected="false" data-name="${escapeHTML(s.name)}">
-         <span class="nm">${escapeHTML(s.name)}</span>
-         ${s.commune ? `<span class="co">${escapeHTML(s.commune)}</span>` : ''}
-         <span class="vv">${shortNum(s.total)}</span></li>`).join('');
-    [...el.children].forEach((li, i) => {
-      li.onmousedown = e => { e.preventDefault(); openStop(list[i].name); };
-    });
-  }
-  el.hidden = false;
-  $('q').setAttribute('aria-expanded', 'true');
-}
-function closeSuggestions() {
-  $('sugg').hidden = true;
-  $('q').setAttribute('aria-expanded', 'false');
-  $('q').removeAttribute('aria-activedescendant');
-  suggIdx = -1;
-}
-function highlight(i) {
-  const el = $('sugg');
-  [...el.children].forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
-  suggIdx = i;
-  if (i >= 0) {
-    $('q').setAttribute('aria-activedescendant', 'sg' + i);
-    el.children[i].scrollIntoView({ block: 'nearest' });
-  }
-}
+function makePicker({ input, clearBtn, list, idPrefix, source, render, empty, onPick }) {
+  let items = [], idx = -1;
 
-function bindSearch() {
-  const q = $('q');
-  q.addEventListener('input', () => {
-    $('qclear').hidden = !q.value;
-    renderSuggestions(searchStops(q.value));
-  });
-  q.addEventListener('focus', () => renderSuggestions(searchStops(q.value)));
-  q.addEventListener('blur', () => setTimeout(closeSuggestions, 120));
-  q.addEventListener('keydown', e => {
-    if ($('sugg').hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { renderSuggestions(searchStops(q.value)); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(suggestions.length - 1, suggIdx + 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(0, suggIdx - 1)); }
+  const open = () => {
+    items = source(input.value); idx = -1;
+    list.innerHTML = items.length
+      ? items.map((it, i) =>
+          `<li role="option" id="${idPrefix}${i}" aria-selected="false">${render(it)}</li>`).join('')
+      : `<li class="none" role="presentation">${empty}</li>`;
+    if (items.length) [...list.children].forEach((li, i) => {
+      li.onmousedown = e => { e.preventDefault(); onPick(items[i]); };
+    });
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    list.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    idx = -1;
+  };
+  const highlight = i => {
+    [...list.children].forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
+    idx = i;
+    if (i >= 0 && list.children[i]) {
+      input.setAttribute('aria-activedescendant', idPrefix + i);
+      list.children[i].scrollIntoView({ block: 'nearest' });
+    }
+  };
+
+  input.addEventListener('input', () => { clearBtn.hidden = !input.value; open(); });
+  input.addEventListener('focus', open);
+  input.addEventListener('blur', () => setTimeout(close, 120));
+  input.addEventListener('keydown', e => {
+    if (list.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { open(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(items.length - 1, idx + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(0, idx - 1)); }
     else if (e.key === 'Enter') {
       e.preventDefault();
-      const pick = suggIdx >= 0 ? suggestions[suggIdx] : suggestions[0];
-      if (pick) openStop(pick.name);
-    } else if (e.key === 'Escape') closeSuggestions();
+      const pick = idx >= 0 ? items[idx] : items[0];
+      if (pick) onPick(pick);
+    } else if (e.key === 'Escape') close();
   });
-  $('qclear').onclick = () => { q.value = ''; $('qclear').hidden = true; q.focus(); renderSuggestions(searchStops('')); };
+  clearBtn.onclick = () => { input.value = ''; clearBtn.hidden = true; input.focus(); open(); };
+  return { close };
+}
+
+let stopPicker, linePicker;
+
+function bindSearch() {
+  stopPicker = makePicker({
+    input: $('q'), clearBtn: $('qclear'), list: $('sugg'), idPrefix: 'sg',
+    source: v => rank(state.directory, v, s => s.name),
+    empty: 'No stop by that name',
+    render: s => `<span class="nm">${escapeHTML(s.name)}</span>
+      ${s.commune ? `<span class="co">${escapeHTML(s.commune)}</span>` : ''}
+      <span class="vv">${shortNum(s.total)}</span>`,
+    onPick: s => openStop(s.name),
+  });
+  linePicker = makePicker({
+    input: $('ql'), clearBtn: $('qlclear'), list: $('suggl'), idPrefix: 'lg',
+    source: v => rank(state.lines || [], v, l => l.line),
+    empty: 'No line by that name',
+    render: l => `<span class="nm">${escapeHTML(l.line)}</span>
+      ${l.type ? `<span class="co">${escapeHTML(l.type)}</span>` : ''}
+      <span class="vv">${shortNum(l.total)}</span>`,
+    onPick: l => openLine(l.line),
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1863,11 +2271,10 @@ function paintProvenance() {
          had no match in the stop reference, so they have no coordinates — they're still searchable.</p>` : '');
 }
 
-function paintChips() {
-  const picks = state.directory.slice(0, 6);
-  $('chips').innerHTML = '<span class="lbl">Try:</span>' + picks.map(s =>
-    `<button class="chip" type="button" data-name="${escapeHTML(s.name)}">${escapeHTML(s.name)}</button>`).join('');
-  for (const b of $('chips').querySelectorAll('.chip')) b.onclick = () => openStop(b.dataset.name);
+function paintChips(el, names, onPick) {
+  el.innerHTML = '<span class="lbl">Try:</span>' + names.map(n =>
+    `<button class="chip" type="button" data-name="${escapeHTML(n)}">${escapeHTML(n)}</button>`).join('');
+  for (const b of el.querySelectorAll('.chip')) b.onclick = () => onPick(b.dataset.name);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1914,7 +2321,7 @@ function reveal() {
   paintSizeLegend();
   paintSurprise();
   paintProvenance();
-  paintChips();
+  paintChips($('chips'), state.directory.slice(0, 6).map(s => s.name), n => openStop(n));
   buildTable();
   setMonth(state.months.length - 1);
   paintDetail();
@@ -1928,8 +2335,14 @@ function reveal() {
   }
   requestAnimationFrame(frame);
 
-  // open the busiest stop so the explorer is never an empty box
+  // open the busiest of each so neither explorer is ever an empty box
   if (state.directory[0]) openStop(state.directory[0].name);
+  if (state.lines.length) {
+    paintChips($('lchips'), state.lines.slice(0, 8).map(l => l.line), n => openLine(n));
+    openLine(state.lines[0].line);
+  } else {
+    $('lineExplorer').hidden = true;
+  }
 }
 
 $('bMap').onclick = () => setMode('map');
@@ -1941,8 +2354,12 @@ $('play').onclick = () => {
 };
 $('retry').onclick = () => location.reload();
 
+const TIPS = ['tip', 'histTip', 'mixTip', 'lhistTip', 'lmixTip', 'lineMapTip'];
+const hideTips = () => { for (const id of TIPS) $(id)?.removeAttribute('data-show'); };
+
 let resizeTimer;
 addEventListener('resize', () => {
+  hideTips();   // a pinned tooltip still carries pixel offsets from the old width
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (!state.stops.length) return;
@@ -1952,6 +2369,9 @@ addEventListener('resize', () => {
     const cur = explorer.name && state.byName.get(explorer.name);
     const cached = explorer.name && explorer.cache.get(explorer.name);
     if (cur && cached) paintStop(cur, cached);
+    const lcur = lineView.name && state.lineByName.get(lineView.name);
+    const lcached = lineView.name && lineView.cache.get(lineView.name);
+    if (lcur && lcached) paintLine(lcur, lcached);
   }, 140);
 });
 
@@ -1966,6 +2386,7 @@ function fail(e) {
 paintSteps();
 bindStage();
 bindSearch();
+bindLineMap();
 load().then(reveal).catch(fail);
 </script>
 </body>
