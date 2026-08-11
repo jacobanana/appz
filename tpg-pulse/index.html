@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Pulse — Geneva's network, breathing</title>
-<meta name="description" content="A live look at the Transports publics genevois open data: every stop on the map, sized by how many people got on, and then re-arranged by the shape of its year." />
+<meta name="description" content="Search any tpg stop and see everything the open data knows about it — its whole history, the lines that serve it, how the mix changed — then watch the network re-arrange itself by the shape of its year." />
 <meta name="theme-color" content="#021018" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23021018'/><circle cx='11' cy='13' r='4' fill='%233987e5'/><circle cx='21' cy='19' r='5' fill='%23e66767'/><circle cx='20' cy='10' r='2.4' fill='%237d868c'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,9 +13,9 @@
 <style>
   :root{
     color-scheme: dark;
-    /* Page + chart surfaces. The categorical and diverging steps below were
-       validated against #04161d (the chart surface) with the dataviz palette
-       validator — lightness band, chroma floor, CVD separation, contrast. */
+    /* Page + chart surfaces. Every step below was validated against #04161d
+       (the chart surface) with the dataviz palette validator — lightness band,
+       chroma floor, CVD separation on adjacent pairs, and contrast. */
     --plane:#021018;
     --surface:#04161d;
     --panel:#062028;
@@ -34,15 +34,15 @@
     --warm:#e66767;
     --neutral:#7d868c;
 
-    /* categorical, fixed order, never cycled */
-    --series-1:#3987e5;
-    --series-2:#d95926;
+    /* categorical, fixed order, never cycled — used for bus lines */
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
 
     --shadow:0 18px 44px -22px rgba(0,0,0,.9);
     --r:18px;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
   body{
     margin:0;background:var(--plane);color:var(--ink);
     font-family:'Nunito',system-ui,'Segoe UI',sans-serif;font-weight:600;line-height:1.55;
@@ -69,7 +69,6 @@
   .hero h1 em{font-style:normal;background:linear-gradient(110deg,var(--cool),var(--neutral) 46%,var(--warm));
     -webkit-background-clip:text;background-clip:text;color:transparent}
   .hero p{max-width:62ch;color:var(--ink-2);font-size:clamp(14.5px,2.1vw,17px);margin:14px 0 0;font-weight:600}
-  .hero p.small{color:var(--muted);font-size:13.5px;max-width:70ch;margin-top:10px}
 
   /* ── boot / error ─────────────────────────────────────── */
   .boot{margin-top:34px;background:var(--panel);border:1.5px solid var(--line);border-radius:var(--r);padding:22px 22px 24px}
@@ -87,16 +86,18 @@
     border:1px solid var(--line);border-radius:11px;padding:11px;color:var(--ink-2);margin:12px 0 0;font-weight:400}
   .btn{appearance:none;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);
     font:inherit;font-size:13.5px;font-weight:800;padding:8px 14px;border-radius:11px;cursor:pointer}
-  .btn:hover{border-color:var(--accent);color:var(--accent)}
-  .btn[aria-pressed="true"]{background:var(--accent);color:#022;border-color:var(--accent)}
+  .btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .btn:disabled{opacity:.45;cursor:default}
 
   /* ── stat tiles ───────────────────────────────────────── */
-  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:30px 0 26px}
+  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:30px 0 26px}
   .tile{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px 15px}
   .tile .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800}
-  .tile .v{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:clamp(22px,3.4vw,30px);
+  .tile .v{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:clamp(21px,3.2vw,29px);
     font-weight:700;line-height:1.15;margin-top:5px;color:var(--ink)}
   .tile .s{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .tiles.compact .v{font-size:clamp(18px,2.6vw,24px)}
 
   /* ── panels ───────────────────────────────────────────── */
   section.panel{background:var(--panel);border:1.5px solid var(--line);border-radius:var(--r);
@@ -106,12 +107,67 @@
   .head p{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:64ch}
   .kicker{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-2);font-weight:800}
 
+  /* ── search ───────────────────────────────────────────── */
+  .search{position:relative;margin:16px 0 4px;max-width:520px}
+  .search input{width:100%;font:inherit;font-size:16px;font-weight:700;color:var(--ink);
+    background:var(--surface);border:1.5px solid var(--line);border-radius:13px;padding:12px 40px 12px 42px}
+  .search input::placeholder{color:var(--muted);font-weight:600}
+  .search input:focus{border-color:var(--accent);outline:none}
+  .search .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);
+    width:18px;height:18px;pointer-events:none}
+  .search .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);appearance:none;border:0;
+    background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:6px 8px;line-height:1}
+  .search .clear:hover{color:var(--warm)}
+  .sugg{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 6px);background:#04191f;
+    border:1.5px solid var(--line);border-radius:13px;box-shadow:var(--shadow);overflow:hidden;
+    max-height:340px;overflow-y:auto;list-style:none;margin:0;padding:4px}
+  .sugg li{display:flex;gap:10px;align-items:center;padding:8px 11px;border-radius:9px;cursor:pointer;font-size:14px}
+  .sugg li[aria-selected="true"], .sugg li:hover{background:var(--line-soft)}
+  .sugg .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sugg .co{color:var(--muted);font-size:12px}
+  .sugg .vv{color:var(--ink-2);font-size:12px;font-variant-numeric:tabular-nums}
+  .sugg .none{color:var(--muted);cursor:default;font-size:13px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;align-items:center}
+  .chips span.lbl{font-size:12px;color:var(--muted)}
+  .chip{appearance:none;font:inherit;font-size:12.5px;font-weight:800;color:var(--ink-2);cursor:pointer;
+    background:var(--surface);border:1.5px solid var(--line);border-radius:99px;padding:5px 12px}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ── stop explorer ────────────────────────────────────── */
+  .stopHead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-top:20px}
+  .stopHead h3{font-size:clamp(22px,3.6vw,30px)}
+  .stopHead .meta{color:var(--muted);font-size:13.5px}
+  .expGrid{display:grid;gap:16px;grid-template-columns:1fr;margin-top:16px}
+  @media (min-width:900px){.expGrid{grid-template-columns:1.6fr 1fr}}
+  .card{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 15px}
+  .card h4{font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;margin:0 0 3px}
+  .card .hint{color:var(--muted);font-size:12.5px;margin:0}
+  .chartbox{position:relative;margin-top:10px}
+  .chartbox svg{display:block;width:100%}
+
+  .lines{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+  .lines li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:13px}
+  .lines .badge{font-family:system-ui,sans-serif;font-weight:800;font-size:12px;color:#02141a;
+    background:var(--neutral);border-radius:7px;padding:2px 8px;min-width:2.6em;text-align:center}
+  .lines .track{height:9px;border-radius:99px;background:var(--line-soft);overflow:hidden}
+  .lines .track i{display:block;height:100%;border-radius:99px}
+  .lines .vv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px;text-align:right;min-width:7.5em}
+  .lines .vv b{color:var(--ink);font-weight:800}
+
+  .swatches{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--ink-2)}
+  .swatches span{display:inline-flex;align-items:center;gap:6px}
+  .swatches i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  .locator{width:100%;height:190px;display:block;border-radius:11px;background:#03131a;
+    border:1.5px solid var(--line);margin-top:10px}
+
   /* ── viz controls ─────────────────────────────────────── */
   .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 12px}
   .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
   .seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:13.5px;
     font-weight:800;padding:8px 15px;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--accent);color:#022}
+  .seg button:disabled{opacity:.4;cursor:default}
   .scrub{display:flex;align-items:center;gap:10px;flex:1;min-width:240px}
   .scrub input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
   .scrub .mo{font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13.5px;
@@ -120,10 +176,9 @@
   /* ── canvas stage ─────────────────────────────────────── */
   .stage{position:relative;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
   .stage canvas{display:block;width:100%;height:min(64vh,560px);touch-action:pan-y}
-  .stage.small canvas{height:min(52vh,420px)}
   .tip{position:absolute;pointer-events:none;opacity:0;transform:translate(-50%,-120%);
     background:#02141a;border:1.5px solid var(--line);border-radius:11px;padding:8px 11px;
-    font-size:12.5px;line-height:1.45;color:var(--ink);box-shadow:var(--shadow);max-width:230px;
+    font-size:12.5px;line-height:1.45;color:var(--ink);box-shadow:var(--shadow);max-width:240px;
     transition:opacity .12s ease;z-index:4;font-family:system-ui,sans-serif}
   .tip b{font-weight:700}
   .tip .n{font-variant-numeric:tabular-nums;color:var(--ink-2)}
@@ -144,9 +199,6 @@
   /* ── side / detail ────────────────────────────────────── */
   .split{display:grid;gap:16px;grid-template-columns:1fr;margin-top:16px}
   @media (min-width:900px){.split{grid-template-columns:1.55fr 1fr}}
-  .card{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 15px}
-  .card h3{font-size:15.5px;margin-bottom:8px}
-  .card .hint{color:var(--muted);font-size:12.5px}
   .rank{list-style:none;margin:0;padding:0;display:grid;gap:2px}
   .rank li{display:flex;gap:9px;align-items:center;font-size:13px;padding:4px 6px;border-radius:8px;cursor:pointer}
   .rank li:hover{background:var(--line-soft)}
@@ -157,7 +209,8 @@
   .rank .vv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12px}
 
   .twins{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
-  .twins li{display:flex;justify-content:space-between;gap:10px}
+  .twins li{display:flex;justify-content:space-between;gap:10px;cursor:pointer;border-radius:7px;padding:2px 5px}
+  .twins li:hover{background:var(--line-soft)}
   .twins .d{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
 
   .spark{width:100%;height:62px;display:block;margin-top:6px}
@@ -166,7 +219,7 @@
 
   /* ── surprise callout ─────────────────────────────────── */
   .surprise{background:linear-gradient(120deg,rgba(57,135,229,.15),rgba(230,103,103,.15));
-    border:1.5px solid var(--line);border-radius:14px;padding:15px 16px;margin-top:16px}
+    border:1.5px solid var(--line);border-radius:14px;padding:15px 16px;margin-top:16px;cursor:pointer}
   .surprise .kicker{color:var(--accent)}
   .surprise p{margin:6px 0 0;font-size:14.5px;color:var(--ink)}
   .surprise .pair{font-family:'Fredoka',sans-serif;font-size:clamp(17px,2.6vw,21px);margin-top:4px}
@@ -192,7 +245,8 @@
   footer a:hover{text-decoration:underline}
 
   [hidden]{display:none!important}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -210,8 +264,9 @@
 
   <section class="hero">
     <h1>Geneva's network, <em>breathing</em>.</h1>
-    <p>Every dot is a tpg stop. How big it is, is how many people got on there last month. Drag the year and watch the whole canton inhale and exhale.</p>
-    <p class="small">Then press <strong>Rhythm</strong> — and the map dissolves. The stops re-arrange themselves not by where they are, but by <em>the shape of their year</em>. Geography evaporates; a school stop in Vernier lands next to a school stop in Carouge, and the lake shore drifts off on its own.</p>
+    <p>Look up any tpg stop and see everything the open data holds on it — its whole counted history,
+       every line that calls there, and how that mix shifted. Then scroll on and watch the network
+       re-arrange itself by the shape of its year.</p>
   </section>
 
   <!-- ── boot ─────────────────────────────────────────── -->
@@ -237,6 +292,80 @@
   <main id="app" hidden>
 
     <div class="tiles" id="tiles"></div>
+
+    <!-- STOP EXPLORER -->
+    <section class="panel" id="explorer">
+      <div class="head"><div>
+        <span class="kicker">Look up a stop</span>
+        <h2>Everything on one stop</h2>
+        <p>Type a name. All <span id="stopCount">—</span> stops tpg has ever counted a passenger at are in here.</p>
+      </div></div>
+
+      <div class="search">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/></svg>
+        <input id="q" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list"
+               aria-controls="sugg" autocomplete="off" spellcheck="false" placeholder="Bel-Air, Cornavin, Bachet…" />
+        <button class="clear" id="qclear" type="button" aria-label="Clear search" hidden>✕</button>
+        <ul class="sugg" id="sugg" role="listbox" aria-label="Matching stops" hidden></ul>
+      </div>
+      <div class="chips" id="chips"></div>
+
+      <div id="stopBody" hidden>
+        <div class="stopHead">
+          <h3 id="stopName">—</h3>
+          <span class="meta" id="stopMeta"></span>
+        </div>
+
+        <div class="tiles compact" id="stopTiles"></div>
+
+        <div class="expGrid">
+          <div class="card">
+            <h4>Boardings, month by month</h4>
+            <p class="hint" id="histHint">Everything the portal has for this stop.</p>
+            <div class="chartbox">
+              <svg id="hist" role="img" aria-label="Monthly boardings at this stop over its whole recorded history"></svg>
+              <div class="tip" id="histTip"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>Where it is</h4>
+            <p class="hint" id="locHint">This stop against the rest of the network.</p>
+            <canvas class="locator" id="loc" aria-label="Map locating this stop within the tpg network"></canvas>
+          </div>
+        </div>
+
+        <div class="expGrid" style="grid-template-columns:1fr">
+          <div class="card">
+            <h4 id="linesTitle">Lines calling here</h4>
+            <p class="hint" id="linesHint"></p>
+            <ol class="lines" id="lineList"></ol>
+          </div>
+        </div>
+
+        <div class="expGrid" id="mixWrap" style="grid-template-columns:1fr">
+          <div class="card">
+            <h4>How the mix shifted</h4>
+            <p class="hint" id="mixHint">Boardings stacked by line, month by month — a line appearing, growing or
+              disappearing shows up as a band changing thickness.</p>
+            <div class="chartbox">
+              <svg id="mix" role="img" aria-label="Boardings at this stop stacked by line over time"></svg>
+              <div class="tip" id="mixTip"></div>
+            </div>
+            <div class="swatches" id="mixLegend"></div>
+          </div>
+        </div>
+
+        <details class="tbl">
+          <summary>Show this stop's numbers as a table</summary>
+          <div class="tblwrap"><table id="stopTable"></table></div>
+        </details>
+      </div>
+
+      <p class="note" id="stopBusy" hidden>Fetching…</p>
+      <p class="note" id="stopErr" hidden></p>
+    </section>
 
     <!-- MAIN VIZ -->
     <section class="panel">
@@ -284,16 +413,17 @@
 
       <div class="split">
         <div class="card">
-          <h3 id="detTitle">Pick a stop</h3>
-          <p class="hint" id="detHint">Hover a dot to read it; click one to lock it, see its year drawn out, and light up the stops whose year looks the same.</p>
+          <h4 id="detTitle">Pick a stop</h4>
+          <p class="hint" id="detHint">Hover a dot to read it; click one to lock it, light up the stops whose year
+            looks the same, and pull it up in the explorer above.</p>
           <svg class="spark" id="detSpark" hidden></svg>
           <div id="detTwins" hidden>
-            <h3 style="margin-top:12px;font-size:14px">Breathes like…</h3>
+            <h4 style="margin-top:12px">Breathes like…</h4>
             <ol class="twins" id="twinList"></ol>
           </div>
         </div>
         <div class="card">
-          <h3>Busiest stops <span id="rankMonth" class="hint"></span></h3>
+          <h4>Busiest stops <span id="rankMonth" class="hint" style="display:inline"></span></h4>
           <ol class="rank" id="rank"></ol>
         </div>
       </div>
@@ -306,12 +436,12 @@
 
       <div class="loadings">
         <div class="card">
-          <h3 style="font-size:14px">What the horizontal axis means</h3>
+          <h4>What the horizontal axis means</h4>
           <p class="hint" id="pc1txt"></p>
           <svg class="spark" id="pc1spark"></svg>
         </div>
         <div class="card">
-          <h3 style="font-size:14px">What the vertical axis means</h3>
+          <h4>What the vertical axis means</h4>
           <p class="hint" id="pc2txt"></p>
           <svg class="spark" id="pc2spark"></svg>
         </div>
@@ -320,27 +450,6 @@
       <details class="tbl">
         <summary>Show the numbers as a table</summary>
         <div class="tblwrap"><table id="dataTable"></table></div>
-      </details>
-    </section>
-
-    <!-- CLOCK -->
-    <section class="panel" id="clockPanel" hidden>
-      <div class="head">
-        <div>
-          <span class="kicker">The shape of a day</span>
-          <h2 id="clockTitle">Twenty-four hours, drawn round</h2>
-          <p id="clockLede">A day laid out as a clock face instead of a line — midnight at the top, noon at the bottom.
-             The further the trace is from the centre, the busier the network is at that time.</p>
-        </div>
-      </div>
-      <div class="stage small" id="clockStage">
-        <canvas id="clockCv" aria-label="Polar chart of network activity through the day"></canvas>
-        <div class="tip" id="clockTip"></div>
-      </div>
-      <div class="legends" id="clockLegend"></div>
-      <details class="tbl">
-        <summary>Show the numbers as a table</summary>
-        <div class="tblwrap"><table id="clockTable"></table></div>
       </details>
     </section>
 
@@ -360,7 +469,7 @@
       <p class="note">
         Boardings are counted by sensors above the vehicle doors and cleaned up by tpg afterwards — which is
         why they come out with decimals. Stops that tpg counts but that aren't in the stop reference (or that
-        moved) can't be drawn on the map; the count is in the table above.
+        moved) can't be drawn on the map; they're still searchable.
       </p>
     </section>
 
@@ -387,21 +496,31 @@ const API = 'https://opendata.tpg.ch/api/explore/v2.1/catalog/datasets';
 const DS = {
   stops:   'arrets',
   monthly: 'montees-mensuelles-par-arret-par-ligne',
-  daypart: 'frequentation-journaliere-par-tranche-horaire',
 };
 
-const MONTHS_WANTED = 18;   // how far back to pull, in months
-const STOPS_PER_MONTH = 200; // top-N stops fetched per month (2 pages of 100)
-const PAGE = 100;            // Explore v2.1 caps a page at 100 rows
+const MONTHS_WANTED = 18;   // how far back the rhythm view looks
+const CHART_STOPS   = 300;  // how many stops the constellation draws
+const PAGE          = 100;  // Explore v2.1 caps a plain page at 100 rows
+const GROUP_PAGE    = 20000; // …but a group_by query may go to 20000
 
 const nf  = new Intl.NumberFormat('de-CH');
 const nf1 = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 1 });
+const pct = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 1 });
+/** Percentages: keep two decimals for the small ones so they don't collapse to 0. */
+const pctOf = v => new Intl.NumberFormat('de-CH',
+  { minimumFractionDigits: v < 1 ? 2 : 1, maximumFractionDigits: v < 1 ? 2 : 1 }).format(v);
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const SERIES = ['#3987e5','#d95926','#199e70','#c98500','#d55181','#008300','#9085e9','#e66767'];
+const OTHER  = '#7d868c';
 
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ── tiny fetch layer ─────────────────────────────────────────────────── */
+
+class FetchError extends Error {
+  constructor(msg, url, detail) { super(msg); this.url = url; this.detail = detail || ''; }
+}
 
 async function getJSON(url) {
   let res;
@@ -418,16 +537,22 @@ async function getJSON(url) {
   return res.json();
 }
 
-class FetchError extends Error {
-  constructor(msg, url, detail) { super(msg); this.url = url; this.detail = detail || ''; }
-}
-
 function recordsURL(ds, params) {
   const u = new URL(`${API}/${encodeURIComponent(ds)}/records`);
   for (const [k, v] of Object.entries(params)) if (v != null && v !== '') u.searchParams.set(k, v);
   return u.toString();
 }
 const records = (ds, params) => getJSON(recordsURL(ds, params));
+
+/** Records, retrying once without the ordering if the portal won't sort on an alias. */
+async function orderedRecords(ds, params) {
+  try { return await records(ds, params); }
+  catch (e) {
+    if (!params.order_by) throw e;
+    const { order_by, ...rest } = params;
+    return records(ds, rest);
+  }
+}
 
 /** Run promise-returning thunks a few at a time so we stay polite. */
 async function pool(thunks, width, onTick) {
@@ -461,9 +586,7 @@ async function describe(ds) {
     },
     /** First field whose name (then label) matches `re`, optionally typed. */
     find(re, { types, not } = {}) {
-      const ok = f =>
-        (!types || types.includes(f.type)) &&
-        (!not || !not.test(f.name));
+      const ok = f => (!types || types.includes(f.type)) && (!not || !not.test(f.name));
       return (fields.find(f => ok(f) && re.test(f.name)) ||
               fields.find(f => ok(f) && re.test(f.label || '')) || {}).name;
     },
@@ -471,7 +594,7 @@ async function describe(ds) {
       return (fields.find(f => types.includes(f.type)) || {}).name;
     },
     /** Every field matching any of `regexes`, in the order the regexes are given —
-        so `/tranche/` beats a looser `/horaire/` that would also match a sibling. */
+        so a tight pattern beats a looser one that would also match a sibling. */
     candidates(regexes, { types, not } = {}) {
       const ok = f => (!types || types.includes(f.type)) && (!not || !not.test(f.name));
       const out = [];
@@ -491,10 +614,19 @@ function need(value, what, ds) {
   return value;
 }
 
+/* ── ODSQL helpers ────────────────────────────────────────────────────── */
+
+const quoted = s => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+
+/** An equality clause that works whether the field is a date or text. */
+const monthWhere = (field, type, literal) =>
+  DATEY.includes(type) ? `${field}=date'${String(literal).slice(0, 10)}'`
+                       : `${field}=${quoted(literal)}`;
+
 /* ── month keys ───────────────────────────────────────────────────────── */
 
 const monthKey = v => String(v).slice(0, 7);                       // "2025-06-01" → "2025-06"
-const monthNum = k => parseInt(k.slice(5, 7), 10);                 // "2025-06" → 6
+const monthNum = k => parseInt(k.slice(5, 7), 10);
 const monthName = k => `${MONTH_ABBR[monthNum(k) - 1]} ${k.slice(2, 4)}`;
 
 /** Rebuild the month *n* steps before `sample`, in the exact shape the API gave us. */
@@ -508,11 +640,6 @@ function shiftMonth(sample, n) {
   const head = `${y}-${String(mo + 1).padStart(2, '0')}`;
   return m[3] ? `${head}-${m[3]}` : head;
 }
-
-/** An ODSQL equality clause that works whether the field is a date or text. */
-const monthWhere = (field, type, literal) =>
-  DATEY.includes(type) ? `${field}=date'${String(literal).slice(0, 10)}'`
-                       : `${field}="${literal}"`;
 
 /* ── name matching between the two datasets ───────────────────────────── */
 
@@ -541,7 +668,6 @@ function pca2(rows) {
   const v1 = powerIterate(C, T);
   deflate(C, T, v1, rayleigh(C, T, v1));
   const v2 = powerIterate(C, T);
-
   return { mean, v1, v2 };
 }
 
@@ -558,7 +684,9 @@ function powerIterate(C, T, iters = 400) {
   return v;
 }
 function normalise(v) {
-  const n = Math.hypot(...v);
+  let n = 0;
+  for (const x of v) n += x * x;
+  n = Math.sqrt(n);
   if (!isFinite(n) || n < 1e-12) return false;
   for (let i = 0; i < v.length; i++) v[i] /= n;
   return true;
@@ -589,10 +717,9 @@ function divergingColor(t, alpha = 1) {
 const STEPS = [
   'Asking the portal what it has',
   'Finding the newest month on file',
-  'Fetching the stop reference',
+  'Listing every stop it has ever counted',
   `Pulling ${MONTHS_WANTED} months of boardings`,
   'Working out the shape of each stop’s year',
-  'Asking about the shape of a day',
 ];
 function paintSteps() {
   $('bootsteps').innerHTML = STEPS.map((s, i) => `<li id="st${i}"><b>${i + 1}.</b> ${s}</li>`).join('');
@@ -608,11 +735,13 @@ function stepOn(i) {
    ═══════════════════════════════════════════════════════════════════════ */
 
 const state = {
-  stops: [],        // {name, lat, lon, commune, series[], total, pc1, pc2, gx, gy, rx, ry, x, y, r}
-  months: [],       // month keys, oldest → newest
-  monthLiterals: [],
+  f: {},            // resolved field names
+  directory: [],    // every counted stop: {name, total, lat, lon, commune}
+  byName: new Map(),
+  stops: [],        // the subset drawn in the constellation
+  months: [],
   monthIdx: 0,
-  morph: 0,         // 0 = map, 1 = rhythm
+  morph: 0,
   targetMorph: 0,
   mode: 'map',
   playing: false,
@@ -620,7 +749,7 @@ const state = {
   hover: null,
   twins: [],
   hasGeo: true,
-  labels: {},
+  groupLimit: GROUP_PAGE,
 };
 
 async function load() {
@@ -643,66 +772,104 @@ async function load() {
   const measF = need(
     sMonthly.find(/mont[ée]e|boarding|frequent|nombre|^nb/i, { types: NUMERIC }) || sMonthly.firstOfType(NUMERIC),
     'a boardings count', DS.monthly);
+  // `ligne` and `ligne_type_act` both match /ligne/ — ask for the exact one first.
+  const lineF = sMonthly.candidates([/^ligne$|^line$/i, /ligne|line/i], { types: ['text'], not: /type|categ|mode/i })[0];
 
+  state.f = { monthF, monthType, stopF, measF, lineF };
   state.labels = {
     measure: sMonthly.labelOf(measF),
     month: sMonthly.labelOf(monthF),
     stop: sMonthly.labelOf(stopF),
-    monthlyTitle: sMonthly.title,
-    stopsTitle: sStops?.title,
+    line: lineF ? sMonthly.labelOf(lineF) : null,
   };
 
   /* 2 ─ newest month, then the window back from it */
   stepOn(1);
-  const newestRow = await records(DS.monthly, { select: monthF, order_by: `${monthF} DESC`, limit: 1 });
+  const newestRow = await orderedRecords(DS.monthly, { select: monthF, order_by: `${monthF} DESC`, limit: 1 });
   const newestLit = newestRow?.results?.[0]?.[monthF];
   if (!newestLit) throw new FetchError('The monthly dataset came back empty.', recordsURL(DS.monthly, { limit: 1 }), '');
 
   const literals = [];
   for (let i = MONTHS_WANTED - 1; i >= 0; i--) literals.push(shiftMonth(newestLit, i));
 
-  /* headline numbers, in parallel with everything else */
   const headline = Promise.all([
     records(DS.monthly, { select: `sum(${measF}) as v`, where: monthWhere(monthF, monthType, newestLit), limit: 1 })
       .then(r => r?.results?.[0]?.v).catch(() => null),
-    records(DS.monthly, { select: monthF, order_by: `${monthF} ASC`, limit: 1 })
+    orderedRecords(DS.monthly, { select: monthF, order_by: `${monthF} ASC`, limit: 1 })
       .then(r => r?.results?.[0]?.[monthF]).catch(() => null),
-    records(DS.stops, { select: 'count(*) as v', limit: 1 })
-      .then(r => r?.results?.[0]?.v).catch(() => null),
+    lineF ? records(DS.monthly, { select: `count(distinct ${lineF}) as v`, limit: 1 })
+      .then(r => r?.results?.[0]?.v).catch(() => null) : Promise.resolve(null),
   ]);
 
-  /* 3 ─ stop reference */
+  /* 3 ─ the searchable directory: every stop with a lifetime total.
+     A group_by query may return up to 20000 rows in one go; if this portal
+     won't, fall back to paging at 100. */
   stepOn(2);
+  const dirSelect = `${stopF}, sum(${measF}) as v`;
+  let dirRows = [];
+  try {
+    const r = await orderedRecords(DS.monthly,
+      { select: dirSelect, group_by: stopF, order_by: 'v DESC', limit: GROUP_PAGE });
+    dirRows = r?.results || [];
+  } catch { dirRows = []; }
+  if (!dirRows.length) {
+    state.groupLimit = PAGE;
+    for (let p = 0; p < 40; p++) {
+      const r = await orderedRecords(DS.monthly,
+        { select: dirSelect, group_by: stopF, order_by: 'v DESC', limit: PAGE, offset: p * PAGE }).catch(() => null);
+      const rows = r?.results || [];
+      dirRows.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+  }
+  if (!dirRows.length) throw new FetchError(
+    'The portal returned no stops for the boardings dataset.',
+    recordsURL(DS.monthly, { select: dirSelect, group_by: stopF, limit: 10 }),
+    `Resolved fields — month: ${monthF} (${monthType}), stop: ${stopF}, measure: ${measF}`);
+
+  /* 4 ─ stop reference (coordinates) */
   const geoF = sStops?.firstOfType(['geo_point_2d']);
   const nameF = sStops && (
     sStops.find(/nom|libell|arret|arrêt|stop|name/i, { types: ['text'], not: /code|didoc|commune|pays|country/i })
     || sStops.find(/./, { types: ['text'] }));
   const communeF = sStops?.find(/commune|municipal|city|ville/i, { types: ['text'] });
+  const codeF = sStops?.find(/didoc|code/i, { types: ['text'] });
 
   const stopRefs = geoF && nameF
-    ? await fetchAllRecords(DS.stops, [nameF, geoF, communeF].filter(Boolean).join(',')).catch(() => [])
+    ? await fetchAllRecords(DS.stops, [nameF, geoF, communeF, codeF].filter(Boolean).join(',')).catch(() => [])
     : [];
 
-  /* 4 ─ the monthly matrix.
+  const refByName = new Map();
+  for (const r of stopRefs) {
+    const g = r[geoF];
+    const lat = Array.isArray(g) ? g[0] : g?.lat, lon = Array.isArray(g) ? g[1] : g?.lon;
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    const key = normName(r[nameF]);
+    if (!key || refByName.has(key)) continue;
+    refByName.set(key, {
+      lat: +lat, lon: +lon,
+      commune: communeF ? r[communeF] : '',
+      code: codeF ? r[codeF] : '',
+    });
+  }
+  state.refPoints = [...refByName.values()];
 
-     Plan A asks for one month at a time (a `where` clause per month, the top
-     stops of each). If the portal won't take that shape — a renamed field, a
-     date literal it doesn't like — plan B groups by stop *and* month in one
-     paginated sweep and sorts the months out here. */
+  state.directory = dirRows.map(r => {
+    const name = r[stopF];
+    const ref = refByName.get(normName(name));
+    return { name, total: Number(r.v) || 0, lat: ref?.lat, lon: ref?.lon, commune: ref?.commune || '', code: ref?.code || '' };
+  }).filter(s => s.name);
+  state.directory.sort((a, b) => b.total - a.total);
+  state.directory.forEach((s, i) => { s.rank = i + 1; state.byName.set(s.name, s); });
+  state.networkTotal = state.directory.reduce((a, s) => a + s.total, 0);
+  state.unmatched = state.directory.filter(s => !isFinite(s.lat)).length;
+
+  /* 5 ─ the monthly matrix for the constellation */
   stepOn(3);
   const onProgress = (done, total) =>
     $('bootbar').style.width = Math.round(((3 + done / total) / STEPS.length) * 100) + '%';
 
-  const query = async params => {
-    try { return await records(DS.monthly, params); }
-    catch (e) {
-      if (!params.order_by) throw e;
-      const { order_by, ...rest } = params;     // some portals refuse ordering by an alias
-      return records(DS.monthly, rest);
-    }
-  };
-
-  let byStop = new Map();   // stop name → Map(monthKey → value)
+  const byStop = new Map();
   const add = (name, key, v) => {
     if (!name || !isFinite(v)) return;
     let m = byStop.get(name);
@@ -710,58 +877,43 @@ async function load() {
     m.set(key, (m.get(key) || 0) + v);
   };
 
-  let planAWorked = false;
-  try {
-    // Probe with the newest month first — if this throws, don't fire 35 more.
-    await query({
-      select: `${stopF}, sum(${measF}) as v`, group_by: stopF,
-      where: monthWhere(monthF, monthType, newestLit), order_by: 'v DESC', limit: 1,
-    });
-    const jobs = [];
-    for (const lit of literals) {
-      for (let p = 0; p < Math.ceil(STOPS_PER_MONTH / PAGE); p++) {
-        jobs.push(() => query({
-          select: `${stopF}, sum(${measF}) as v`,
-          group_by: stopF,
-          where: monthWhere(monthF, monthType, lit),
-          order_by: 'v DESC',
-          limit: PAGE,
-          offset: p * PAGE,
-        }).then(r => ({ key: monthKey(lit), rows: r?.results || [] }))
-          .catch(() => ({ key: monthKey(lit), rows: [] })));
-      }
+  const monthPages = state.groupLimit === PAGE ? Math.ceil(CHART_STOPS / PAGE) : 1;
+  const jobs = [];
+  for (const lit of literals) {
+    for (let p = 0; p < monthPages; p++) {
+      jobs.push(() => orderedRecords(DS.monthly, {
+        select: dirSelect, group_by: stopF,
+        where: monthWhere(monthF, monthType, lit),
+        order_by: 'v DESC', limit: state.groupLimit, offset: p * PAGE,
+      }).then(r => ({ key: monthKey(lit), rows: r?.results || [] }))
+        .catch(() => ({ key: monthKey(lit), rows: [] })));
     }
-    for (const { key, rows } of await pool(jobs, 6, onProgress))
-      for (const row of rows) add(row[stopF], key, Number(row.v));
-    planAWorked = byStop.size >= 10;
-  } catch { /* fall through to plan B */ }
+  }
+  for (const { key, rows } of await pool(jobs, 6, onProgress))
+    for (const row of rows) add(row[stopF], key, Number(row.v));
 
-  if (!planAWorked) {
-    byStop = new Map();
+  /* If per-month filtering was refused outright, sweep stop × month instead. */
+  if (byStop.size === 0) {
     const wanted = new Set(literals.map(monthKey));
-    const pages = Array.from({ length: 30 }, (_, p) => () => query({
-      select: `${stopF}, ${monthF}, sum(${measF}) as v`,
-      group_by: `${stopF},${monthF}`,
-      order_by: 'v DESC',
-      limit: PAGE,
-      offset: p * PAGE,
-    }).then(r => r?.results || []).catch(() => []));
-    for (const rows of await pool(pages, 6, onProgress))
+    const pages = Array.from({ length: state.groupLimit === PAGE ? 30 : 2 }, (_, p) => () =>
+      orderedRecords(DS.monthly, {
+        select: `${stopF}, ${monthF}, sum(${measF}) as v`,
+        group_by: `${stopF},${monthF}`, order_by: 'v DESC',
+        limit: state.groupLimit, offset: p * state.groupLimit,
+      }).then(r => r?.results || []).catch(() => []));
+    for (const rows of await pool(pages, 4, onProgress))
       for (const row of rows) {
         const key = monthKey(row[monthF]);
         if (wanted.has(key)) add(row[stopF], key, Number(row.v));
       }
   }
+  if (byStop.size === 0) throw new FetchError(
+    'The monthly query came back with no rows — the portal may have changed how months are filtered.',
+    recordsURL(DS.monthly, { select: dirSelect, group_by: stopF,
+                             where: monthWhere(monthF, monthType, literals.at(-1)), limit: 10 }),
+    `Resolved fields — month: ${monthF} (${monthType}), stop: ${stopF}, measure: ${measF}`);
 
-  if (byStop.size === 0) {
-    throw new FetchError(
-      'The monthly query came back with no rows — the portal may have changed how months are filtered.',
-      recordsURL(DS.monthly, { select: `${stopF}, sum(${measF}) as v`, group_by: stopF,
-                               where: monthWhere(monthF, monthType, literals.at(-1)), limit: PAGE }),
-      `Resolved fields — month: ${monthF} (${monthType}), stop: ${stopF}, measure: ${measF}`);
-  }
-
-  /* Keep the longest recent run of months that a decent number of stops covers fully. */
+  /* Keep the longest recent run of months a decent number of stops covers fully. */
   const present = literals.map(monthKey).filter(k => [...byStop.values()].some(m => m.has(k)));
   let months = present, complete = [];
   for (let cut = 0; cut < present.length - 5; cut++) {
@@ -775,45 +927,27 @@ async function load() {
   }
   if (complete.length < 3) throw new FetchError(
     'Not enough stops have an unbroken run of months to compare their rhythms.',
-    recordsURL(DS.monthly, { group_by: stopF, limit: PAGE }),
+    recordsURL(DS.monthly, { group_by: stopF, limit: 10 }),
     `${byStop.size} stops seen across ${present.length} months.`);
 
   state.months = months;
-  state.monthLiterals = literals;
   state.monthIdx = months.length - 1;
 
-  /* 5 ─ join to geography, then PCA on the profiles */
+  /* 6 ─ pick the stops to draw, then PCA over their year-shapes */
   stepOn(4);
-  const refByName = new Map();
-  for (const r of stopRefs) {
-    const g = r[geoF];
-    const lat = Array.isArray(g) ? g[0] : g?.lat, lon = Array.isArray(g) ? g[1] : g?.lon;
-    if (!isFinite(lat) || !isFinite(lon)) continue;
-    const key = normName(r[nameF]);
-    if (!key || refByName.has(key)) continue;
-    refByName.set(key, { lat: +lat, lon: +lon, commune: communeF ? r[communeF] : '' });
-  }
-
-  let unmatched = 0;
   const stops = complete.map(([name, m]) => {
     const series = months.map(k => m.get(k));
     const total = series.reduce((a, b) => a + b, 0);
-    const ref = refByName.get(normName(name));
-    if (!ref) unmatched++;
+    const ref = state.byName.get(name);
     return { name, series, total, lat: ref?.lat, lon: ref?.lon, commune: ref?.commune || '' };
-  }).filter(s => s.total > 0);
+  }).filter(s => s.total > 0).sort((a, b) => b.total - a.total).slice(0, CHART_STOPS);
 
   const mapped = stops.filter(s => isFinite(s.lat));
   state.hasGeo = mapped.length >= Math.max(10, stops.length * 0.3);
   state.stops = state.hasGeo ? mapped : stops;
-  state.unmatched = unmatched;
-  state.totalStopsSeen = stops.length;
 
   const profiles = state.stops.map(s => s.series.map(v => v / s.total));
   const { v1, v2 } = pca2(profiles);
-
-  // Orient the axes so the labels below are always true of the data:
-  // +x = a bigger-than-average share of the year in the months that load positively.
   orientBySeason(v1, months);
   orientByTrend(v2);
 
@@ -827,16 +961,14 @@ async function load() {
   });
   state.pc = { v1, v2, mean };
 
-  /* 6 ─ the day-shape chart (optional; never fatal) */
-  stepOn(5);
-  loadClock().catch(() => { $('clockPanel').hidden = true; });
-
-  const [latestTotal, oldestMonth, stopCount] = await headline;
-  state.headline = { latestTotal, oldestMonth, stopCount, newestKey: monthKey(newestLit) };
+  const [latestTotal, oldestMonth, lineCount] = await headline;
+  state.headline = { latestTotal, oldestMonth, lineCount, newestKey: monthKey(newestLit) };
 
   state.provenance = [
-    { ds: DS.monthly, title: sMonthly.title, fields: { month: monthF, stop: stopF, measure: measF } },
-    sStops && { ds: DS.stops, title: sStops.title, fields: { name: nameF, point: geoF, commune: communeF } },
+    { ds: DS.monthly, title: sMonthly.title,
+      fields: { month: monthF, stop: stopF, line: lineF, measure: measF } },
+    sStops && { ds: DS.stops, title: sStops.title,
+      fields: { name: nameF, point: geoF, commune: communeF, code: codeF } },
   ].filter(Boolean);
 
   $('bootbar').style.width = '100%';
@@ -849,7 +981,8 @@ async function fetchAllRecords(ds, select) {
   const out = [...(first.results || [])];
   const pages = [];
   for (let o = PAGE; o < total; o += PAGE) pages.push(o);
-  const rest = await pool(pages.map(o => () => records(ds, { select, limit: PAGE, offset: o }).catch(() => ({ results: [] }))), 6);
+  const rest = await pool(pages.map(o => () =>
+    records(ds, { select, limit: PAGE, offset: o }).catch(() => ({ results: [] }))), 6);
   for (const r of rest) out.push(...(r.results || []));
   return out;
 }
@@ -867,106 +1000,454 @@ function orientByTrend(v) {
   if (s < 0) for (let i = 0; i < n; i++) v[i] = -v[i];
 }
 
-/* ── the day-shape (polar) chart ──────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   STOP EXPLORER
+   ═══════════════════════════════════════════════════════════════════════ */
 
-const clock = { slots: [], series: [], ok: false, label: '' };
+const explorer = { name: null, token: 0, cache: new Map() };
 
-async function loadClock() {
-  const s = await describe(DS.daypart);
-  // `horaire_type` and `horaire_tranche_stop_theo` both say "horaire" — ask for the
-  // time *band* first, and only accept a field that actually comes back with bands in it.
-  const slotFields = s.candidates(
-    [/tranche/i, /cr[ée]neau|slot|plage/i, /heure|hour/i, /horaire/i], { types: ['text'] });
-  const valF  = s.find(/indice|mont|frequent|nombre|^nb|voyage/i, { types: NUMERIC }) || s.firstOfType(NUMERIC);
-  const dayF  = s.find(/jour.?semaine|weekday/i, { types: ['text'] }) || s.find(/jour|day/i, { types: ['text'] });
-  if (!slotFields.length || !valF) throw new Error('no usable fields');
+/** Everything the boardings dataset holds about one stop, in three queries. */
+async function fetchStop(name) {
+  if (explorer.cache.has(name)) return explorer.cache.get(name);
+  const { stopF, measF, monthF, lineF } = state.f;
+  const where = `${stopF}=${quoted(name)}`;
 
-  const isWeekend = v => /sam|dim|sat|sun|week ?end/i.test(String(v || ''));
-  let slotF = null, acc = null;
+  const [monthsRes, linesRes, mixRes] = await Promise.all([
+    orderedRecords(DS.monthly, {
+      select: `${monthF}, sum(${measF}) as v`, group_by: monthF, where,
+      limit: state.groupLimit,
+    }),
+    lineF ? orderedRecords(DS.monthly, {
+      select: `${lineF}, sum(${measF}) as v`, group_by: lineF, where,
+      order_by: 'v DESC', limit: Math.min(state.groupLimit, 300),
+    }).catch(() => null) : Promise.resolve(null),
+    lineF ? orderedRecords(DS.monthly, {
+      select: `${lineF}, ${monthF}, sum(${measF}) as v`, group_by: `${lineF},${monthF}`, where,
+      limit: state.groupLimit,
+    }).catch(() => null) : Promise.resolve(null),
+  ]);
 
-  for (const cand of slotFields) {
-    const groups = dayF ? `${cand},${dayF}` : cand;
-    const sel = dayF ? `${cand}, ${dayF}, avg(${valF}) as v` : `${cand}, avg(${valF}) as v`;
-    let rows = [];
-    try {
-      for (let p = 0; p < 3; p++) {
-        const r = await records(DS.daypart, { select: sel, group_by: groups, limit: PAGE, offset: p * PAGE });
-        rows.push(...(r.results || []));
-        if ((r.results || []).length < PAGE) break;
-      }
-    } catch { continue; }
+  const months = (monthsRes?.results || [])
+    .map(r => ({ k: monthKey(r[monthF]), v: Number(r.v) || 0 }))
+    .filter(r => /^\d{4}-\d{2}$/.test(r.k))
+    .sort((a, b) => a.k.localeCompare(b.k));
 
-    const a = new Map();   // slot → {wd:[sum,n], we:[sum,n]}
-    for (const row of rows) {
-      const slot = row[cand], v = Number(row.v);
-      if (slot == null || !isFinite(v)) continue;
-      let e = a.get(slot);
-      if (!e) a.set(slot, e = { wd: [0, 0], we: [0, 0] });
-      const bucket = dayF && isWeekend(row[dayF]) ? e.we : e.wd;
-      bucket[0] += v; bucket[1]++;
-    }
-    // A day needs more than a couple of bands to be worth drawing round.
-    if (a.size >= 4) { slotF = cand; acc = a; break; }
+  const lines = (linesRes?.results || [])
+    .map(r => ({ line: String(r[lineF] ?? '—'), v: Number(r.v) || 0 }))
+    .filter(r => r.v > 0)
+    .sort((a, b) => b.v - a.v);
+
+  const mix = new Map();   // line → Map(monthKey → v)
+  for (const r of (mixRes?.results || [])) {
+    const l = String(r[lineF] ?? '—'), k = monthKey(r[monthF]), v = Number(r.v) || 0;
+    if (!/^\d{4}-\d{2}$/.test(k)) continue;
+    let m = mix.get(l);
+    if (!m) mix.set(l, m = new Map());
+    m.set(k, (m.get(k) || 0) + v);
   }
-  if (!slotF) throw new Error('no field held enough time bands');
 
-  // Order the slots by the first hour we can read out of their label; fall back to as-given.
-  const hourOf = s2 => { const m = /(\d{1,2})/.exec(String(s2)); return m ? +m[1] : NaN; };
-  let slots = [...acc.keys()];
-  if (slots.every(x => isFinite(hourOf(x)))) slots.sort((a, b) => hourOf(a) - hourOf(b));
+  const data = { name, months, lines, mix };
+  explorer.cache.set(name, data);
+  return data;
+}
 
-  clock.slots = slots;
-  clock.hours = slots.map(hourOf);
-  clock.weekday = slots.map(k => { const [s2, n] = acc.get(k).wd; return n ? s2 / n : null; });
-  clock.weekend = slots.map(k => { const [s2, n] = acc.get(k).we; return n ? s2 / n : null; });
-  clock.hasWeekend = clock.weekend.some(v => v != null);
-  clock.label = s.labelOf(valF);
-  clock.slotLabel = s.labelOf(slotF);
-  clock.title = s.title;
-  clock.ok = true;
+async function openStop(name, { scroll = false } = {}) {
+  const entry = state.byName.get(name);
+  if (!entry) return;
+  explorer.name = name;
+  const token = ++explorer.token;
 
-  $('clockPanel').hidden = false;
-  $('clockLede').innerHTML =
-    `Each spoke is one of the portal's time bands, laid out round a clock face — midnight at the top. ` +
-    `The further the trace is from the centre, the higher the average <strong>${escapeHTML(clock.label)}</strong>` +
-    (clock.hasWeekend ? ` — weekdays and weekends drawn separately.` : `.`);
-  drawClock();
-  buildClockTable();
-  buildClockLegend();
+  $('q').value = name;
+  $('qclear').hidden = false;
+  closeSuggestions();
+  $('stopErr').hidden = true;
+  $('stopBusy').hidden = false;
+  if (scroll) $('explorer').scrollIntoView({ block: 'start' });
+
+  let data;
+  try { data = await fetchStop(name); }
+  catch (e) {
+    if (token !== explorer.token) return;
+    $('stopBusy').hidden = true;
+    $('stopErr').hidden = false;
+    $('stopErr').textContent = `Couldn't fetch this stop — ${e.message}`;
+    return;
+  }
+  if (token !== explorer.token) return;
+
+  $('stopBusy').hidden = true;
+  $('stopBody').hidden = false;
+  paintStop(entry, data);
+
+  // keep the constellation in step when the stop is one it draws
+  const dot = state.stops.find(s => s.name === name);
+  if (dot && dot !== state.selected) selectDot(dot, { sync: false });
+}
+
+function paintStop(entry, data) {
+  const { months, lines, mix } = data;
+  const latest = months.at(-1);
+  const best = months.reduce((a, b) => (b.v > a.v ? b : a), months[0] || { k: '', v: 0 });
+  const share = state.networkTotal ? (entry.total / state.networkTotal) * 100 : 0;
+
+  $('stopName').textContent = entry.name;
+  $('stopMeta').textContent = [
+    entry.commune,
+    entry.code ? `Didoc ${entry.code}` : '',
+    isFinite(entry.lat) ? `${entry.lat.toFixed(4)}, ${entry.lon.toFixed(4)}` : 'not in the stop reference',
+  ].filter(Boolean).join(' · ');
+
+  const tiles = [
+    { k: 'Boardings counted', v: nf.format(Math.round(entry.total)),
+      s: `${pctOf(share)}% of everything tpg has counted` },
+    latest && { k: `Latest month · ${monthName(latest.k)}`, v: nf.format(Math.round(latest.v)),
+      s: months.length > 12 ? yoy(months) : 'first months on record' },
+    { k: 'Rank on the network', v: `#${nf.format(entry.rank)}`,
+      s: `of ${nf.format(state.directory.length)} counted stops` },
+    lines.length && { k: 'Lines calling here', v: nf.format(lines.length),
+      s: `busiest is ${lines[0].line}` },
+    best && best.k && { k: 'Busiest month ever', v: monthName(best.k),
+      s: `${nf.format(Math.round(best.v))} boardings` },
+  ].filter(Boolean);
+  $('stopTiles').innerHTML = tiles.map(t =>
+    `<div class="tile"><div class="k">${escapeHTML(t.k)}</div>
+       <div class="v">${escapeHTML(t.v)}</div><div class="s">${escapeHTML(t.s)}</div></div>`).join('');
+
+  $('histHint').textContent = months.length
+    ? `${months.length} months, ${monthName(months[0].k)} to ${monthName(months.at(-1).k)}.`
+    : 'No monthly rows came back for this stop.';
+  historyChart(months);
+
+  drawLocator(entry);
+  $('locHint').textContent = isFinite(entry.lat)
+    ? `${entry.commune || 'Geneva'} — every other counted stop is drawn faint behind it.`
+    : 'This stop has no match in the stop reference, so it can’t be placed.';
+
+  paintLines(lines, entry);
+  paintMix(months, mix, lines);
+  buildStopTable(months, mix, lines);
+}
+
+function yoy(months) {
+  const last = months.at(-1), prev = months.find(m => m.k === shiftKey(last.k, 12));
+  if (!prev || !prev.v) return 'no reading a year earlier';
+  const d = ((last.v - prev.v) / prev.v) * 100;
+  return `${d >= 0 ? '+' : '−'}${pctOf(Math.abs(d))}% against ${monthName(prev.k)}`;
+}
+const shiftKey = (k, n) => shiftMonth(k + '-01', n).slice(0, 7);
+
+/* ── the stop's own charts ────────────────────────────────────────────── */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function historyChart(months) {
+  const svg = $('hist'), tip = $('histTip');
+  const w = Math.max(280, svg.clientWidth || 520), h = 210;
+  const padL = 46, padR = 12, padT = 12, padB = 26;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.height = h + 'px';
+  if (!months.length) { svg.innerHTML = ''; return; }
+
+  const max = Math.max(...months.map(m => m.v)) || 1;
+  const x = i => padL + (i / Math.max(1, months.length - 1)) * (w - padL - padR);
+  const y = v => h - padB - (v / max) * (h - padT - padB);
+
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const yy = y(max * f);
+    return `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${w - padR}" y2="${yy.toFixed(1)}" stroke="#0f3540" stroke-width="1"/>
+            <text x="${padL - 6}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#7e9b9b"
+                  font-family="system-ui">${shortNum(max * f)}</text>`;
+  }).join('');
+
+  // one tick per January, so a long history stays readable
+  const ticks = months.map((m, i) => ({ m, i }))
+    .filter(({ m }) => monthNum(m.k) === 1)
+    .map(({ m, i }) => `<text x="${x(i).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="10"
+       fill="#7e9b9b" font-family="system-ui">${m.k.slice(0, 4)}</text>`).join('');
+
+  const line = months.map((m, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(m.v).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(months.length - 1).toFixed(1)},${h - padB} L${x(0).toFixed(1)},${h - padB} Z`;
+
+  svg.innerHTML = `${grid}${ticks}
+    <path d="${area}" fill="#3987e5" fill-opacity=".14"/>
+    <path d="${line}" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle id="histDot" r="4.5" fill="#3987e5" stroke="#04161d" stroke-width="2" opacity="0"/>
+    <line id="histRule" y1="${padT}" y2="${h - padB}" stroke="#94d2bd" stroke-width="1" opacity="0"/>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="histHit"/>`;
+
+  const hit = svg.querySelector('#histHit'), dotEl = svg.querySelector('#histDot'), rule = svg.querySelector('#histRule');
+  const move = ev => {
+    const r = svg.getBoundingClientRect();
+    const px = ((ev.clientX - r.left) / r.width) * w;
+    let i = Math.round(((px - padL) / (w - padL - padR)) * (months.length - 1));
+    i = Math.max(0, Math.min(months.length - 1, i));
+    const m = months[i];
+    dotEl.setAttribute('cx', x(i)); dotEl.setAttribute('cy', y(m.v)); dotEl.setAttribute('opacity', '1');
+    rule.setAttribute('x1', x(i)); rule.setAttribute('x2', x(i)); rule.setAttribute('opacity', '.5');
+    tip.innerHTML = `<b>${monthName(m.k)}</b><br><span class="n">${nf.format(Math.round(m.v))} boardings</span>`;
+    tip.style.left = (x(i) / w * 100) + '%';
+    tip.style.top = (y(m.v) / h * r.height) + 'px';
+    tip.dataset.show = '1';
+  };
+  hit.addEventListener('pointermove', move);
+  hit.addEventListener('pointerleave', () => {
+    tip.removeAttribute('data-show'); dotEl.setAttribute('opacity', '0'); rule.setAttribute('opacity', '0');
+  });
+}
+
+function paintLines(lines, entry) {
+  if (!lines.length) {
+    $('linesTitle').textContent = 'Lines calling here';
+    $('linesHint').textContent = state.f.lineF
+      ? 'No line breakdown came back for this stop.'
+      : 'The boardings dataset on this portal has no line column, so this one is unavailable.';
+    $('lineList').innerHTML = '';
+    return;
+  }
+  const total = lines.reduce((a, l) => a + l.v, 0);
+  $('linesTitle').textContent = `${lines.length} line${lines.length > 1 ? 's' : ''} calling here`;
+  $('linesHint').innerHTML =
+    `Every line the boardings dataset has ever recorded a passenger boarding on at <strong>${escapeHTML(entry.name)}</strong>, ` +
+    `by lifetime boardings. Colours match the chart below.`;
+
+  const colours = lineColours(lines);
+  const max = lines[0].v || 1;
+  $('lineList').innerHTML = lines.map(l => `
+    <li>
+      <span class="badge" style="background:${colours.get(l.line)}">${escapeHTML(l.line)}</span>
+      <span class="track"><i style="width:${Math.max(2, (l.v / max) * 100).toFixed(1)}%;background:${colours.get(l.line)}"></i></span>
+      <span class="vv"><b>${nf.format(Math.round(l.v))}</b> · ${pctOf((l.v / total) * 100)}%</span>
+    </li>`).join('');
+}
+
+/** One colour per line, fixed for the whole stop view so both charts agree. */
+function lineColours(lines) {
+  const m = new Map();
+  lines.forEach((l, i) => m.set(l.line, i < SERIES.length ? SERIES[i] : OTHER));
+  return m;
+}
+
+function paintMix(months, mix, lines) {
+  const svg = $('mix'), tip = $('mixTip');
+  const keys = months.map(m => m.k);
+  const wrap = $('mixWrap');
+  if (!mix.size || keys.length < 2 || lines.length < 2) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+
+  const top = lines.slice(0, SERIES.length).map(l => l.line);
+  const rest = lines.slice(SERIES.length).map(l => l.line);
+  const colours = lineColours(lines);
+
+  const series = top.map(name => ({
+    name, color: colours.get(name),
+    values: keys.map(k => mix.get(name)?.get(k) || 0),
+  }));
+  if (rest.length) series.push({
+    name: `${rest.length} other line${rest.length > 1 ? 's' : ''}`, color: OTHER,
+    values: keys.map(k => rest.reduce((a, n) => a + (mix.get(n)?.get(k) || 0), 0)),
+  });
+
+  const w = Math.max(280, svg.clientWidth || 640), h = 230;
+  const padL = 46, padR = 12, padT = 12, padB = 26;
+  const totals = keys.map((_, i) => series.reduce((a, s) => a + s.values[i], 0));
+  const max = Math.max(...totals) || 1;
+  const x = i => padL + (i / Math.max(1, keys.length - 1)) * (w - padL - padR);
+  const y = v => h - padB - (v / max) * (h - padT - padB);
+
+  const grid = [0, 0.5, 1].map(f => {
+    const yy = y(max * f);
+    return `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${w - padR}" y2="${yy.toFixed(1)}" stroke="#0f3540" stroke-width="1"/>
+            <text x="${padL - 6}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#7e9b9b"
+                  font-family="system-ui">${shortNum(max * f)}</text>`;
+  }).join('');
+  const ticks = keys.map((k, i) => ({ k, i })).filter(({ k }) => monthNum(k) === 1)
+    .map(({ k, i }) => `<text x="${x(i).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="10"
+       fill="#7e9b9b" font-family="system-ui">${k.slice(0, 4)}</text>`).join('');
+
+  // stack from the bottom up; a 2px surface stroke keeps the bands separable
+  const lower = new Array(keys.length).fill(0);
+  const bands = series.map(s => {
+    const upper = lower.map((v, i) => v + s.values[i]);
+    const up = upper.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const down = lower.map((v, i) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`).reverse().join(' ');
+    s.upper = [...upper];
+    for (let i = 0; i < lower.length; i++) lower[i] = upper[i];
+    return `<path d="${up} ${down} Z" fill="${s.color}" fill-opacity=".85" stroke="#04161d" stroke-width="2"/>`;
+  }).join('');
+
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.height = h + 'px';
+  svg.innerHTML = `${grid}${ticks}${bands}
+    <line id="mixRule" y1="${padT}" y2="${h - padB}" stroke="#94d2bd" stroke-width="1" opacity="0"/>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" id="mixHit"/>`;
+
+  $('mixLegend').innerHTML = series.map(s =>
+    `<span><i style="background:${s.color}"></i>${escapeHTML(s.name)}</span>`).join('');
+
+  const hit = svg.querySelector('#mixHit'), rule = svg.querySelector('#mixRule');
+  hit.addEventListener('pointermove', ev => {
+    const r = svg.getBoundingClientRect();
+    const px = ((ev.clientX - r.left) / r.width) * w;
+    let i = Math.round(((px - padL) / (w - padL - padR)) * (keys.length - 1));
+    i = Math.max(0, Math.min(keys.length - 1, i));
+    rule.setAttribute('x1', x(i)); rule.setAttribute('x2', x(i)); rule.setAttribute('opacity', '.5');
+    const rows = series.filter(s => s.values[i] > 0)
+      .map(s => `<span class="n">${escapeHTML(s.name)}: ${nf.format(Math.round(s.values[i]))}</span>`).join('<br>');
+    tip.innerHTML = `<b>${monthName(keys[i])}</b><br>${rows || '<span class="n">nothing recorded</span>'}`;
+    tip.style.left = (x(i) / w * 100) + '%';
+    tip.style.top = (padT / h * r.height) + 'px';
+    tip.dataset.show = '1';
+  });
+  hit.addEventListener('pointerleave', () => { tip.removeAttribute('data-show'); rule.setAttribute('opacity', '0'); });
+}
+
+function drawLocator(entry) {
+  const c = $('loc');
+  const rect = c.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = rect.width || 320, h = rect.height || 190;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+
+  const pts = state.refPoints || [];
+  if (!pts.length) return;
+  const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
+  const lat0 = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const k = Math.cos(lat0 * Math.PI / 180);
+  const xs = lons.map(l => l * k);
+  const xmin = Math.min(...xs), xmax = Math.max(...xs);
+  const ymin = Math.min(...lats), ymax = Math.max(...lats);
+  const pad = 12;
+  const s = Math.min((w - pad * 2) / (xmax - xmin || 1), (h - pad * 2) / (ymax - ymin || 1));
+  const ox = pad + ((w - pad * 2) - (xmax - xmin) * s) / 2;
+  const oy = pad + ((h - pad * 2) - (ymax - ymin) * s) / 2;
+  const px = (lon, lat) => [ox + (lon * k - xmin) * s, oy + (ymax - lat) * s];
+
+  g.fillStyle = 'rgba(126,155,155,.28)';
+  for (const p of pts) {
+    const [a, b] = px(p.lon, p.lat);
+    g.beginPath(); g.arc(a, b, 1.3, 0, Math.PI * 2); g.fill();
+  }
+  if (!isFinite(entry.lat)) return;
+  const [a, b] = px(entry.lon, entry.lat);
+  g.beginPath(); g.arc(a, b, 11, 0, Math.PI * 2);
+  g.strokeStyle = '#94d2bd'; g.lineWidth = 2; g.stroke();
+  g.beginPath(); g.arc(a, b, 4.5, 0, Math.PI * 2);
+  g.fillStyle = '#3987e5'; g.fill();
+  g.lineWidth = 2; g.strokeStyle = '#04161d'; g.stroke();
+}
+
+function buildStopTable(months, mix, lines) {
+  const shown = lines.slice(0, SERIES.length).map(l => l.line);
+  const head = `<thead><tr><th>Month</th><th style="text-align:right">Total</th>${shown.map(l =>
+    `<th style="text-align:right">${escapeHTML(l)}</th>`).join('')}</tr></thead>`;
+  const body = '<tbody>' + months.map(m =>
+    `<tr><td>${monthName(m.k)}</td><td class="n">${nf.format(Math.round(m.v))}</td>` +
+    shown.map(l => {
+      const v = mix.get(l)?.get(m.k);
+      return `<td class="n">${v == null ? '—' : nf.format(Math.round(v))}</td>`;
+    }).join('') + '</tr>').join('') + '</tbody>';
+  $('stopTable').innerHTML = head + body;
+}
+
+/* ── search box ───────────────────────────────────────────────────────── */
+
+let suggestions = [], suggIdx = -1;
+
+function searchStops(q) {
+  const needle = normName(q);
+  if (!needle) return state.directory.slice(0, 10);
+  const starts = [], contains = [];
+  for (const s of state.directory) {
+    const n = s._n || (s._n = normName(s.name));
+    const at = n.indexOf(needle);
+    if (at === 0) starts.push(s);
+    else if (at > 0) contains.push(s);
+    if (starts.length >= 12) break;
+  }
+  return [...starts, ...contains].slice(0, 12);
+}
+
+function renderSuggestions(list) {
+  suggestions = list; suggIdx = -1;
+  const el = $('sugg');
+  if (!list.length) {
+    el.innerHTML = '<li class="none" role="presentation">No stop by that name</li>';
+  } else {
+    el.innerHTML = list.map((s, i) =>
+      `<li role="option" id="sg${i}" aria-selected="false" data-name="${escapeHTML(s.name)}">
+         <span class="nm">${escapeHTML(s.name)}</span>
+         ${s.commune ? `<span class="co">${escapeHTML(s.commune)}</span>` : ''}
+         <span class="vv">${shortNum(s.total)}</span></li>`).join('');
+    [...el.children].forEach((li, i) => {
+      li.onmousedown = e => { e.preventDefault(); openStop(list[i].name); };
+    });
+  }
+  el.hidden = false;
+  $('q').setAttribute('aria-expanded', 'true');
+}
+function closeSuggestions() {
+  $('sugg').hidden = true;
+  $('q').setAttribute('aria-expanded', 'false');
+  $('q').removeAttribute('aria-activedescendant');
+  suggIdx = -1;
+}
+function highlight(i) {
+  const el = $('sugg');
+  [...el.children].forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
+  suggIdx = i;
+  if (i >= 0) {
+    $('q').setAttribute('aria-activedescendant', 'sg' + i);
+    el.children[i].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function bindSearch() {
+  const q = $('q');
+  q.addEventListener('input', () => {
+    $('qclear').hidden = !q.value;
+    renderSuggestions(searchStops(q.value));
+  });
+  q.addEventListener('focus', () => renderSuggestions(searchStops(q.value)));
+  q.addEventListener('blur', () => setTimeout(closeSuggestions, 120));
+  q.addEventListener('keydown', e => {
+    if ($('sugg').hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { renderSuggestions(searchStops(q.value)); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(suggestions.length - 1, suggIdx + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(0, suggIdx - 1)); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const pick = suggIdx >= 0 ? suggestions[suggIdx] : suggestions[0];
+      if (pick) openStop(pick.name);
+    } else if (e.key === 'Escape') closeSuggestions();
+  });
+  $('qclear').onclick = () => { q.value = ''; $('qclear').hidden = true; q.focus(); renderSuggestions(searchStops('')); };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RENDER
+   CONSTELLATION
    ═══════════════════════════════════════════════════════════════════════ */
 
 const cv = $('cv'), ctx = cv.getContext('2d');
 const tip = $('tip');
 let W = 0, H = 0, DPR = 1;
 
-function sizeCanvas(c) {
-  const rect = c.getBoundingClientRect();
-  DPR = Math.min(2, window.devicePixelRatio || 1);
-  c.width = Math.max(1, Math.round(rect.width * DPR));
-  c.height = Math.max(1, Math.round(rect.height * DPR));
-  return { w: rect.width, h: rect.height, g: c.getContext('2d') };
-}
-
 function computeLayout() {
   const rect = cv.getBoundingClientRect();
   W = rect.width; H = rect.height;
   const pad = 34, inner = { w: W - pad * 2, h: H - pad * 2 };
 
-  /* geographic: equirectangular, longitude squeezed by cos(latitude) */
   if (state.hasGeo) {
     const lats = state.stops.map(s => s.lat), lons = state.stops.map(s => s.lon);
     const lat0 = (Math.min(...lats) + Math.max(...lats)) / 2;
     const k = Math.cos(lat0 * Math.PI / 180);
-    const xs = lons.map(l => l * k), ys = lats;
-    fit(xs, ys, inner, pad, (s, x, y) => { s.gx = x; s.gy = y; }, true);
+    fit(lons.map(l => l * k), lats, inner, pad, (s, x, y) => { s.gx = x; s.gy = y; });
   }
 
-  /* rhythm: PCA coordinates, clipped to a robust range so one outlier
-     can't flatten everything else into a dot */
   const px = state.stops.map(s => s.pc1), py = state.stops.map(s => s.pc2);
   const [x0, x1] = robustRange(px), [y0, y1] = robustRange(py);
   const toX = v => pad + ((clampTo(v, x0, x1) - x0) / (x1 - x0 || 1)) * inner.w;
@@ -976,18 +1457,13 @@ function computeLayout() {
   state.zeroY = toY(0);
 }
 
-function fit(xs, ys, inner, pad, assign, flipY) {
+function fit(xs, ys, inner, pad, assign) {
   const xmin = Math.min(...xs), xmax = Math.max(...xs);
   const ymin = Math.min(...ys), ymax = Math.max(...ys);
-  const sx = inner.w / (xmax - xmin || 1), sy = inner.h / (ymax - ymin || 1);
-  const s = Math.min(sx, sy);
+  const s = Math.min(inner.w / (xmax - xmin || 1), inner.h / (ymax - ymin || 1));
   const ox = pad + (inner.w - (xmax - xmin) * s) / 2;
   const oy = pad + (inner.h - (ymax - ymin) * s) / 2;
-  state.stops.forEach((st, i) => {
-    const x = ox + (xs[i] - xmin) * s;
-    const y = flipY ? oy + (ymax - ys[i]) * s : oy + (ys[i] - ymin) * s;
-    assign(st, x, y);
-  });
+  state.stops.forEach((st, i) => assign(st, ox + (xs[i] - xmin) * s, oy + (ymax - ys[i]) * s));
 }
 
 function robustRange(a) {
@@ -998,14 +1474,12 @@ function robustRange(a) {
 }
 const clampTo = (v, a, b) => Math.max(a, Math.min(b, v));
 
-/* dot radius carries magnitude — area-proportional, so √ */
 let rScale = 1;
 function computeRadii() {
   const max = Math.max(...state.stops.map(s => Math.max(...s.series)));
-  rScale = 17 / Math.sqrt(max || 1);
+  rScale = 15 / Math.sqrt(max || 1);
 }
-const radiusFor = v => Math.max(2.6, Math.sqrt(Math.max(0, v)) * rScale);
-
+const radiusFor = v => Math.max(2.2, Math.sqrt(Math.max(0, v)) * rScale);
 const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 function draw() {
@@ -1017,12 +1491,11 @@ function draw() {
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.clearRect(0, 0, W, H);
 
-  const m = state.morph, sm = easeInOut(m);
+  const sm = easeInOut(state.morph);
   const idx = state.monthIdx;
 
   if (sm > 0.02) drawRhythmAxes(g, sm);
 
-  // positions
   for (const s of state.stops) {
     const gx = state.hasGeo ? s.gx : s.rx, gy = state.hasGeo ? s.gy : s.ry;
     s.x = gx + (s.rx - gx) * sm;
@@ -1030,7 +1503,6 @@ function draw() {
     s.r = radiusFor(s.series[idx]);
   }
 
-  // twin threads — the punchline: in map view these run right across the canton
   if (state.selected && state.twins.length) {
     g.save();
     g.strokeStyle = 'rgba(148,210,189,.55)'; g.lineWidth = 1.4; g.setLineDash([5, 4]);
@@ -1040,15 +1512,13 @@ function draw() {
     g.restore();
   }
 
-  // marks, biggest first so small ones stay clickable on top
   const order = [...state.stops].sort((a, b) => b.r - a.r);
   for (const s of order) {
     const dim = state.selected && s !== state.selected && !state.twins.some(t => t.stop === s);
     g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     g.fillStyle = divergingColor(s.pc1 / (state.pcScale || 1), dim ? 0.3 : 0.86);
     g.fill();
-    // 2px surface ring keeps overlapping marks separable
-    g.lineWidth = 1.6; g.strokeStyle = dim ? 'rgba(4,22,29,.5)' : '#04161d'; g.stroke();
+    g.lineWidth = 1.4; g.strokeStyle = dim ? 'rgba(4,22,29,.5)' : '#04161d'; g.stroke();
   }
 
   for (const s of [state.hover, state.selected]) {
@@ -1057,8 +1527,7 @@ function draw() {
     g.lineWidth = 2; g.strokeStyle = s === state.selected ? '#94d2bd' : 'rgba(238,155,0,.9)'; g.stroke();
   }
 
-  // direct labels for a few marks, so identity is never colour-alone.
-  // Greedy placement: a label that would land on one already drawn is dropped.
+  // direct labels, greedily placed — a label landing on one already drawn is dropped
   g.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'bottom';
   const wanted = state.selected
@@ -1066,9 +1535,8 @@ function draw() {
     : [...state.stops].sort((a, b) => b.series[idx] - a.series[idx]).slice(0, 8);
   const placed = [];
   for (const s of wanted) {
-    const w = g.measureText(s.name).width, h = 13;
-    const bx = s.x - w / 2 - 3, by = s.y - s.r - 4 - h;
-    const box = { x: bx, y: by, w: w + 6, h: h + 3 };
+    const tw = g.measureText(s.name).width, th = 13;
+    const box = { x: s.x - tw / 2 - 3, y: s.y - s.r - 4 - th, w: tw + 6, h: th + 3 };
     if (box.x < 2 || box.x + box.w > W - 2 || box.y < 2) continue;
     if (placed.some(p => box.x < p.x + p.w && p.x < box.x + box.w && box.y < p.y + p.h && p.y < box.y + box.h)) continue;
     placed.push(box);
@@ -1099,12 +1567,9 @@ function drawRhythmAxes(g, a) {
   g.restore();
 }
 
-/* ── animation loop ───────────────────────────────────────────────────── */
-
 let last = 0, playAcc = 0;
 function frame(t) {
   const dt = Math.min(0.1, (t - last) / 1000 || 0); last = t;
-
   if (state.morph !== state.targetMorph) {
     const step = reducedMotion ? 1 : dt / 0.9;
     const d = state.targetMorph - state.morph;
@@ -1112,18 +1577,13 @@ function frame(t) {
   }
   if (state.playing) {
     playAcc += dt;
-    if (playAcc > 0.55) {
-      playAcc = 0;
-      setMonth((state.monthIdx + 1) % state.months.length);
-    }
+    if (playAcc > 0.55) { playAcc = 0; setMonth((state.monthIdx + 1) % state.months.length); }
   }
   draw();
   requestAnimationFrame(frame);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   INTERACTION
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ── interaction ──────────────────────────────────────────────────────── */
 
 function nearest(px, py, maxDist = 22) {
   let best = null, bestD = maxDist * maxDist;
@@ -1139,10 +1599,9 @@ function nearest(px, py, maxDist = 22) {
 function bindStage() {
   const showTip = (s, x, y) => {
     if (!s) { tip.removeAttribute('data-show'); return; }
-    const v = s.series[state.monthIdx];
     tip.innerHTML =
       `<b>${escapeHTML(s.name)}</b>${s.commune ? `<br><span class="n">${escapeHTML(s.commune)}</span>` : ''}` +
-      `<br><span class="n">${nf.format(Math.round(v))} boardings · ${monthName(state.months[state.monthIdx])}</span>` +
+      `<br><span class="n">${nf.format(Math.round(s.series[state.monthIdx]))} boardings · ${monthName(state.months[state.monthIdx])}</span>` +
       `<br><span class="n">${describeRhythm(s)}</span>`;
     tip.style.left = x + 'px';
     tip.style.top = (y - 10) + 'px';
@@ -1160,7 +1619,7 @@ function bindStage() {
   cv.addEventListener('click', e => {
     const r = cv.getBoundingClientRect();
     const s = nearest(e.clientX - r.left, e.clientY - r.top);
-    select(s === state.selected ? null : s);
+    selectDot(s === state.selected ? null : s);
   });
 }
 
@@ -1172,11 +1631,12 @@ function describeRhythm(s) {
   return 'an average-shaped year';
 }
 
-function select(s) {
+function selectDot(s, { sync = true } = {}) {
   state.selected = s;
   state.twins = s ? findTwins(s, 5) : [];
   paintDetail();
   paintRank();
+  if (sync && s) openStop(s.name);
 }
 
 /** Nearest neighbours in profile space — "stops whose year has the same shape". */
@@ -1192,14 +1652,12 @@ function profileDistance(a, b) {
   for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; sum += d * d; }
   return Math.sqrt(sum);
 }
-
-/* haversine, for the "how far apart are these twins" line */
 function kmBetween(a, b) {
   if (!isFinite(a.lat) || !isFinite(b.lat)) return null;
   const R = 6371, rad = Math.PI / 180;
   const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
+  const hv = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(hv));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1208,10 +1666,11 @@ function kmBetween(a, b) {
 
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shortNum = v => v >= 1e6 ? nf1.format(v / 1e6) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'k' : Math.round(v);
 
 function paintTiles() {
   const h = state.headline || {};
-  const busiest = [...state.stops].sort((a, b) => b.series.at(-1) - a.series.at(-1))[0];
+  const busiest = state.directory[0];
   const span = h.oldestMonth ? yearsBetween(monthKey(h.oldestMonth), h.newestKey) : null;
 
   const tiles = [
@@ -1220,21 +1679,14 @@ function paintTiles() {
       v: nf.format(Math.round(h.latestTotal)),
       s: 'across the whole network, that month alone',
     },
-    busiest && {
-      k: 'Busiest stop',
-      v: busiest.name,
-      s: `${nf.format(Math.round(busiest.series.at(-1)))} boardings in ${monthName(state.months.at(-1))}`,
-    },
-    h.stopCount != null && {
-      k: 'Stops on file',
-      v: nf.format(h.stopCount),
-      s: `${nf.format(state.stops.length)} of them charted here`,
-    },
-    span && {
-      k: 'Counted since',
-      v: monthName(monthKey(h.oldestMonth)),
-      s: `${nf1.format(span)} years of people getting on buses`,
-    },
+    { k: 'Stops counted', v: nf.format(state.directory.length),
+      s: `${nf.format(state.stops.length)} of them charted below` },
+    h.lineCount != null && { k: 'Lines on record', v: nf.format(h.lineCount),
+      s: 'in the boardings dataset' },
+    busiest && { k: 'Busiest stop', v: busiest.name,
+      s: `${nf.format(Math.round(busiest.total))} boardings all-time` },
+    span && { k: 'Counted since', v: monthName(monthKey(h.oldestMonth)),
+      s: `${nf1.format(span)} years of people getting on buses` },
   ].filter(Boolean);
 
   $('tiles').innerHTML = tiles.map(t =>
@@ -1259,7 +1711,7 @@ function paintRank() {
   for (const li of $('rank').children) {
     li.onclick = () => {
       const s = state.stops.find(x => x.name === li.dataset.name);
-      select(s === state.selected ? null : s);
+      selectDot(s === state.selected ? null : s);
     };
   }
 }
@@ -1280,17 +1732,23 @@ function paintDetail() {
   $('detSpark').removeAttribute('hidden');
   $('detTwins').hidden = false;
 
-  sparkline($('detSpark'), s.series, state.months, divergingColor(s.pc1 / (state.pcScale || 1)), true);
+  sparkline($('detSpark'), s.series, state.months, divergingColor(s.pc1 / (state.pcScale || 1)));
 
   $('twinList').innerHTML = state.twins.map(t => {
     const km = kmBetween(s, t.stop);
-    return `<li><span>${escapeHTML(t.stop.name)}</span>
+    return `<li data-name="${escapeHTML(t.stop.name)}"><span>${escapeHTML(t.stop.name)}</span>
               <span class="d">${km != null ? nf1.format(km) + ' km away' : ''}</span></li>`;
   }).join('');
+  for (const li of $('twinList').children) {
+    li.onclick = () => {
+      const o = state.stops.find(x => x.name === li.dataset.name);
+      if (o) selectDot(o);
+    };
+  }
 }
 
 /** A small line chart in inline SVG — crisper than canvas for a 60px strip. */
-function sparkline(svg, values, labels, color, withEnds) {
+function sparkline(svg, values, labels, color) {
   const w = svg.clientWidth || 260, h = 62, pad = 8, bottom = h - 16;
   const max = Math.max(...values), min = Math.min(...values);
   const x = i => pad + (i / Math.max(1, values.length - 1)) * (w - pad * 2);
@@ -1301,8 +1759,8 @@ function sparkline(svg, values, labels, color, withEnds) {
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.innerHTML =
     `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}` +
-    (withEnds ? `<text x="${pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" font-family="system-ui">${monthName(labels[0])}</text>
-                 <text x="${w - pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" text-anchor="end" font-family="system-ui">${monthName(labels.at(-1))}</text>` : '');
+    `<text x="${pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" font-family="system-ui">${monthName(labels[0])}</text>
+     <text x="${w - pad}" y="${h - 2}" font-size="10" fill="#7e9b9b" text-anchor="end" font-family="system-ui">${monthName(labels.at(-1))}</text>`;
 }
 
 /** The PCA loading curves, so the axes are readable rather than magic. */
@@ -1318,10 +1776,8 @@ function paintLoadings() {
   const a = label(v1), b = label(v2);
 
   state.axisLabels = {
-    x1: `more of its year in ${a.hi}`,
-    x0: `more of its year in ${a.lo}`,
-    y1: `more of its year in ${b.hi}`,
-    y0: `more of its year in ${b.lo}`,
+    x1: `more of its year in ${a.hi}`, x0: `more of its year in ${a.lo}`,
+    y1: `more of its year in ${b.hi}`, y0: `more of its year in ${b.lo}`,
   };
   state.axisMonths = { xHi: a.hi, xLo: a.lo, yHi: b.hi, yLo: b.lo };
   $('lbWarm').textContent = `busier than average in ${a.hi}`;
@@ -1353,7 +1809,7 @@ function loadingCurve(svg, v, months) {
      <text x="${w - pad}" y="${h - 1}" font-size="10" fill="#7e9b9b" text-anchor="end" font-family="system-ui">${monthName(months.at(-1))}</text>`;
 }
 
-/** The stat this whole page exists for: same heartbeat, opposite ends of the canton. */
+/** The stat this whole view exists for: same heartbeat, opposite ends of the canton. */
 function paintSurprise() {
   if (!state.hasGeo) return;
   let best = null;
@@ -1368,7 +1824,6 @@ function paintSurprise() {
     }
   }
   if (!best) return;
-  // How far apart the two curves ever get, in percentage points of a stop's own year.
   let worst = 0;
   for (let i = 0; i < best.a.profile.length; i++)
     worst = Math.max(worst, Math.abs(best.a.profile[i] - best.b.profile[i]) * 100);
@@ -1380,7 +1835,7 @@ function paintSurprise() {
     `${nf1.format(best.km)} km apart, opposite corners of the network — and yet across ` +
     `${state.months.length} months their share of the year never parts company by more than ` +
     `${pp} percentage points. Click to light up the threads.`;
-  $('surprise').onclick = () => select(best.a);
+  $('surprise').onclick = () => selectDot(best.a);
 }
 
 function buildTable() {
@@ -1396,7 +1851,7 @@ function buildTable() {
 function paintProvenance() {
   $('prov').innerHTML = (state.provenance || []).map(p => `
     <div class="card" style="margin-top:10px">
-      <h3 style="font-size:14px">${escapeHTML(p.title)}</h3>
+      <h4>${escapeHTML(p.title)}</h4>
       <p class="hint" style="margin:4px 0 0">
         <code style="font-family:ui-monospace,monospace">${escapeHTML(p.ds)}</code> —
         using ${Object.entries(p.fields).filter(([, v]) => v)
@@ -1404,138 +1859,15 @@ function paintProvenance() {
       </p>
     </div>`).join('') +
     (state.unmatched
-      ? `<p class="note">${nf.format(state.unmatched)} of ${nf.format(state.totalStopsSeen)} counted stops
-         had no match in the stop reference, so they aren't drawn.</p>` : '');
+      ? `<p class="note">${nf.format(state.unmatched)} of ${nf.format(state.directory.length)} counted stops
+         had no match in the stop reference, so they have no coordinates — they're still searchable.</p>` : '');
 }
 
-/* ── the polar day chart ──────────────────────────────────────────────── */
-
-function drawClock() {
-  if (!clock.ok) return;
-  const c = $('clockCv');
-  const { w, h, g } = sizeCanvas(c);
-  g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  g.clearRect(0, 0, w, h);
-
-  const cx = w / 2, cy = h / 2;
-  const R = Math.min(w, h) / 2 - 42, R0 = Math.max(16, R * 0.16);
-  const n = clock.slots.length;
-  const all = [...clock.weekday, ...clock.weekend].filter(v => v != null);
-  const max = Math.max(...all) || 1;
-
-  const angle = i => {
-    const hr = clock.hours[i];
-    const frac = isFinite(hr) ? hr / 24 : i / n;
-    return frac * Math.PI * 2 - Math.PI / 2;
-  };
-  const rad = v => R0 + (v / max) * (R - R0);
-
-  /* recessive rings + hour spokes */
-  g.strokeStyle = '#0f3540'; g.lineWidth = 1;
-  for (const f of [0.25, 0.5, 0.75, 1]) {
-    g.beginPath(); g.arc(cx, cy, R0 + (R - R0) * f, 0, Math.PI * 2); g.stroke();
-  }
-  g.font = '600 10px system-ui, sans-serif';
-  g.fillStyle = '#5f7d7d'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (let hr = 0; hr < 24; hr += 3) {
-    const a = hr / 24 * Math.PI * 2 - Math.PI / 2;
-    g.strokeStyle = '#0a2831';
-    g.beginPath(); g.moveTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0);
-    g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke();
-    g.fillText(String(hr).padStart(2, '0') + 'h', cx + Math.cos(a) * (R + 16), cy + Math.sin(a) * (R + 16));
-  }
-
-  // Only join the last band back to the first when the bands really wrap the clock —
-  // otherwise a dataset that starts at 04h would grow a chord across the small hours.
-  const wraps = isFinite(clock.hours[0]) && clock.hours[0] <= 2 && clock.hours[n - 1] >= 21;
-
-  const trace = (vals, color, width) => {
-    const pts = vals.map((v, i) => v == null ? null : {
-      x: cx + Math.cos(angle(i)) * rad(v), y: cy + Math.sin(angle(i)) * rad(v), i, v,
-    }).filter(Boolean);
-    if (pts.length < 2) return pts;
-    g.beginPath();
-    pts.forEach((p, k) => k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y));
-    if (wraps) g.closePath();
-    g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.stroke();
-    g.fillStyle = color.replace('rgb', 'rgba').replace(')', ',.13)');
-    g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1;
-    for (const p of pts) {
-      g.beginPath(); g.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      g.fillStyle = color; g.fill();
-      g.lineWidth = 2; g.strokeStyle = '#04161d'; g.stroke();
-    }
-    return pts;
-  };
-
-  clock.pts = { wd: trace(clock.weekday, 'rgb(57,135,229)', 2) };
-  if (clock.hasWeekend) clock.pts.we = trace(clock.weekend, 'rgb(217,89,38)', 2);
-
-  /* direct labels at each series' peak — identity never rests on colour alone */
-  const labelPeak = (vals, color, text) => {
-    let bi = -1, bv = -Infinity;
-    vals.forEach((v, i) => { if (v != null && v > bv) { bv = v; bi = i; } });
-    if (bi < 0) return;
-    const a = angle(bi), x = cx + Math.cos(a) * (rad(bv) + 14), y = cy + Math.sin(a) * (rad(bv) + 14);
-    g.font = '800 11px system-ui, sans-serif';
-    g.textAlign = Math.cos(a) < -0.2 ? 'right' : Math.cos(a) > 0.2 ? 'left' : 'center';
-    g.textBaseline = 'middle';
-    g.lineWidth = 3.5; g.strokeStyle = 'rgba(4,22,29,.95)'; g.strokeText(text, x, y);
-    g.fillStyle = color; g.fillText(text, x, y);
-  };
-  labelPeak(clock.weekday, '#3987e5', clock.hasWeekend ? 'weekday' : 'average day');
-  if (clock.hasWeekend) labelPeak(clock.weekend, '#d95926', 'weekend');
-
-  // Outer-ring value, tucked just inside the ring so it clears the 00h hour label.
-  g.font = '600 10px system-ui, sans-serif';
-  g.fillStyle = '#5f7d7d'; g.textAlign = 'center'; g.textBaseline = 'top';
-  g.fillText(nf1.format(max), cx, cy - R + 5);
-}
-
-function buildClockLegend() {
-  const items = [['#3987e5', clock.hasWeekend ? 'Weekday' : 'Average day']];
-  if (clock.hasWeekend) items.push(['#d95926', 'Weekend']);
-  $('clockLegend').innerHTML =
-    `<div class="leg"><span class="lt">${escapeHTML(clock.label)} — average per time band</span>
-      <div style="display:flex;gap:16px;margin-top:2px">` +
-    items.map(([c, t]) =>
-      `<span style="display:inline-flex;align-items:center;gap:7px;color:var(--ink-2)">
-         <i style="width:11px;height:11px;border-radius:50%;background:${c};display:inline-block"></i>${t}</span>`).join('') +
-    `</div></div>`;
-}
-
-function buildClockTable() {
-  const head = `<thead><tr><th>${escapeHTML(clock.slotLabel || 'Time band')}</th>
-    <th style="text-align:right">${clock.hasWeekend ? 'Weekday' : 'Average'}</th>
-    ${clock.hasWeekend ? '<th style="text-align:right">Weekend</th>' : ''}</tr></thead>`;
-  const body = '<tbody>' + clock.slots.map((s, i) =>
-    `<tr><td>${escapeHTML(s)}</td>
-       <td class="n">${clock.weekday[i] == null ? '—' : nf1.format(clock.weekday[i])}</td>
-       ${clock.hasWeekend ? `<td class="n">${clock.weekend[i] == null ? '—' : nf1.format(clock.weekend[i])}</td>` : ''}
-     </tr>`).join('') + '</tbody>';
-  $('clockTable').innerHTML = head + body;
-
-  const cc = $('clockCv');
-  cc.addEventListener('pointermove', e => {
-    const r = cc.getBoundingClientRect();
-    const px = e.clientX - r.left, py = e.clientY - r.top;
-    let best = null, bd = 26 * 26;
-    for (const key of ['wd', 'we']) {
-      for (const p of (clock.pts?.[key] || [])) {
-        const d = (p.x - px) ** 2 + (p.y - py) ** 2;
-        if (d < bd) { bd = d; best = { p, key }; }
-      }
-    }
-    const t = $('clockTip');
-    if (!best) { t.removeAttribute('data-show'); return; }
-    const i = best.p.i;
-    t.innerHTML = `<b>${escapeHTML(clock.slots[i])}</b>` +
-      `<br><span class="n">${clock.hasWeekend ? 'weekday' : 'average'}: ${clock.weekday[i] == null ? '—' : nf1.format(clock.weekday[i])}</span>` +
-      (clock.hasWeekend ? `<br><span class="n">weekend: ${clock.weekend[i] == null ? '—' : nf1.format(clock.weekend[i])}</span>` : '');
-    t.style.left = best.p.x + 'px'; t.style.top = (best.p.y - 8) + 'px';
-    t.dataset.show = '1';
-  });
-  cc.addEventListener('pointerleave', () => $('clockTip').removeAttribute('data-show'));
+function paintChips() {
+  const picks = state.directory.slice(0, 6);
+  $('chips').innerHTML = '<span class="lbl">Try:</span>' + picks.map(s =>
+    `<button class="chip" type="button" data-name="${escapeHTML(s.name)}">${escapeHTML(s.name)}</button>`).join('');
+  for (const b of $('chips').querySelectorAll('.chip')) b.onclick = () => openStop(b.dataset.name);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1558,26 +1890,23 @@ function setMode(mode) {
 
 function paintSizeLegend() {
   const max = Math.max(...state.stops.map(s => Math.max(...s.series)));
-  const steps = [max, max / 4, max / 16];
-  $('sizeleg').innerHTML = steps.map(v => {
+  $('sizeleg').innerHTML = [max, max / 4, max / 16].map(v => {
     const r = radiusFor(v);
     return `<span style="display:flex;flex-direction:column;align-items:center;gap:4px">
       <i style="width:${(r * 2).toFixed(0)}px;height:${(r * 2).toFixed(0)}px"></i>
       <span>${shortNum(v)}</span></span>`;
   }).join('');
 }
-const shortNum = v => v >= 1e6 ? nf1.format(v / 1e6) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'k' : Math.round(v);
 
 function reveal() {
   $('boot').hidden = true;
   $('app').hidden = false;
 
-  state.pcScale = Math.max(...state.stops.map(s => Math.abs(s.pc1))) || 1;
-  // Use a robust scale so a single freak stop doesn't wash the colours out.
   const sorted = state.stops.map(s => Math.abs(s.pc1)).sort((a, b) => a - b);
-  state.pcScale = sorted[Math.floor(sorted.length * 0.92)] || state.pcScale;
+  state.pcScale = sorted[Math.floor(sorted.length * 0.92)] || 1;
 
   $('month').max = String(state.months.length - 1);
+  $('stopCount').textContent = nf.format(state.directory.length);
   computeLayout();
   computeRadii();
   paintTiles();
@@ -1585,10 +1914,10 @@ function reveal() {
   paintSizeLegend();
   paintSurprise();
   paintProvenance();
+  paintChips();
   buildTable();
   setMonth(state.months.length - 1);
   paintDetail();
-  drawClock();   // the clock may have loaded while #app was still hidden (zero-size canvas)
 
   if (!state.hasGeo) {
     setMode('rhythm');
@@ -1598,6 +1927,9 @@ function reveal() {
     state.morph = 1;
   }
   requestAnimationFrame(frame);
+
+  // open the busiest stop so the explorer is never an empty box
+  if (state.directory[0]) openStop(state.directory[0].name);
 }
 
 $('bMap').onclick = () => setMode('map');
@@ -1617,8 +1949,10 @@ addEventListener('resize', () => {
     computeLayout();
     paintLoadings();
     if (state.selected) paintDetail();
-    drawClock();
-  }, 120);
+    const cur = explorer.name && state.byName.get(explorer.name);
+    const cached = explorer.name && explorer.cache.get(explorer.name);
+    if (cur && cached) paintStop(cur, cached);
+  }, 140);
 });
 
 function fail(e) {
@@ -1631,6 +1965,7 @@ function fail(e) {
 
 paintSteps();
 bindStage();
+bindSearch();
 load().then(reveal).catch(fail);
 </script>
 </body>
