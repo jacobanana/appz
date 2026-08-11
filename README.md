@@ -12,7 +12,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🃏 Yaniv Scorekeeper | [`yaniv/`](yaniv/) | Scorekeeper for the card game Yaniv — cut for the deal, log each hand, mark a clean Yaniv or an Asaf catch, track totals to 200, with an AI commentator roasting the table each round. Remembers your house rules, the last line-up and every finished game, with an all-time stats page on top. |
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
-| 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Every stop is a dot sized by its monthly boardings — drag through the year and the canton breathes. Then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
+| 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop and get its whole counted history, every line that calls there and how that mix shifted. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
 
 ## How it's laid out
@@ -121,20 +121,26 @@ what each person put in, owes, and has since handed over.
 `tpg-pulse/` is the only app here with no local state at all — it stores
 nothing, and every figure on the page is fetched from the
 [Explore v2.1 API](https://opendata.tpg.ch/api/explore/v2.1/console) at
-`opendata.tpg.ch` when you open it, straight from the browser. Three datasets:
+`opendata.tpg.ch` when you open it, straight from the browser. Two datasets:
 
 | Dataset | What it gives Pulse |
 | --- | --- |
-| `montees-mensuelles-par-arret-par-ligne` | boardings per stop per month — the whole chart |
-| `arrets` | the coordinates that turn stop names into a map |
-| `frequentation-journaliere-par-tranche-horaire` | the 24-hour clock at the bottom |
+| `montees-mensuelles-par-arret-par-ligne` | boardings per stop **per line** per month — the searchable directory, every stop's history, and which lines call where |
+| `arrets` | the coordinates, commune and Didoc code behind each stop name |
 
 It asks each dataset for its *own field list* first and resolves what it needs
 by name and type, then builds every query from that — so a renamed column shows
-up as a specific message rather than a blank page. The stop reference and the
-day-part chart are both optional: lose the coordinates and it falls back to the
-rhythm arrangement alone; lose the day-part dataset and that section just
-doesn't appear.
+up as a specific message rather than a blank page. The stop reference is
+optional: lose the coordinates and the map half switches off while everything
+else keeps working. Group-by queries are asked for at the API's documented
+20 000-row ceiling and fall back to paging at 100 if the portal says no.
+
+**Which lines serve a stop.** There's no separate lines-to-stops reference on
+the portal, but the monthly boardings dataset carries `ligne` *and* `arret` on
+every row — so grouping by line inside one stop is the answer, and it comes with
+the passenger numbers attached. That's what the stop page's line list and its
+stacked "how the mix shifted" chart are built from: a line appearing, growing or
+vanishing at a stop shows up as a band changing thickness.
 
 **The trick.** Take each stop's last 18 months of boardings and divide by its
 own total, so what's left is only the *shape* of its year — a big terminus and a
