@@ -13,7 +13,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
 | 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
-| 🐷 Piggy | [`piggy/`](piggy/) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. |
+| 🐷 Piggy | [moved to its own repo →](https://github.com/jacobanana/piggy) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. Now a Vite app at [jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/), with a FastAPI + Postgres backend growing beside it. |
 
 ## How it's laid out
 
@@ -23,7 +23,6 @@ candy-beads/index.html  # one app, one folder, one HTML file
 yaniv/index.html
 breathing-flow-log/index.html
 sensor-readout/index.html
-piggy/index.html
 tpg-pulse/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
@@ -75,46 +74,12 @@ medical advice — if there's an action plan with its own numbers, that wins.
 
 ### What Piggy remembers
 
-`piggy/` keeps one `localStorage` key, `piggy.ledger.v1`, holding the whole
-book in a flat, relational shape — `people`, `accounts`, `ledgers`, `rules`,
-`overrides`, `expenses`, `settlements` — so it maps onto database tables if it
-ever grows a backend. Nothing is uploaded and there's no account; **Settings →
-Your data** exports the lot as JSON (or a flat CSV of every entry) and imports
-it back on another device. **Erase everything** wipes the key.
-
-Amounts are stored as a decimal plus an ISO currency code. A one-off expense
-also snapshots the exchange rate it was entered at, so re-reading an old month
-never rewrites its numbers; recurring bills use the live rate from settings
-instead, so a foreign standing order follows the currency. **Settings →
-Currencies → Refresh** pulls rates from `api.frankfurter.dev` — the only
-network call the app makes, and everything works with hand-typed rates if it's
-blocked.
-
-An expense can be logged before it's paid — a hotel you've booked, a deposit
-you owe. Flip **Has it been paid?** to *Still to pay* and it lands in a **Still
-to pay** card with its own total and each person's share once it's settled, so
-a trip can be budgeted before a franc moves. Planned entries stay out of the
-tally, out of *where it went* and out of who-paid-what, because nobody is out of
-pocket yet; tapping **Paid** on the row folds it into the real numbers, dating
-it today if it was due in the future. A household month shows what's been paid
-and what's still planned as separate totals.
-
-Who paid is derived from the account an entry came out of: an account credits
-its owners in proportion to their share, so a 50/50 joint account means joint
-spending never needs settling. Who owes is the split — evenly, by weighted
-shares, or exact amounts, with rounding pennies going to the first person.
-
-Repayments are their own thing, not an edit to any expense. **Settle up** logs
-the whole outstanding amount, *Part of it…* logs less than the full amount, and
-**＋ Log a repayment** takes an arbitrary one — either direction, any currency,
-any date, with a note. Each one records how the money travelled (cash, bank
-transfer, Twint or app, or other); the picker sits on the settle-up screen too,
-so the one-tap path captures it as well, and it defaults to whatever was used
-last. They're all listed under **Repayments**, each tappable to correct or
-delete (deleting puts the amount back on the tally), with a per-pair subtotal
-once money has moved both ways. The receipt shows a *paid back by* line
-per person alongside *paid by*, so the balance at the top is the visible sum of
-what each person put in, owes, and has since handed over.
+Piggy has moved to [its own repository](https://github.com/jacobanana/piggy) —
+same app, now a Vite + TypeScript codebase with a FastAPI + Postgres backend
+growing beside it. The GitHub Pages build at
+[jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/) stays
+frontend-only: one `localStorage` key (`piggy.ledger.v1`), JSON export/import,
+nothing uploaded. The full story lives in that repo's README.
 
 ### What Pulse reads, and the trick it plays
 
