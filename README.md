@@ -74,46 +74,12 @@ medical advice — if there's an action plan with its own numbers, that wins.
 
 ### What Piggy remembers
 
-`piggy/` keeps one `localStorage` key, `piggy.ledger.v1`, holding the whole
-book in a flat, relational shape — `people`, `accounts`, `ledgers`, `rules`,
-`overrides`, `expenses`, `settlements` — so it maps onto database tables if it
-ever grows a backend. Nothing is uploaded and there's no account; **Settings →
-Your data** exports the lot as JSON (or a flat CSV of every entry) and imports
-it back on another device. **Erase everything** wipes the key.
-
-Amounts are stored as a decimal plus an ISO currency code. A one-off expense
-also snapshots the exchange rate it was entered at, so re-reading an old month
-never rewrites its numbers; recurring bills use the live rate from settings
-instead, so a foreign standing order follows the currency. **Settings →
-Currencies → Refresh** pulls rates from `api.frankfurter.dev` — the only
-network call the app makes, and everything works with hand-typed rates if it's
-blocked.
-
-An expense can be logged before it's paid — a hotel you've booked, a deposit
-you owe. Flip **Has it been paid?** to *Still to pay* and it lands in a **Still
-to pay** card with its own total and each person's share once it's settled, so
-a trip can be budgeted before a franc moves. Planned entries stay out of the
-tally, out of *where it went* and out of who-paid-what, because nobody is out of
-pocket yet; tapping **Paid** on the row folds it into the real numbers, dating
-it today if it was due in the future. A household month shows what's been paid
-and what's still planned as separate totals.
-
-Who paid is derived from the account an entry came out of: an account credits
-its owners in proportion to their share, so a 50/50 joint account means joint
-spending never needs settling. Who owes is the split — evenly, by weighted
-shares, or exact amounts, with rounding pennies going to the first person.
-
-Repayments are their own thing, not an edit to any expense. **Settle up** logs
-the whole outstanding amount, *Part of it…* logs less than the full amount, and
-**＋ Log a repayment** takes an arbitrary one — either direction, any currency,
-any date, with a note. Each one records how the money travelled (cash, bank
-transfer, Twint or app, or other); the picker sits on the settle-up screen too,
-so the one-tap path captures it as well, and it defaults to whatever was used
-last. They're all listed under **Repayments**, each tappable to correct or
-delete (deleting puts the amount back on the tally), with a per-pair subtotal
-once money has moved both ways. The receipt shows a *paid back by* line
-per person alongside *paid by*, so the balance at the top is the visible sum of
-what each person put in, owes, and has since handed over.
+Piggy has moved to [its own repository](https://github.com/jacobanana/piggy) —
+same app, now a Vite + TypeScript codebase with a FastAPI + Postgres backend
+growing beside it. The GitHub Pages build at
+[jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/) stays
+frontend-only: one `localStorage` key (`piggy.ledger.v1`), JSON export/import,
+nothing uploaded. The full story lives in that repo's README.
 
 ### What Pulse reads, and the trick it plays
 
