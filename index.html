@@ -267,6 +267,10 @@ const APPS = [
   },
   {
     slug: 'piggy',
+    // Piggy grew up and moved into its own repo (Vite app + backend in the
+    // making): https://github.com/jacobanana/piggy — the card stays on the
+    // shelf, the link goes to its new home.
+    url: 'https://jacobanana.github.io/piggy/',
     name: 'Piggy',
     emoji: '🐷',
     desc: 'A shared piggy bank for two. Log the recurring bills and the everyday extras, split each one evenly, by shares or down to the cent, and a paper receipt keeps the running tally of who owes whom — with every repayment between you itemised underneath. Book a trip before paying for it and the planned spend budgets itself, in whatever currency it happened in.',
@@ -351,7 +355,7 @@ const grid = document.getElementById('grid');
 APPS.forEach(app => {
   const a = document.createElement('a');
   a.className = 'card';
-  a.href = app.slug + '/';
+  a.href = app.url || app.slug + '/';
   a.innerHTML = `
     <span class="thumb">${app.thumb}</span>
     <span class="body">
