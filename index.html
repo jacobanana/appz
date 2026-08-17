@@ -347,6 +347,30 @@ const APPS = [
         g.insertAdjacentHTML('beforeend',
           `<circle cx="${x}" cy="${y}" r="${r}" fill="${mix(t)}" fill-opacity=".88" stroke="#04161d" stroke-width="1.2"/>`);
     }
+  },
+  {
+    slug: 'headboard-bracket',
+    name: 'Headboard Bracket',
+    emoji: '📐',
+    desc: 'A saddle bracket that hangs over the headboard and holds a projector, drawn to your own measurements. Type the board thickness and how far it leans and the profile redraws — side elevation, plan, and a 3D preview you can spin, with the projector on it swinging on its hinge until it fouls the wall. Then take the STL, or a real STEP solid for CAD.',
+    tags: ['3D printing', 'CAD', 'parametric', 'STL'],
+    thumb: `
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Drafting-paper side elevation of a bracket saddled over a leaning headboard, carrying a projector on its shelf">
+        <rect width="160" height="90" fill="#E9EAE3"/>
+        <g stroke="#BCC1B5" stroke-width="1" opacity=".6">
+          <path d="M0 10h160M0 30h160M0 50h160M0 70h160"/>
+          <path d="M20 0v90M40 0v90M60 0v90M80 0v90M100 0v90M120 0v90M140 0v90"/>
+        </g>
+        <polygon points="46,36 56,36 62,90 52,90" fill="#8C7346" fill-opacity=".18" stroke="#8C7346" stroke-width="1.3"/>
+        <rect x="70" y="14" width="42" height="16" fill="none" stroke="#6E7A83" stroke-width="1.3" stroke-dasharray="5 3"/>
+        <path d="M104 36 L64 58" stroke="#C7451A" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+        <path d="M48.7 60 L46 36 L56 36 L60.2 74 L66.2 74 L62 36 L120 36 L120 20 L114 20 L114 30 L40 30 L42.7 60 Z"
+              fill="#C7451A" fill-opacity=".14" stroke="#C7451A" stroke-width="2" stroke-linejoin="round"/>
+        <g stroke="#2C6A8C" stroke-width="1">
+          <path d="M66 40v8M120 40v8M66 44h54"/>
+          <path d="M70 42l-4 2 4 2M116 42l4 2-4 2" fill="none"/>
+        </g>
+      </svg>`,
   }
 ];
 

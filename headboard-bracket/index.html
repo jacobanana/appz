@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Headboard Bracket — parametric designer</title>
+<meta name="description" content="Design a saddle bracket that hangs over a headboard and holds a projector. Type your board thickness and lean, watch the profile redraw, check it clears the wall, then download an STL or a STEP." />
+<meta name="theme-color" content="#E9EAE3" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23E9EAE3'/><path d='M12 4h5v24h-5z' fill='%238C7346'/><path d='M9 6h11v5H9zM17 11h11v4H17zM24 15h4v3h-4z' fill='%23C7451A'/></svg>" />
+<style>
+:root{
+  --paper:#E9EAE3; --paper-2:#DDE0D6; --field:#F3F4EE;
+  --ink:#151A20; --ink-2:#5C6670; --ink-3:#8B939A; --rule:#BCC1B5;
+  --part:#C7451A; --part-fill:rgba(199,69,26,.14);
+  --board:#8C7346; --dim:#2C6A8C; --dev:#6E7A83;
+  --ok:#3D6B36; --warn:#9C3B12;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper-2);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.45;-webkit-text-size-adjust:100%}
+.wrap{max-width:1180px;margin:0 auto;padding:14px 12px 60px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1.5px solid var(--ink);padding-bottom:8px;margin-bottom:14px}
+h1{font-size:15px;font-weight:700;margin:0;text-transform:uppercase;letter-spacing:.16em}
+.sub{color:var(--ink-2);font-size:11px;letter-spacing:.04em;margin-top:2px}
+.rev{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.18em;text-align:right}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:900px){.grid{grid-template-columns:1.15fr .85fr;align-items:start}.viewcol{position:sticky;top:12px}}
+.panel{background:var(--paper);border:1px solid var(--rule);box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.panel + .panel{margin-top:12px}
+.phead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border-bottom:1px solid var(--rule);background:var(--paper-2)}
+.phead h2{margin:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--ink-2)}
+.phead .tag{font-size:10px;color:var(--ink-3);letter-spacing:.08em;text-align:right}
+.pbody{padding:10px}
+svg{display:block;width:100%;height:auto;background:var(--paper)}
+svg[hidden]{display:none}
+canvas#cv3d{display:block;width:100%;aspect-ratio:4/3;background:var(--paper);touch-action:none;cursor:pointer}
+canvas#cv3d:active{cursor:grabbing}
+canvas#cv3d[hidden]{display:none}
+.viewtabs{display:flex;border-top:1px solid var(--rule)}
+.viewtabs button{flex:1;appearance:none;border:0;border-right:1px solid var(--rule);background:var(--paper-2);color:var(--ink-2);font-family:inherit;font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:8px 4px;cursor:pointer}
+.viewtabs button:last-child{border-right:0}
+.viewtabs button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.viewtabs button:focus-visible{outline:2px solid var(--dim);outline-offset:-3px}
+.readout{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--rule)}
+@media(min-width:520px){.readout{grid-template-columns:repeat(4,1fr)}}
+.cell{background:var(--paper);padding:8px 9px}
+.cell .k{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3)}
+.cell .v{font-size:15px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums}
+.cell .u{font-size:10px;font-weight:400;color:var(--ink-2)}
+.ctl{padding:7px 0;border-bottom:1px dotted var(--rule)}
+.ctl:last-child{border-bottom:0}
+.ctl .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ctl label{font-size:11px}
+.ctl .field{display:inline-flex;align-items:stretch;border:1px solid var(--rule);background:var(--field);flex:0 0 auto}
+.ctl .field:focus-within{outline:2px solid var(--dim);outline-offset:1px}
+.ctl .num{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;background:transparent;border:0;width:66px;text-align:right;padding:5px 4px 5px 7px;font-family:inherit;color:var(--ink)}
+.ctl .num:focus{outline:none}
+.ctl .unit{display:flex;align-items:center;padding:0 7px 0 3px;font-size:10px;color:var(--ink-3);border-left:1px solid var(--rule);background:var(--paper-2)}
+.hint{font-size:10px;color:var(--ink-3);margin-top:3px}
+.warnhint{color:var(--warn)}
+.seg{display:flex;border:1px solid var(--rule);margin-top:4px}
+.seg button{flex:1;appearance:none;border:0;border-right:1px solid var(--rule);background:var(--field);color:var(--ink-2);font-family:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:6px 3px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.check{display:flex;align-items:center;gap:8px;padding:7px 0}
+.check input{width:15px;height:15px;accent-color:var(--ink)}
+.notes{margin-top:10px}
+.note{display:flex;gap:8px;padding:7px 9px;font-size:11px;line-height:1.4;border-left:3px solid var(--ok);background:rgba(61,107,54,.08);margin-bottom:5px}
+.note.bad{border-left-color:var(--warn);background:rgba(156,59,18,.09)}
+.export{display:grid;gap:8px}
+.btn{appearance:none;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;padding:12px;cursor:pointer;width:100%}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--dim);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;padding:8px 10px;border-top:1px solid var(--rule);font-size:10px;color:var(--ink-2)}
+.legend i{display:inline-block;width:16px;height:0;border-top-width:2px;border-top-style:solid;vertical-align:middle;margin-right:5px}
+footer{margin-top:18px;font-size:10.5px;color:var(--ink-2);line-height:1.6}
+footer h3{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--ink);margin:0 0 5px}
+footer ol{margin:0;padding-left:18px}
+footer li{margin-bottom:3px}
+footer .back{display:inline-block;margin-top:12px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Headboard bracket</h1>
+    <div class="sub">Parametric saddle bracket · extruded profile · print two</div>
+  </div>
+  <div class="rev">mm · bed is to the right<br>in the side view</div>
+</header>
+
+<div class="grid">
+  <div class="viewcol">
+    <div class="panel">
+      <div class="phead"><h2>Drawing</h2><span class="tag" id="viewTag">side elevation</span></div>
+      <svg id="dwg" viewBox="0 0 600 420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bracket drawing"></svg>
+      <canvas id="cv3d" hidden aria-label="Rotatable 3D preview of the bracket on the board"></canvas>
+      <div class="viewtabs">
+        <button id="tabSide" aria-pressed="true">Side</button>
+        <button id="tabPlan" aria-pressed="false">Plan</button>
+        <button id="tab3d" aria-pressed="false">3D</button>
+      </div>
+      <div class="legend">
+        <span><i style="border-color:var(--part)"></i>printed part</span>
+        <span><i style="border-color:var(--board)"></i>headboard</span>
+        <span><i style="border-color:var(--dev);border-top-style:dashed"></i>projector</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>Output</h2><span class="tag" id="triTag">—</span></div>
+      <div class="readout">
+        <div class="cell"><div class="k">Flat size</div><div class="v" id="oFlat">—</div><div class="u">profile bounding box</div></div>
+        <div class="cell"><div class="k">Shelf area</div><div class="v" id="oArea">—</div><div class="u">usable top</div></div>
+        <div class="cell"><div class="k">Filament</div><div class="v" id="oVol">—</div><div class="u" id="oVolU">all parts</div></div>
+        <div class="cell"><div class="k" id="oTiltK">Max tilt</div><div class="v" id="oTilt">—</div><div class="u" id="oTiltU">before it hits the wall</div></div>
+      </div>
+      <div class="pbody">
+        <div class="notes" id="notes"></div>
+        <div class="export">
+          <button class="btn" id="dl">Download STL</button>
+          <button class="btn ghost" id="dlStep">Download STEP</button>
+          <button class="btn ghost" id="reset">Reset to defaults</button>
+          <div class="hint" id="storeStatus"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel"><div class="phead"><h2>Your headboard</h2><span class="tag">measure first</span></div><div class="pbody" id="grpBoard"></div></div>
+    <div class="panel"><div class="phead"><h2>Saddle</h2><span class="tag">the bit that grips</span></div><div class="pbody" id="grpSaddle"></div></div>
+    <div class="panel"><div class="phead"><h2>Shelf</h2><span class="tag">the bit that holds</span></div><div class="pbody" id="grpShelf"></div></div>
+    <div class="panel"><div class="phead"><h2>Lighten</h2><span class="tag">less plastic</span></div><div class="pbody" id="grpLight"></div></div>
+    <div class="panel"><div class="phead"><h2>Print</h2><span class="tag">sanity checks</span></div><div class="pbody" id="grpPrint"></div></div>
+    <div class="panel"><div class="phead"><h2>Projector &amp; wall</h2><span class="tag">clash test</span></div><div class="pbody" id="grpDev"></div></div>
+  </div>
+</div>
+
+<footer>
+  <h3>How to print it</h3>
+  <ol>
+    <li>Lay the profile flat on the bed — no supports, and the layer lines run across the load instead of splitting it.</li>
+    <li>PETG over PLA. PLA creeps under a constant load in a warm room and a bracket over your pillow is not the place to find that out.</li>
+    <li>4 perimeters. On a cantilever the perimeters carry the load, not the infill.</li>
+    <li>Print one, hang it, load it with something heavier than the projector, leave it overnight. Then print the second.</li>
+    <li>Line the saddle with adhesive felt — grips better, won't mark the wood.</li>
+  </ol>
+  <a class="back" href="../">← back to the shelf</a>
+</footer>
+</div>
+
+<script>
+"use strict";
+
+const DEFS = [
+  {g:'grpBoard', k:'boardT', label:'Board thickness', min:8, max:60, step:0.5, val:20, hint:'Measure the plank, not any padding.'},
+  {g:'grpBoard', k:'lean',   label:'Board lean',      min:-30, max:30, step:0.5, val:8, unit:'°',
+    hint:'Positive = top tilts away from the bed (the usual case). Negative tilts it toward the bed.'},
+  {g:'grpBoard', k:'boardW', label:'Board width',     min:400, max:2200, step:10, val:1400, hint:'Plan view only.'},
+  {g:'grpBoard', k:'topEdge',label:'Top edge is cut', type:'seg', opts:[['square','Square to board'],['level','Level']], val:'square',
+    hint:'A rectangular plank that is simply leaned back is “square to board”.'},
+
+  {g:'grpSaddle', k:'clearance', label:'Fit clearance',  min:0, max:3, step:0.1, val:0.8, hint:'Total slop across the board. 0.8 snug, 1.5 easy.'},
+  {g:'grpSaddle', k:'wall',      label:'Wall thickness', min:2, max:15, step:0.5, val:5},
+  {g:'grpSaddle', k:'frontLeg',  label:'Bed-side leg drop', min:15, max:200, step:1, val:70, hint:'Longer = less tipping.'},
+  {g:'grpSaddle', k:'backLeg',   label:'Wall-side leg drop', min:10, max:200, step:1, val:45, hint:'Keep short if the board sits against a wall.'},
+  {g:'grpSaddle', k:'fillet',    label:'Edge rounding',  min:0, max:8, step:0.5, val:2,
+    hint:'Rounds outer corners. The four corners gripping the board stay square.'},
+
+  {g:'grpShelf', k:'shelfDepth', label:'Shelf depth',       min:40, max:300, step:1, val:160},
+  {g:'grpShelf', k:'shelfT',     label:'Shelf thickness',   min:3, max:20, step:0.5, val:7},
+  {g:'grpShelf', k:'backOver',   label:'Rear overhang',     min:0, max:120, step:1, val:0, hint:'Extra tray behind the board. 0 for none.'},
+  {g:'grpShelf', k:'lipH',       label:'Front lip height',  min:0, max:30, step:0.5, val:10, hint:'Stops the projector walking off. 0 to remove.'},
+  {g:'grpShelf', k:'lipT',       label:'Front lip thickness', min:2, max:12, step:0.5, val:4},
+  {g:'grpShelf', k:'gussetStyle',label:'Brace under shelf', type:'seg', opts:[['strut','Strut'],['solid','Solid'],['none','None']], val:'strut',
+    hint:'Strut uses about a third of the plastic of solid, for nearly the same stiffness.'},
+  {g:'grpShelf', k:'gussetDrop', label:'Brace lands at',    min:5, max:200, step:1, val:55, hint:'How far down the bed-side leg the brace meets it.'},
+  {g:'grpShelf', k:'flip',       label:'Shelf points',      type:'seg', opts:[['front','Over the bed'],['back','Behind the board']], val:'front'},
+
+  {g:'grpLight', k:'taper',  label:'Tip thickness',   min:25, max:100, step:5, val:100, unit:'%',
+    hint:'Thins the shelf toward the tip, where the bending load is smallest. 100% is a flat slab.'},
+  {g:'grpLight', k:'perf',   label:'Perforate the tray', type:'check', val:false,
+    hint:'Holes straight down through the shelf, in a grid across the tray. Also lets the projector breathe.'},
+  {g:'grpLight', k:'perfStrut', label:'Perforate the brace', type:'check', val:false,
+    hint:'Same treatment for the diagonal strut. It works in compression, so the material near its centre does little.'},
+  {g:'grpLight', k:'holeD',  label:'Hole diameter',   min:4,  max:60, step:1, val:14},
+  {g:'grpLight', k:'holeGap',label:'Gap between holes',min:3,  max:40, step:1, val:9},
+  {g:'grpLight', k:'perfMargin', label:'Keep-out from edges', min:3, max:40, step:1, val:8,
+    hint:'Solid border left around the tray and clear of the lip and the brace.'},
+
+  {g:'grpPrint', k:'bracketW', label:'Bracket width',   min:12, max:400, step:1, val:40,
+    hint:'Printed flat this becomes the height in Z, so one wide bracket is limited by Z travel, not the plate.'},
+  {g:'grpPrint', k:'count',    label:'Number to print', min:1, max:6, step:1, val:2},
+  {g:'grpPrint', k:'spacing',  label:'Bracket spacing', min:40, max:600, step:5, val:90, hint:'Centre to centre. Narrower than the projector.'},
+  {g:'grpPrint', k:'infill',   label:'Infill',          min:10, max:100, step:5, val:35, unit:'%'},
+  {g:'grpPrint', k:'bedX',     label:'Build plate X',   min:100, max:450, step:5, val:220},
+  {g:'grpPrint', k:'bedY',     label:'Build plate Y',   min:100, max:450, step:5, val:220},
+  {g:'grpPrint', k:'bedZ',     label:'Build height Z',  min:100, max:600, step:5, val:250},
+  {g:'grpPrint', k:'dims',     label:'Show dimensions', type:'check', val:true},
+
+  {g:'grpDev', k:'devW',     label:'Foot width',      min:40, max:400, step:1, val:145, hint:'Wanbo T2 Ultra: 145 foot, 124 body, 142 deep, 219 tall.'},
+  {g:'grpDev', k:'devBodyW', label:'Body width',      min:40, max:400, step:1, val:124},
+  {g:'grpDev', k:'devD',     label:'Body depth',      min:40, max:400, step:1, val:142},
+  {g:'grpDev', k:'devH',     label:'Height folded',   min:30, max:500, step:1, val:219},
+  {g:'grpDev', k:'devFootH', label:'Foot height',     min:4,  max:80,  step:1, val:15},
+  {g:'grpDev', k:'devPivot', label:'Hinge from back', min:0,  max:400, step:1, val:45},
+  {g:'grpDev', k:'devPivotH',label:'Hinge above shelf',min:0,  max:400, step:1, val:55,
+    hint:'Measure to the centre of the round hinge on the stand.'},
+  {g:'grpDev', k:'devTilt',  label:'Tilt back',       min:0,  max:120, step:1, val:0,  unit:'°',
+    hint:'Tilting back aims the lens upward — and swings the top toward the wall.'},
+  {g:'grpDev', k:'wallGap',  label:'Board to wall',   min:0,  max:400, step:1, val:0,
+    hint:'Gap between the back of the headboard and the wall. 0 means it is touching.'},
+];
+
+const P = {}; DEFS.forEach(d => P[d.k] = d.val);
+let view = 'side';
+
+/* ---------------- saved settings ----------------
+   One localStorage key, this browser only. Nothing is uploaded, and a browser
+   that blocks storage still runs the app — it just forgets. --------------- */
+const STORE_KEY = 'headboard_bracket_v1';
+let canStore = false;
+try{
+  const probe = '__hb_probe__';
+  window.localStorage.setItem(probe, '1');
+  window.localStorage.removeItem(probe);
+  canStore = true;
+}catch(e){ canStore = false; }
+
+function applySaved(obj){
+  if(!obj || typeof obj !== 'object') return false;
+  let any = false;
+  DEFS.forEach(d=>{
+    if(!(d.k in obj)) return;
+    const v = obj[d.k];
+    if(d.type === 'check'){
+      if(typeof v === 'boolean'){ P[d.k] = v; any = true; }
+    } else if(d.type === 'seg'){
+      if(d.opts.some(o=>o[0] === v)){ P[d.k] = v; any = true; }
+    } else {
+      const num = Number(v);
+      if(isFinite(num)){ P[d.k] = Math.min(d.max, Math.max(d.min, num)); any = true; }
+    }
+  });
+  return any;
+}
+
+function loadSaved(){
+  if(!canStore) return false;
+  try{
+    const raw = window.localStorage.getItem(STORE_KEY);
+    return raw ? applySaved(JSON.parse(raw)) : false;
+  }catch(e){ return false; }
+}
+
+let saveTimer = null;
+function scheduleSave(){
+  if(!canStore) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{ window.localStorage.setItem(STORE_KEY, JSON.stringify(P)); }catch(e){}
+  }, 250);
+}
+
+function clearSaved(){
+  clearTimeout(saveTimer);
+  try{ if(canStore) window.localStorage.removeItem(STORE_KEY); }catch(e){}
+}
+
+function showStoreStatus(){
+  const s = document.getElementById('storeStatus');
+  if(!s) return;
+  if(canStore){
+    s.textContent = 'Settings are saved in this browser as you type.';
+    s.className = 'hint';
+  } else {
+    s.textContent = 'This browser is blocking storage, so settings last until you reload.';
+    s.className = 'hint warnhint';
+  }
+}
+
+/* ---------------- controls ---------------- */
+function buildControls(){
+  DEFS.forEach(d=>{
+    const host = document.getElementById(d.g);
+    const row = document.createElement('div');
+
+    if(d.type === 'check'){
+      row.className='check';
+      const id='c_'+d.k;
+      row.innerHTML = '<input type="checkbox" id="'+id+'" '+(P[d.k]?'checked':'')+'><label for="'+id+'">'+d.label+'</label>';
+      row.querySelector('input').addEventListener('change', e=>{P[d.k]=e.target.checked; render();});
+      host.appendChild(row); return;
+    }
+    if(d.type === 'seg'){
+      row.className='ctl';
+      row.innerHTML = '<div class="top"><label>'+d.label+'</label></div>';
+      const seg=document.createElement('div'); seg.className='seg';
+      d.opts.forEach(function(o){
+        const b=document.createElement('button'); b.type='button'; b.textContent=o[1];
+        b.setAttribute('aria-pressed', String(o[0]===P[d.k]));
+        b.addEventListener('click', function(){
+          P[d.k]=o[0];
+          Array.from(seg.children).forEach((c,i)=>c.setAttribute('aria-pressed', String(d.opts[i][0]===o[0])));
+          render();
+        });
+        seg.appendChild(b);
+      });
+      row.appendChild(seg);
+      if(d.hint){const h=document.createElement('div');h.className='hint';h.textContent=d.hint;row.appendChild(h);}
+      host.appendChild(row); return;
+    }
+
+    row.className='ctl';
+    const unit=d.unit||'mm';
+    row.innerHTML =
+      '<div class="top"><label for="n_'+d.k+'">'+d.label+'</label>'+
+      '<span class="field"><input class="num" id="n_'+d.k+'" type="number" inputmode="decimal" min="'+d.min+'" max="'+d.max+'" step="'+d.step+'" value="'+P[d.k]+'" aria-label="'+d.label+' in '+unit+'"><span class="unit">'+unit+'</span></span></div>'+
+      (d.hint ? '<div class="hint">'+d.hint+'</div>' : '');
+    host.appendChild(row);
+
+    const num=row.querySelector('.num');
+    const clamp=v=>Math.min(d.max, Math.max(d.min, Number(v)));
+    num.addEventListener('input', e=>{
+      const raw=e.target.value;
+      if(raw==='' || !isFinite(Number(raw))) return;
+      P[d.k]=clamp(raw);
+      render();
+    });
+    num.addEventListener('blur', e=>{
+      const v=clamp(e.target.value);
+      if(!isFinite(v)) return;
+      P[d.k]=v; num.value=v; render();
+    });
+  });
+}
+
+/* ---------------- geometry ----------------
+   Origin: centre of the board at its top edge.
+   +x toward the foot of the bed, +y up.
+   Positive lean tilts the top of the board away from the bed (-x).
+------------------------------------------- */
+// round every corner of a closed polygon: convex corners get rounded off,
+// concave ones get a fillet. Winding-independent.
+function filletPoly(poly, r, skip){
+  if(r <= 0 || poly.length < 3) return poly;
+  const out=[], N=poly.length;
+  for(let i=0;i<N;i++){
+    const P0=poly[(i-1+N)%N], Pv=poly[i], P1=poly[(i+1)%N];
+    if(skip && skip(Pv)){ out.push(Pv); continue; }   // slot corners stay square
+    let v1=[P0[0]-Pv[0],P0[1]-Pv[1]], v2=[P1[0]-Pv[0],P1[1]-Pv[1]];
+    const L1=Math.hypot(v1[0],v1[1]), L2=Math.hypot(v2[0],v2[1]);
+    if(L1<1e-6 || L2<1e-6){ out.push(Pv); continue; }
+    v1=[v1[0]/L1,v1[1]/L1]; v2=[v2[0]/L2,v2[1]/L2];
+    let cs=v1[0]*v2[0]+v1[1]*v2[1];
+    cs=Math.max(-1,Math.min(1,cs));
+    const ang=Math.acos(cs);
+    if(ang > Math.PI-0.02 || ang < 0.02){ out.push(Pv); continue; }
+    const half=ang/2;
+    let t=Math.min(r/Math.tan(half), L1*0.47, L2*0.47);
+    const rr=t*Math.tan(half);
+    if(rr < 0.02){ out.push(Pv); continue; }
+    const T1=[Pv[0]+v1[0]*t, Pv[1]+v1[1]*t];
+    const T2=[Pv[0]+v2[0]*t, Pv[1]+v2[1]*t];
+    let bx=v1[0]+v2[0], by=v1[1]+v2[1];
+    const BL=Math.hypot(bx,by);
+    if(BL<1e-6){ out.push(Pv); continue; }
+    bx/=BL; by/=BL;
+    const d=rr/Math.sin(half);
+    const cx=Pv[0]+bx*d, cy=Pv[1]+by*d;
+    let a1=Math.atan2(T1[1]-cy,T1[0]-cx), a2=Math.atan2(T2[1]-cy,T2[0]-cx);
+    let da=a2-a1;
+    while(da> Math.PI) da-=2*Math.PI;
+    while(da<-Math.PI) da+=2*Math.PI;
+    const steps=Math.max(2, Math.ceil(Math.abs(da)/0.4));
+    for(let s=0;s<=steps;s++){
+      const aa=a1+da*s/steps;
+      out.push([cx+rr*Math.cos(aa), cy+rr*Math.sin(aa)]);
+    }
+  }
+  return out;
+}
+
+// keep only the part of a convex polygon on the far side of a plane
+function clipHalf(poly, nx, ny, c){
+  const out=[];
+  for(let i=0;i<poly.length;i++){
+    const A=poly[i], B=poly[(i+1)%poly.length];
+    const da=A[0]*nx+A[1]*ny-c, db=B[0]*nx+B[1]*ny-c;
+    if(da>=0) out.push(A);
+    if((da>0&&db<0)||(da<0&&db>0)){
+      const t=da/(da-db);
+      out.push([A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t]);
+    }
+  }
+  return out;
+}
+
+// hard guarantee: no vertex may sit inside the volume the board occupies
+function keepOutOfSlot(poly, n, u, a){
+  const moved=[];
+  for(const p of poly){
+    const ac=p[0]*n[0]+p[1]*n[1], dn=p[0]*u[0]+p[1]*u[1];
+    if(Math.abs(ac) < a-1e-6 && dn > 1e-6){
+      const dWall=a-Math.abs(ac);
+      let ac2=ac, dn2=dn;
+      if(dWall <= dn) ac2 = (ac>=0 ? a : -a); else dn2 = 0;
+      moved.push([n[0]*ac2+u[0]*dn2, n[1]*ac2+u[1]*dn2]);
+    } else moved.push(p);
+  }
+  const res=[];
+  for(const p of moved){
+    const l=res[res.length-1];
+    if(!l || Math.hypot(l[0]-p[0], l[1]-p[1]) > 1e-4) res.push(p);
+  }
+  while(res.length>1 && Math.hypot(res[0][0]-res[res.length-1][0], res[0][1]-res[res.length-1][1]) <= 1e-4) res.pop();
+  return res;
+}
+
+function profile(){
+  const th = P.lean * Math.PI/180;
+  const S = Math.sin(th), C = Math.cos(th);
+  const u = [S, -C];   // travelling down the board
+  const n = [C,  S];   // out of the bed-side face
+  const pt = (across, down) => [n[0]*across + u[0]*down, n[1]*across + u[1]*down];
+
+  const a = P.boardT/2 + P.clearance/2;
+  const w = P.wall;
+  const b = a + w;
+
+  let sInF, sInB, yBase;
+  if(P.topEdge === 'level'){
+    const t = Math.tan(th);
+    sInF = a*t; sInB = -a*t; yBase = w;
+  } else {
+    sInF = 0; sInB = 0; yBase = Math.max(b*S + w*C, -b*S + w*C);
+  }
+  const Fo = pt( b, ( b*S - yBase)/C);
+  const Bo = pt(-b, (-b*S - yBase)/C);
+
+  const ts     = P.shelfT;
+  const tipT   = ts * Math.max(25, Math.min(100, P.taper))/100;
+  const frontX = Fo[0] + P.shelfDepth;
+  const topY   = yBase + ts;
+  // the shelf underside rises toward the tip when tapered
+  const underAt = xx => {
+    const f = (xx - Fo[0]) / Math.max(1e-6, frontX - Fo[0]);
+    return yBase + (ts - tipT) * Math.max(0, Math.min(1, f));
+  };
+  const backX  = Bo[0] - P.backOver;
+  const gDrop  = Math.min(P.gussetDrop, P.frontLeg);
+  const lipT   = Math.min(P.lipT, P.shelfDepth - 1);
+  const solid  = (P.gussetStyle === 'solid');
+
+  const main = [];
+  const push = p => {
+    const l = main[main.length-1];
+    if(!l || Math.hypot(l[0]-p[0], l[1]-p[1]) > 1e-6) main.push(p);
+  };
+  push(pt( a, P.frontLeg));
+  push(pt( a, sInF));
+  push(pt(-a, sInB));
+  push(pt(-a, P.backLeg));
+  push(pt(-b, P.backLeg));
+  push(Bo);
+  push([backX, yBase]);
+  push([backX, yBase + ts]);
+  if(P.lipH > 0){
+    push([frontX - lipT, yBase + ts]);
+    push([frontX - lipT, yBase + ts + P.lipH]);
+    push([frontX,        yBase + ts + P.lipH]);
+  } else {
+    push([frontX, yBase + ts]);
+  }
+  push([frontX, underAt(frontX)]);
+  push(solid ? pt(b, gDrop) : Fo);
+  push(pt(b, P.frontLeg));
+
+  let strutAttachX = null;
+  const parts = [main];
+
+  if(P.gussetStyle === 'strut'){
+    const ax = frontX - Math.max(ts, lipT + 3);
+    const A = [ax, (underAt(ax) + topY)/2];
+    const B = pt((a+b)/2, gDrop);
+    let dx = B[0]-A[0], dy = B[1]-A[1];
+    const L = Math.hypot(dx,dy) || 1; dx/=L; dy/=L;
+    const A2 = [A[0]-dx*3, A[1]-dy*3], B2 = [B[0]+dx*8, B[1]+dy*8];
+    const hw = w/2, px = -dy*hw, py = dx*hw;
+    strutAttachX = A[0];
+    let strut = [[A2[0]+px,A2[1]+py],[B2[0]+px,B2[1]+py],[B2[0]-px,B2[1]-py],[A2[0]-px,A2[1]-py]];
+    // stop just inside the leg: still fully welded, but no edge sits exactly on another,
+    // which keeps the boolean union in the STEP export well conditioned
+    strut = clipHalf(strut, n[0], n[1], a + Math.min(1, w*0.25));
+    if(strut.length >= 3) parts.push(strut);
+  }
+
+  const holes=[];
+
+  const r = Math.max(0, Math.min(P.fillet, w*0.45, ts*0.45));
+  // any vertex sitting on a face that touches the board keeps its true corner
+  const onSlotFace = p => Math.abs(Math.abs(p[0]*n[0] + p[1]*n[1]) - a) < 1e-6;
+  const clean = parts
+    .map(poly => keepOutOfSlot(filletPoly(poly, r, onSlotFace), n, u, a))
+    .filter(poly => poly.length >= 3);
+
+  // Perforation is described per plate: two opposite profile edges plus hole
+  // rings laid out in (position along the plate, width). Works for the flat
+  // tray and for the diagonal brace alike, whatever their orientation.
+  const plates=[];
+  const makePlate=(faceA, faceB, dia)=>{
+    const ux=faceA[1][0]-faceA[0][0], uy=faceA[1][1]-faceA[0][1];
+    const L=Math.hypot(ux,uy);
+    if(L<1e-6) return null;
+    const u=[ux/L, uy/L], p0=faceA[0];
+    const proj=q=>(q[0]-p0[0])*u[0]+(q[1]-p0[1])*u[1];
+    const sA=[0, L];
+    const sB=[proj(faceB[0]), proj(faceB[1])].sort((m,n2)=>m-n2);
+    const rr=dia/2, mg=P.perfMargin;
+    const s0=Math.max(sA[0], sB[0])+mg+rr, s1=Math.min(sA[1], sB[1])-mg-rr;
+    const z0=mg+rr, z1=P.bracketW-mg-rr;
+    if(!(s1>s0 && z1>z0)) return null;
+    const step=dia+P.holeGap;
+    const ns=Math.floor((s1-s0)/step)+1, nz=Math.floor((z1-z0)/step)+1;
+    const os=s0+((s1-s0)-(ns-1)*step)/2, oz=z0+((z1-z0)-(nz-1)*step)/2;
+    const rings=[];
+    for(let i=0;i<ns;i++) for(let j=0;j<nz;j++){
+      const cs=os+i*step, cz=oz+j*step, loop=[];
+      for(let k=0;k<20;k++){
+        const t=k/20*Math.PI*2;
+        loop.push([cs+rr*Math.cos(t), cz+rr*Math.sin(t)]);
+      }
+      rings.push(loop);
+    }
+    // keep only holes that bridge cleanly into BOTH faces, so the mesh, the
+    // mass figure, the drawings and the STEP export all see the same set
+    const rectA=[[sA[0],0],[sA[1],0],[sA[1],P.bracketW],[sA[0],P.bracketW]];
+    const rectB=[[sB[0],0],[sB[1],0],[sB[1],P.bracketW],[sB[0],P.bracketW]];
+    const okA=withHoles([rectA], rings).cut;
+    const okB=withHoles([rectB], rings).cut;
+    const good=rings.filter(h=>okA.indexOf(h)>=0 && okB.indexOf(h)>=0);
+    return good.length ? {a:faceA, b:faceB, u:u, holes:good, d:dia} : null;
+  };
+
+  if(clean.length){
+    const poly=clean[0];
+    const longest=test=>{
+      let bi=-1, bl=0;
+      for(let i=0;i<poly.length;i++){
+        const a=poly[i], b2=poly[(i+1)%poly.length];
+        if(!test(a)||!test(b2)) continue;
+        const L=Math.hypot(b2[0]-a[0], b2[1]-a[1]);
+        if(L>bl){ bl=L; bi=i; }
+      }
+      return bi<0 ? null : [poly[bi], poly[(bi+1)%poly.length]];
+    };
+    if(P.perf && P.gussetStyle!=='solid'){
+      const topSeg=longest(q=>Math.abs(q[1]-topY)<1e-6);
+      const botSeg=longest(q=>Math.abs(q[1]-underAt(q[0]))<1e-6 && q[1]<topY-1e-6);
+      if(topSeg && botSeg){
+        // hold the holes clear of the brace where it meets the underside
+        const pl=makePlate(topSeg, botSeg, P.holeD);
+        if(pl){
+          if(strutAttachX!==null){
+            const p0=topSeg[0], u=pl.u;
+            const sLimit=(strutAttachX-p0[0])*u[0]+(topY-p0[1])*u[1];
+            pl.holes=pl.holes.filter(h=>h.every(q=>(u[0]>0 ? q[0] < sLimit-P.holeD*0.5-4
+                                                          : q[0] > sLimit+P.holeD*0.5+4)));
+          }
+          if(pl.holes.length) plates.push(pl);
+        }
+      }
+    }
+    if(P.perfStrut && P.gussetStyle==='strut' && clean.length>1){
+      const sp=clean[1];
+      let e1=-1, e2=-1, l1=0, l2=0;
+      for(let i=0;i<sp.length;i++){
+        const L=Math.hypot(sp[(i+1)%sp.length][0]-sp[i][0], sp[(i+1)%sp.length][1]-sp[i][1]);
+        if(L>l1){ l2=l1; e2=e1; l1=L; e1=i; } else if(L>l2){ l2=L; e2=i; }
+      }
+      if(e1>=0 && e2>=0){
+        const fa=[sp[e1], sp[(e1+1)%sp.length]], fb=[sp[e2], sp[(e2+1)%sp.length]];
+        const pl=makePlate(fa, fb, Math.min(P.holeD, l1*0.5));
+        if(pl){ pl.part=1; plates.push(pl); }
+      }
+    }
+  }
+
+  const mir = (P.flip === 'back') ? -1 : 1;
+  const flipP = arr => (mir === -1) ? arr.map(p=>p.map(q=>[-q[0], q[1]])) : arr;
+  const out = flipP(clean);
+  const outHoles = flipP(holes);
+  const outPlates = (mir===-1)
+    ? plates.map(pl=>({a:pl.a.map(q=>[-q[0],q[1]]), b:pl.b.map(q=>[-q[0],q[1]]),
+                       u:[-pl.u[0], pl.u[1]], holes:pl.holes, d:pl.d, part:pl.part||0}))
+    : plates.map(pl=>({a:pl.a, b:pl.b, u:pl.u, holes:pl.holes, d:pl.d, part:pl.part||0}));
+
+  return {
+    parts: out, holes: outHoles, perf: (outPlates.length?outPlates:null), mir, yBase, ts,
+    boardDir: [u[0]*mir, u[1]],
+    boardNrm: [n[0]*mir, n[1]],
+    shelfTopY: yBase + ts,
+    shelfFrontX: frontX * mir,
+    shelfBackX:  backX  * mir,
+    legOuter: b,
+    filletUsed: r
+  };
+}
+
+const area = pts => {
+  let s=0;
+  for(let i=0;i<pts.length;i++){const A=pts[i],B=pts[(i+1)%pts.length]; s+=A[0]*B[1]-B[0]*A[1];}
+  return s/2;
+};
+const perim = pts => {
+  let s=0;
+  for(let i=0;i<pts.length;i++){const A=pts[i],B=pts[(i+1)%pts.length]; s+=Math.hypot(B[0]-A[0],B[1]-A[1]);}
+  return s;
+};
+const bbox = pts => {
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  return {x0:Math.min.apply(null,xs), x1:Math.max.apply(null,xs), y0:Math.min.apply(null,ys), y1:Math.max.apply(null,ys)};
+};
+
+/* ---------------- mesh + STL ---------------- */
+const ccw = pts => area(pts) < 0 ? pts.slice().reverse() : pts.slice();
+
+// Triangulation for polygons that may carry bridged holes.
+// Ear clipping alone stalls on keyhole shapes, so when it stops making
+// progress we split the remainder on a valid diagonal and recurse — the
+// bridge's coincident vertex pairs are exactly where that split belongs.
+function earClip(poly){
+  const X=(a,b,c)=>(poly[b][0]-poly[a][0])*(poly[c][1]-poly[a][1])
+                  -(poly[b][1]-poly[a][1])*(poly[c][0]-poly[a][0]);
+  const inT=(a,b,c,p)=>X(a,b,p)>=0 && X(b,c,p)>=0 && X(c,a,p)>=0;
+  const same=(u,v)=>Math.abs(poly[u][0]-poly[v][0])<1e-9 && Math.abs(poly[u][1]-poly[v][1])<1e-9;
+  const out=[];
+
+  const earPass=ids=>{
+    const w=ids.slice();
+    let guard=0;
+    while(w.length>3 && guard++<100000){
+      let cut=false;
+      for(let i=0;i<w.length;i++){
+        const L=w.length;
+        const a=w[(i-1+L)%L], b=w[i], c=w[(i+1)%L];
+        if(X(a,b,c)<=1e-12) continue;
+        let ok=true;
+        for(let j=0;j<L;j++){
+          const p=w[j];
+          if(p===a||p===b||p===c) continue;
+          if(same(p,a)||same(p,b)||same(p,c)) continue;
+          const pv=w[(j-1+L)%L], nx=w[(j+1)%L];
+          if(X(pv,p,nx)<=0 && inT(a,b,c,p)){ ok=false; break; }
+        }
+        if(ok){ out.push([a,b,c]); w.splice(i,1); cut=true; break; }
+      }
+      if(!cut) break;
+    }
+    if(w.length===3){ out.push([w[0],w[1],w[2]]); return []; }
+    return w;
+  };
+
+  const validDiag=(w,i,j)=>{
+    const A=poly[w[i]], B=poly[w[j]];
+    if(same(w[i],w[j])) return true;                 // bridge pair: split right here
+    const n=w.length;
+    for(let k=0;k<n;k++){
+      const p=w[k], q=w[(k+1)%n];
+      if(p===w[i]||q===w[i]||p===w[j]||q===w[j]) continue;
+      if(segCross(A,B,poly[p],poly[q])) return false;
+    }
+    const mid=[(A[0]+B[0])/2,(A[1]+B[1])/2];
+    return ptInPoly(mid, w.map(k=>poly[k]));
+  };
+
+  const solve=ids=>{
+    if(ids.length<3) return;
+    const left=earPass(ids);
+    if(left.length<3) return;
+    const n=left.length;
+    for(let i=0;i<n;i++){
+      for(let j=i+2;j<n;j++){
+        if(i===0 && j===n-1) continue;
+        if(validDiag(left,i,j)){
+          solve(left.slice(i,j+1));
+          solve(left.slice(j).concat(left.slice(0,i+1)));
+          return;
+        }
+      }
+    }
+    for(let i=1;i<n-1;i++) out.push([left[0],left[i],left[i+1]]);   // last resort
+  };
+
+  solve(poly.map((_,i)=>i));
+  return out;
+}
+
+// A hole is stitched into its parent with a zero-width bridge, turning the
+// region back into one simple polygon that ear clipping can consume.
+function crossesAny(a,b,rings,skipA,skipB){
+  for(const r of rings){
+    for(let i=0;i<r.length;i++){
+      const p=r[i], q=r[(i+1)%r.length];
+      if(p===skipA||q===skipA||p===skipB||q===skipB) continue;
+      if(segCross(a,b,p,q)) return true;
+    }
+  }
+  return false;
+}
+function spliceHole(outer, holeRaw, others){
+  const hole = area(holeRaw)>0 ? holeRaw.slice().reverse() : holeRaw.slice();   // opposite winding
+  let hi=0;
+  for(let i=1;i<hole.length;i++) if(hole[i][0]>hole[hi][0]) hi=i;
+  const H=hole[hi];
+  let best=-1, bestD=Infinity;
+  for(let i=0;i<outer.length;i++){
+    const d=Math.hypot(outer[i][0]-H[0], outer[i][1]-H[1]);
+    if(d>=bestD) continue;
+    if(crossesAny(H, outer[i], [outer].concat(others), H, outer[i])) continue;
+    best=i; bestD=d;
+  }
+  if(best<0) return null;
+  const res=outer.slice(0,best+1);
+  for(let k=0;k<=hole.length;k++) res.push(hole[(hi+k)%hole.length]);
+  for(let i=best;i<outer.length;i++) res.push(outer[i]);
+  return res;
+}
+// Holes are merged right to left, so each bridge can run rightward and, if the
+// outer wall is blocked, land on a hole that has already been merged in.
+// Returns which holes actually made it, so callers never build a wall for a
+// hole that was not cut — that mismatch is what opens up a mesh.
+function withHoles(parts, holes){
+  const res=parts.map(p=>ccw(p).slice());
+  const done=[];
+  if(!holes || !holes.length) return {polys:res, cut:done};
+  const maxX=h=>h.reduce((m,q)=>Math.max(m,q[0]),-Infinity);
+  const ordered=holes.slice().sort((a,b)=>maxX(b)-maxX(a));
+  ordered.forEach((h,oi)=>{
+    const pending=ordered.slice(oi+1);          // only unmerged holes can block
+    let idx=-1;
+    for(let i=0;i<res.length;i++) if(ptInPoly(h[0], res[i])){ idx=i; break; }
+    if(idx<0) return;
+    const merged=spliceHole(res[idx], h, pending);
+    if(merged){ res[idx]=merged; done.push(h); }
+  });
+  return {polys:res, cut:done};
+}
+
+// point on the opposite face at axial position s. The two faces are not
+// always parallel (a tapered tray is not), so this must intersect that face's
+// line rather than slide along the plate axis.
+function plateMap(pl){
+  const u=pl.u, p0=pl.a[0], q0=pl.b[0], q1=pl.b[1];
+  let vx=q1[0]-q0[0], vy=q1[1]-q0[1];
+  const L=Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+  const du=vx*u[0]+vy*u[1];
+  const off=(q0[0]-p0[0])*u[0]+(q0[1]-p0[1])*u[1];
+  return {
+    ptA:s=>[p0[0]+u[0]*s, p0[1]+u[1]*s],
+    ptB:s=>{
+      if(Math.abs(du)<1e-9) return [q0[0], q0[1]];
+      const t=(s-off)/du;
+      return [q0[0]+vx*t, q0[1]+vy*t];
+    },
+    proj:q=>(q[0]-p0[0])*u[0]+(q[1]-p0[1])*u[1]
+  };
+}
+
+function mesh(parts, W, holes, plates){
+  const out=[];
+  const near=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<1e-6;
+  const sameEdge=(A,B,seg)=>seg && ((near(A,seg[0])&&near(B,seg[1]))||(near(A,seg[1])&&near(B,seg[0])));
+
+  // per plate: map a position along the plate onto each of its two faces
+  const PL=(plates||[]).map(pl=>{
+    const M=plateMap(pl);
+    return {pl:pl, u:pl.u, ptA:M.ptA, ptB:M.ptB,
+      sA:[0, Math.hypot(pl.a[1][0]-pl.a[0][0], pl.a[1][1]-pl.a[0][1])],
+      sB:[M.proj(pl.b[0]), M.proj(pl.b[1])].sort((m,n)=>m-n),
+      cut:null};
+  });
+
+  // a hole only counts if it cuts cleanly through both faces of its plate
+  PL.forEach(P_=>{
+    const rectA=[[P_.sA[0],0],[P_.sA[1],0],[P_.sA[1],W],[P_.sA[0],W]];
+    const rectB=[[P_.sB[0],0],[P_.sB[1],0],[P_.sB[1],W],[P_.sB[0],W]];
+    const okA=withHoles([rectA], P_.pl.holes).cut;
+    const okB=withHoles([rectB], P_.pl.holes).cut;
+    P_.cut=okA.filter(h=>okB.indexOf(h)>=0);
+  });
+
+  // A CCW ring in (position, width) maps to normal (uy,-ux,0). The winding is
+  // decided once per face — per triangle flips the bridge slivers apart.
+  const pierced=(P_, sRange, mapPt, want)=>{
+    const rect=[[sRange[0],0],[sRange[1],0],[sRange[1],W],[sRange[0],W]];
+    const p=ccw(withHoles([rect], P_.cut).polys[0]);
+    const rev=(P_.u[1]*want[0] - P_.u[0]*want[1]) < 0;
+    earClip(p).forEach(t=>{
+      const q=t.map(i=>{ const m=mapPt(p[i][0]); return [m[0], m[1], p[i][1]]; });
+      out.push(rev ? [q[0],q[2],q[1]] : [q[0],q[1],q[2]]);
+    });
+  };
+
+  withHoles(parts, holes).polys.forEach((raw,pi)=>{
+    const p=ccw(raw), tris=earClip(p);
+    tris.forEach(t=>{
+      const i=t[0],j=t[1],k=t[2];
+      out.push([[p[i][0],p[i][1],0],[p[k][0],p[k][1],0],[p[j][0],p[j][1],0]]);
+      out.push([[p[i][0],p[i][1],W],[p[j][0],p[j][1],W],[p[k][0],p[k][1],W]]);
+    });
+    for(let i=0;i<p.length;i++){
+      const A=p[i], B=p[(i+1)%p.length];
+      const want=[B[1]-A[1], -(B[0]-A[0]), 0];
+      let done=false;
+      for(const P_ of PL){
+        if((P_.pl.part||0)!==pi) continue;
+        if(sameEdge(A,B,P_.pl.a)){ pierced(P_, P_.sA, P_.ptA, want); done=true; break; }
+        if(sameEdge(A,B,P_.pl.b)){ pierced(P_, P_.sB, P_.ptB, want); done=true; break; }
+      }
+      if(done) continue;
+      out.push([[A[0],A[1],0],[B[0],B[1],0],[B[0],B[1],W]]);
+      out.push([[A[0],A[1],0],[B[0],B[1],W],[A[0],A[1],W]]);
+    }
+  });
+
+  // hole walls; winding settled once per hole against its own axis
+  PL.forEach(P_=>{
+    P_.cut.forEach(h=>{
+      let cs=0, cz=0;
+      h.forEach(q=>{ cs+=q[0]; cz+=q[1]; });
+      cs/=h.length; cz/=h.length;
+      const ca=P_.ptA(cs), cb=P_.ptB(cs);
+      const axis=[(ca[0]+cb[0])/2, (ca[1]+cb[1])/2, cz];
+      const quads=[];
+      for(let i=0;i<h.length;i++){
+        const a=h[i], b=h[(i+1)%h.length];
+        const A0=P_.ptB(a[0]), B0=P_.ptB(b[0]);
+        const A1=P_.ptA(a[0]), B1=P_.ptA(b[0]);
+        quads.push([[A0[0],A0[1],a[1]],[B0[0],B0[1],b[1]],[B1[0],B1[1],b[1]],[A1[0],A1[1],a[1]]]);
+      }
+      const q0=quads[0];
+      const nx=(q0[1][1]-q0[0][1])*(q0[2][2]-q0[0][2])-(q0[1][2]-q0[0][2])*(q0[2][1]-q0[0][1]);
+      const ny=(q0[1][2]-q0[0][2])*(q0[2][0]-q0[0][0])-(q0[1][0]-q0[0][0])*(q0[2][2]-q0[0][2]);
+      const nz=(q0[1][0]-q0[0][0])*(q0[2][1]-q0[0][1])-(q0[1][1]-q0[0][1])*(q0[2][0]-q0[0][0]);
+      const mid=[(q0[0][0]+q0[2][0])/2,(q0[0][1]+q0[2][1])/2,(q0[0][2]+q0[2][2])/2];
+      const flip=(nx*(axis[0]-mid[0])+ny*(axis[1]-mid[1])+nz*(axis[2]-mid[2])) < 0;
+      quads.forEach(q=>{
+        if(flip){ out.push([q[0],q[2],q[1]]); out.push([q[0],q[3],q[2]]); }
+        else    { out.push([q[0],q[1],q[2]]); out.push([q[0],q[2],q[3]]); }
+      });
+    });
+  });
+  return out;
+}
+
+function stlBlob(tris){
+  const buf=new ArrayBuffer(84+tris.length*50), dv=new DataView(buf);
+  dv.setUint32(80,tris.length,true);
+  let o=84;
+  tris.forEach(t=>{
+    const A=t[0],B=t[1],C=t[2];
+    const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2];
+    const vx=C[0]-A[0],vy=C[1]-A[1],vz=C[2]-A[2];
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const L=Math.hypot(nx,ny,nz)||1;
+    dv.setFloat32(o,nx/L,true);dv.setFloat32(o+4,ny/L,true);dv.setFloat32(o+8,nz/L,true);o+=12;
+    [A,B,C].forEach(v=>{dv.setFloat32(o,v[0],true);dv.setFloat32(o+4,v[1],true);dv.setFloat32(o+8,v[2],true);o+=12;});
+    dv.setUint16(o,0,true);o+=2;
+  });
+  return new Blob([buf],{type:'model/stl'});
+}
+
+
+
+/* ---------------- 2D boolean union ----------------
+   Both bodies are extruded the same height, so unioning their profiles is
+   the whole job. Split each outline where it crosses the other, keep the
+   pieces that lie outside, then stitch. The strut leaves a triangular void,
+   so the result is an outer ring plus a hole.                            */
+function segParam(a,b,c,d){
+  const rx=b[0]-a[0], ry=b[1]-a[1], sx=d[0]-c[0], sy=d[1]-c[1];
+  const den=rx*sy-ry*sx;
+  if(Math.abs(den)<1e-12) return null;
+  const t=((c[0]-a[0])*sy-(c[1]-a[1])*sx)/den;
+  const u=((c[0]-a[0])*ry-(c[1]-a[1])*rx)/den;
+  if(t>1e-9 && t<1-1e-9 && u>1e-9 && u<1-1e-9) return t;
+  return null;
+}
+
+function unionPolys(A, B){
+  const cut=(Pp, Qq)=>{
+    const segs=[];
+    for(let i=0;i<Pp.length;i++){
+      const a=Pp[i], b=Pp[(i+1)%Pp.length];
+      const ts=[0,1];
+      for(let j=0;j<Qq.length;j++){
+        const t=segParam(a,b,Qq[j],Qq[(j+1)%Qq.length]);
+        if(t!==null) ts.push(t);
+      }
+      ts.sort((x,y)=>x-y);
+      for(let k=0;k<ts.length-1;k++){
+        if(ts[k+1]-ts[k] < 1e-9) continue;
+        const p0=[a[0]+(b[0]-a[0])*ts[k],   a[1]+(b[1]-a[1])*ts[k]];
+        const p1=[a[0]+(b[0]-a[0])*ts[k+1], a[1]+(b[1]-a[1])*ts[k+1]];
+        if(!ptInPoly([(p0[0]+p1[0])/2,(p0[1]+p1[1])/2], Qq)) segs.push([p0,p1]);
+      }
+    }
+    return segs;
+  };
+  const segs=cut(A,B).concat(cut(B,A));
+  if(!segs.length) return null;
+
+  const key=p=>p[0].toFixed(5)+','+p[1].toFixed(5);
+  const from=new Map();
+  segs.forEach((sg,i)=>{
+    const k=key(sg[0]);
+    if(!from.has(k)) from.set(k,[]);
+    from.get(k).push(i);
+  });
+  const used=new Array(segs.length).fill(false);
+  const rings=[];
+  for(let i=0;i<segs.length;i++){
+    if(used[i]) continue;
+    const ring=[];
+    let cur=i, guard=0;
+    while(cur!==undefined && !used[cur] && guard++<=segs.length){
+      used[cur]=true;
+      ring.push(segs[cur][0]);
+      const cand=(from.get(key(segs[cur][1]))||[]).filter(j=>!used[j]);
+      cur=cand.length?cand[0]:undefined;
+    }
+    if(ring.length>=3) rings.push(ring);
+  }
+  if(!rings.length) return null;
+
+  // drop points that just sit on a straight run
+  const tidy=r=>{
+    const o=[];
+    for(let i=0;i<r.length;i++){
+      const p=r[(i-1+r.length)%r.length], q=r[i], n2=r[(i+1)%r.length];
+      const cr=(q[0]-p[0])*(n2[1]-p[1])-(q[1]-p[1])*(n2[0]-p[0]);
+      const l1=Math.hypot(q[0]-p[0],q[1]-p[1]), l2=Math.hypot(n2[0]-q[0],n2[1]-q[1]);
+      if(l1<1e-7) continue;
+      if(Math.abs(cr) > 1e-7*Math.max(1,l1*l2)) o.push(q);
+    }
+    return o.length>=3 ? o : r;
+  };
+  const scored=rings.map(r=>({pts:tidy(r), a:area(tidy(r))}));
+  scored.sort((x,y)=>Math.abs(y.a)-Math.abs(x.a));
+  const outer=scored[0];
+  const holes=scored.slice(1).filter(h=>ptInPoly(h.pts[0], outer.pts));
+  return {
+    outer: outer.a<0 ? outer.pts.slice().reverse() : outer.pts,          // CCW
+    holes: holes.map(h=>h.a>0 ? h.pts.slice().reverse() : h.pts)          // CW
+  };
+}
+
+// fold every part into one region where they touch
+function unionAll(parts){
+  if(parts.length===1) return [{outer:ccw(parts[0]), holes:[]}];
+  let acc={outer:ccw(parts[0]), holes:[]};
+  for(let i=1;i<parts.length;i++){
+    const u=unionPolys(acc.outer, ccw(parts[i]));
+    if(!u) return null;
+    acc={outer:u.outer, holes:acc.holes.concat(u.holes)};
+  }
+  return [acc];
+}
+
+/* ---------------- STEP (AP214) export ----------------
+   Each part is a prism: planar side faces plus two cap faces, sharing edges.
+   That gives CAD a real solid to work with rather than a triangle soup.   */
+function buildSTEP(parts, holes, W, name, perf){
+  const body=[];
+  let n=0;
+  const put=t=>{ n++; body.push('#'+n+'='+t+';'); return '#'+n; };
+  const num=v=>{
+    if(!isFinite(v)) v=0;
+    let t=v.toFixed(6).replace(/0+$/,'');
+    if(t.charAt(t.length-1)==='.') t+='0';
+    return t;
+  };
+  const pc=new Map(), dc=new Map();
+  const PT=(x,y,z)=>{
+    const k=num(x)+','+num(y)+','+num(z);
+    if(pc.has(k)) return pc.get(k);
+    const r=put("CARTESIAN_POINT('',("+k+"))"); pc.set(k,r); return r;
+  };
+  const DIR=(x,y,z)=>{
+    const L=Math.hypot(x,y,z)||1;
+    const k=num(x/L)+','+num(y/L)+','+num(z/L);
+    if(dc.has(k)) return dc.get(k);
+    const r=put("DIRECTION('',("+k+"))"); dc.set(k,r); return r;
+  };
+  const AX=(p,a,r)=>put("AXIS2_PLACEMENT_3D('',"+p+","+a+","+r+")");
+
+  const app=put("APPLICATION_CONTEXT('automotive design')");
+  put("APPLICATION_PROTOCOL_DEFINITION('draft international standard','automotive_design',1998,"+app+")");
+  const pctx=put("PRODUCT_CONTEXT('',"+app+",'mechanical')");
+  const prod=put("PRODUCT('"+name+"','"+name+"','',("+pctx+"))");
+  put("PRODUCT_RELATED_PRODUCT_CATEGORY('part','',("+prod+"))");
+  const pdf=put("PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',"+prod+",.NOT_KNOWN.)");
+  const pdc=put("PRODUCT_DEFINITION_CONTEXT('part definition',"+app+",'design')");
+  const pd=put("PRODUCT_DEFINITION('design','',"+pdf+","+pdc+")");
+  const pds=put("PRODUCT_DEFINITION_SHAPE('','',"+pd+")");
+
+  const lu=put("(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.))");
+  const au=put("(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.))");
+  const su=put("(NAMED_UNIT(*)SOLID_ANGLE_UNIT()SI_UNIT($,.STERADIAN.))");
+  const unc=put("UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-05),"+lu+",'distance_accuracy_value','confusion accuracy')");
+  const ctx=put("(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT(("+unc+"))GLOBAL_UNIT_ASSIGNED_CONTEXT(("+lu+","+au+","+su+"))REPRESENTATION_CONTEXT('',''))");
+
+  const solids=[];
+
+  // one solid per region: an outer ring, plus any holes the strut leaves behind
+  const PLATES=(perf||[]).map(pl=>{
+    const M=plateMap(pl);
+    return {pl:pl, u:pl.u, ptA:M.ptA, ptB:M.ptB, proj:M.proj};
+  });
+
+  const region=(outer, holes)=>{
+    const rings=[outer].concat(holes);
+    const RV=[], RBE=[], RTE=[], RVE=[];
+    const faces=[];
+    const seg=(a,b)=>{
+      const dx=b[0]-a[0], dy=b[1]-a[1], dz=b[2]-a[2];
+      const L=Math.hypot(dx,dy,dz)||1;
+      return put("LINE('',"+PT(a[0],a[1],a[2])+","+put("VECTOR('',"+DIR(dx,dy,dz)+","+num(L)+")")+")");
+    };
+    rings.forEach(p=>{
+      const N=p.length, vb=[], vt=[], BE=[], TE=[], VE=[];
+      for(let i=0;i<N;i++){
+        vb.push(put("VERTEX_POINT('',"+PT(p[i][0],p[i][1],0)+")"));
+        vt.push(put("VERTEX_POINT('',"+PT(p[i][0],p[i][1],W)+")"));
+      }
+      for(let i=0;i<N;i++){
+        const j=(i+1)%N;
+        BE.push(put("EDGE_CURVE('',"+vb[i]+","+vb[j]+","+seg([p[i][0],p[i][1],0],[p[j][0],p[j][1],0])+",.T.)"));
+        TE.push(put("EDGE_CURVE('',"+vt[i]+","+vt[j]+","+seg([p[i][0],p[i][1],W],[p[j][0],p[j][1],W])+",.T.)"));
+        VE.push(put("EDGE_CURVE('',"+vb[i]+","+vt[i]+","+seg([p[i][0],p[i][1],0],[p[i][0],p[i][1],W])+",.T.)"));
+      }
+      RV.push({p:p,N:N}); RBE.push(BE); RTE.push(TE); RVE.push(VE);
+    });
+    const OE=(e,o)=>put("ORIENTED_EDGE('',*,*,"+e+","+(o?'.T.':'.F.')+")");
+
+    // Perforation. Each hole gets a ring on each face of its plate, joined by
+    // wall faces; the two pierced faces then carry those rings as inner bounds.
+    // Faces are located by collinearity, since the union may have shortened them.
+    const innerFor={};                       // "ringIndex:edgeIndex" -> [FACE_BOUND,...]
+    PLATES.forEach(PP=>{
+      const onLine=(a,b,line)=>{
+        const d=(q,l)=>Math.abs((q[0]-l[0][0])*PP.u[1]-(q[1]-l[0][1])*PP.u[0]);
+        return d(a,line)<1e-6 && d(b,line)<1e-6;
+      };
+      let ai=null, bi=null, al=0, bl=0;
+      rings.forEach((p,r)=>{
+        for(let i=0;i<p.length;i++){
+          const a=p[i], b=p[(i+1)%p.length];
+          const L=Math.hypot(b[0]-a[0], b[1]-a[1]);
+          if(L<1e-9) continue;
+          if(onLine(a,b,PP.pl.a) && L>al){ al=L; ai=[r,i]; }
+          else if(onLine(a,b,PP.pl.b) && L>bl){ bl=L; bi=[r,i]; }
+        }
+      });
+      if(!ai || !bi) return;
+      const boundsA=[], boundsB=[];
+      PP.pl.holes.forEach(hh=>{
+        const h = area(hh) < 0 ? hh.slice().reverse() : hh;
+        const N=h.length, va=[], vb=[], AE=[], BE2=[], VE2=[];
+        const PA=h.map(q=>{ const m=PP.ptA(q[0]); return [m[0],m[1],q[1]]; });
+        const PB=h.map(q=>{ const m=PP.ptB(q[0]); return [m[0],m[1],q[1]]; });
+        for(let i=0;i<N;i++){
+          va.push(put("VERTEX_POINT('',"+PT(PA[i][0],PA[i][1],PA[i][2])+")"));
+          vb.push(put("VERTEX_POINT('',"+PT(PB[i][0],PB[i][1],PB[i][2])+")"));
+        }
+        for(let i=0;i<N;i++){
+          const j=(i+1)%N;
+          AE.push(put("EDGE_CURVE('',"+va[i]+","+va[j]+","+seg(PA[i],PA[j])+",.T.)"));
+          BE2.push(put("EDGE_CURVE('',"+vb[i]+","+vb[j]+","+seg(PB[i],PB[j])+",.T.)"));
+          VE2.push(put("EDGE_CURVE('',"+vb[i]+","+va[i]+","+seg(PB[i],PA[i])+",.T.)"));
+        }
+        for(let i=0;i<N;i++){
+          const j=(i+1)%N;
+          const loop=put("EDGE_LOOP('',("+[OE(BE2[i],true),OE(VE2[j],true),OE(AE[i],false),OE(VE2[i],false)].join(',')+"))");
+          const bnd=put("FACE_OUTER_BOUND('',"+loop+",.T.)");
+          const dx=PB[j][0]-PB[i][0], dy=PB[j][1]-PB[i][1], dz=PB[j][2]-PB[i][2];
+          const wx=PA[i][0]-PB[i][0], wy=PA[i][1]-PB[i][1], wz=PA[i][2]-PB[i][2];
+          const nx=dy*wz-dz*wy, ny=dz*wx-dx*wz, nz=dx*wy-dy*wx;
+          const pl2=put("PLANE('',"+AX(PT(PB[i][0],PB[i][1],PB[i][2]), DIR(nx,ny,nz), DIR(dx,dy,dz))+")");
+          faces.push(put("ADVANCED_FACE('',("+bnd+"),"+pl2+",.T.)"));
+        }
+        const oa=[], ob=[];
+        for(let i=0;i<N;i++)    oa.push(OE(AE[i],true));
+        for(let i=N-1;i>=0;i--) ob.push(OE(BE2[i],false));
+        boundsA.push(put("FACE_BOUND('',"+put("EDGE_LOOP('',("+oa.join(',')+"))")+",.T.)"));
+        boundsB.push(put("FACE_BOUND('',"+put("EDGE_LOOP('',("+ob.join(',')+"))")+",.T.)"));
+      });
+      (innerFor[ai[0]+':'+ai[1]] = innerFor[ai[0]+':'+ai[1]]||[]).push.apply(innerFor[ai[0]+':'+ai[1]], boundsA);
+      (innerFor[bi[0]+':'+bi[1]] = innerFor[bi[0]+':'+bi[1]]||[]).push.apply(innerFor[bi[0]+':'+bi[1]], boundsB);
+    });
+
+    // side walls, for the outer ring and for every hole
+    rings.forEach((p,r)=>{
+      const N=p.length, BE=RBE[r], TE=RTE[r], VE=RVE[r];
+      for(let i=0;i<N;i++){
+        const j=(i+1)%N;
+        const loop=put("EDGE_LOOP('',("+[OE(BE[i],true),OE(VE[j],true),OE(TE[i],false),OE(VE[i],false)].join(',')+"))");
+        const bnds=[put("FACE_OUTER_BOUND('',"+loop+",.T.)")];
+        const extra=innerFor[r+':'+i];
+        if(extra) extra.forEach(x=>bnds.push(x));
+        const dx=p[j][0]-p[i][0], dy=p[j][1]-p[i][1];
+        const pl=put("PLANE('',"+AX(PT(p[i][0],p[i][1],0), DIR(dy,-dx,0), DIR(dx,dy,0))+")");
+        faces.push(put("ADVANCED_FACE('',("+bnds.join(',')+"),"+pl+",.T.)"));
+      }
+    });
+
+    // caps carry the outer loop plus one inner loop per hole
+    const capLoop=(r, top, rev)=>{
+      const N=RV[r].N, E=top?RTE[r]:RBE[r], oes=[];
+      if(rev){ for(let i=N-1;i>=0;i--) oes.push(OE(E[i],false)); }
+      else   { for(let i=0;i<N;i++)     oes.push(OE(E[i],true));  }
+      return put("EDGE_LOOP('',("+oes.join(',')+"))");
+    };
+    [false,true].forEach(top=>{
+      const rev=!top;
+      const bounds=[put("FACE_OUTER_BOUND('',"+capLoop(0,top,rev)+",.T.)")];
+      for(let r=1;r<rings.length;r++) bounds.push(put("FACE_BOUND('',"+capLoop(r,top,rev)+",.T.)"));
+      const pl=put("PLANE('',"+AX(PT(0,0,top?W:0), DIR(0,0,top?1:-1), DIR(1,0,0))+")");
+      faces.push(put("ADVANCED_FACE('',("+bounds.join(',')+"),"+pl+",.T.)"));
+    });
+
+    solids.push(put("MANIFOLD_SOLID_BREP('',"+put("CLOSED_SHELL('',("+faces.join(',')+"))")+")"));
+  };
+
+  const extra=(holes||[]).map(h=>area(h)>0 ? h.slice().reverse() : h.slice());   // holes run CW
+  const merged = unionAll(parts);
+  if(merged) merged.forEach((r,i)=>region(r.outer, r.holes.concat(i===0?extra:[])));
+  else { parts.forEach((raw,i)=>region(ccw(raw), i===0?extra:[])); }
+
+  const place=AX(PT(0,0,0),DIR(0,0,1),DIR(1,0,0));
+  const absr=put("ADVANCED_BREP_SHAPE_REPRESENTATION('"+name+"',("+[place].concat(solids).join(',')+"),"+ctx+")");
+  put("SHAPE_DEFINITION_REPRESENTATION("+pds+","+absr+")");
+
+  const stamp=new Date().toISOString().replace(/\.\d+Z$/,'');
+  return "ISO-10303-21;\nHEADER;\n"
+    +"FILE_DESCRIPTION(('"+name+"'),'2;1');\n"
+    +"FILE_NAME('"+name+".step','"+stamp+"',(''),(''),'headboard-bracket-designer','',''); \n"
+    +"FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\nENDSEC;\nDATA;\n"
+    +body.join('\n')+"\nENDSEC;\nEND-ISO-10303-21;\n";
+}
+
+/* ---------------- svg helpers ---------------- */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+const pathOf = pts => pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(3)+' '+p[1].toFixed(3)).join(' ')+' Z';
+
+// flipped = true when the parent group carries scale(1,-1)
+function dim(g, A, B, off, text, k, flipped){
+  const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy);
+  if(L < 2) return;
+  const px=-dy/L*off, py=dx/L*off;
+  const a=[A[0]+px,A[1]+py], b=[B[0]+px,B[1]+py];
+  const st={stroke:'var(--dim)','stroke-width':k*0.8,fill:'none'};
+  el('line',Object.assign({},st,{x1:A[0],y1:A[1],x2:a[0]+px*0.15,y2:a[1]+py*0.15,'stroke-dasharray':(k*3)+' '+(k*2)}),g);
+  el('line',Object.assign({},st,{x1:B[0],y1:B[1],x2:b[0]+px*0.15,y2:b[1]+py*0.15,'stroke-dasharray':(k*3)+' '+(k*2)}),g);
+  el('line',Object.assign({},st,{x1:a[0],y1:a[1],x2:b[0],y2:b[1],'marker-start':'url(#ar)','marker-end':'url(#ar)'}),g);
+
+  const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+  // screen-space angle: when the group is y-flipped the apparent slope inverts
+  let ang = Math.atan2(flipped ? -dy : dy, dx)*180/Math.PI;
+  if(ang > 90) ang -= 180;
+  if(ang < -90) ang += 180;
+  const undo = flipped ? ' scale(1,-1)' : '';
+  const t = el('text',{
+    x:0, y:0, 'text-anchor':'middle', 'dominant-baseline':'central',
+    fill:'var(--dim)', 'font-size':k*9, 'font-family':'var(--mono)', 'font-weight':'700',
+    transform:'translate('+mx+' '+my+')'+undo+' rotate('+ang+') translate(0 '+(-k*5)+')'
+  },g);
+  t.textContent = text;
+}
+
+/* ---------------- projector, hinge and wall ----------------
+   Everything lives in the profile plane, so a tilt is a plain 2D rotation
+   about the hinge axis. Depth along the bed is measured as u = x*mir, so
+   larger u always means "further from the wall".                        */
+function segCross(a1,a2,b1,b2){
+  const d=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);
+  const d1=d(b1,b2,a1), d2=d(b1,b2,a2), d3=d(a1,a2,b1), d4=d(a1,a2,b2);
+  return ((d1>0)!==(d2>0)) && ((d3>0)!==(d4>0));
+}
+function ptInPoly(p,poly){
+  let c=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    if((poly[i][1]>p[1])!==(poly[j][1]>p[1]) &&
+       p[0] < (poly[j][0]-poly[i][0])*(p[1]-poly[i][1])/(poly[j][1]-poly[i][1])+poly[i][0]) c=!c;
+  }
+  return c;
+}
+function polysOverlap(A, list){
+  for(const B of list){
+    for(let i=0;i<A.length;i++){
+      const a1=A[i], a2=A[(i+1)%A.length];
+      for(let j=0;j<B.length;j++){
+        if(segCross(a1,a2,B[j],B[(j+1)%B.length])) return true;
+      }
+    }
+    if(ptInPoly(A[0],B) || ptInPoly(B[0],A)) return true;
+  }
+  return false;
+}
+
+function deviceGeom(geo, tiltDeg){
+  const mir=geo.mir;
+  const tilt=(tiltDeg===undefined ? P.devTilt : tiltDeg);
+  const frontX=geo.shelfFrontX - P.lipT*mir;
+  const rearX =frontX - P.devD*mir;
+  const y0=geo.shelfTopY;
+  const fh=Math.max(1, Math.min(P.devFootH, P.devH-10));
+  const bodyH=P.devH-fh;
+
+  const foot=[[rearX,y0],[frontX,y0],[frontX,y0+fh],[rearX,y0+fh]];
+  const piv=[rearX + Math.min(P.devPivot,P.devD)*mir, y0+P.devPivotH];
+  const t=tilt*Math.PI/180*mir, ct=Math.cos(t), st=Math.sin(t);
+  const rot=p=>[piv[0]+(p[0]-piv[0])*ct-(p[1]-piv[1])*st,
+                piv[1]+(p[0]-piv[0])*st+(p[1]-piv[1])*ct];
+  const body=[[rearX,y0+fh],[frontX,y0+fh],[frontX,y0+fh+bodyH],[rearX,y0+fh+bodyH]].map(rot);
+
+  // the wall sits behind whichever part of the board reaches furthest back
+  const dir=geo.boardDir, nrm=geo.boardNrm, hb=P.boardT/2;
+  const th=P.lean*Math.PI/180;
+  const sF=(P.topEdge==='level') ?  hb*Math.tan(th) : 0;
+  const sB=(P.topEdge==='level') ? -hb*Math.tan(th) : 0;
+  const bot=Math.max(P.frontLeg,P.backLeg)+45;
+  const boardPts=[
+    [ nrm[0]*hb+dir[0]*sF,   nrm[1]*hb+dir[1]*sF  ],
+    [-nrm[0]*hb+dir[0]*sB,  -nrm[1]*hb+dir[1]*sB  ],
+    [-nrm[0]*hb+dir[0]*bot, -nrm[1]*hb+dir[1]*bot ],
+    [ nrm[0]*hb+dir[0]*bot,  nrm[1]*hb+dir[1]*bot ]
+  ];
+  let rearU=Infinity;
+  boardPts.forEach(p=>{ rearU=Math.min(rearU, p[0]*mir); });
+  const wallU=rearU - P.wallGap;
+  const wallX=wallU*mir;
+
+  let wallClear=Infinity;
+  body.forEach(p=>{ wallClear=Math.min(wallClear, p[0]*mir - wallU); });
+  // clash against the printed bracket and the board as real outlines
+  const hitMount=polysOverlap(body, geo.parts.concat([boardPts]));
+  return {foot:foot, body:body, piv:piv, wallX:wallX, wallU:wallU,
+          wallClear:wallClear, hitMount:hitMount, boardPts:boardPts, footH:fh};
+}
+
+// the wall and the shelf bind at different angles, so solve for each
+function maxSafeTilt(geo){
+  let w=120, m=120;
+  for(let a=0;a<=120;a+=0.5){
+    const d=deviceGeom(geo,a);
+    if(w===120 && d.wallClear < 0) w=Math.max(0,a-0.5);
+    if(m===120 && d.hitMount)      m=Math.max(0,a-0.5);
+    if(w<120 && m<120) break;
+  }
+  return {wall:w, mount:m, overall:Math.min(w,m)};
+}
+
+/* ---------------- 3D preview ---------------- */
+const cam = {yaw:0.72, pitch:-0.38, zoom:1, fast:false};
+let scene3d=null, sceneMeta=null, scenePieces=[], viewXf=null;
+const hiddenPieces=new Set();
+
+// edges worth drawing: the silhouette of each body, skipping the internal
+// triangulation and the shallow steps that make up a fillet arc
+function featureEdges(tris){
+  const map=new Map();
+  const kk=p=>Math.round(p[0]*100)+','+Math.round(p[1]*100)+','+Math.round(p[2]*100);
+  for(const t of tris){
+    let nx=(t[1][1]-t[0][1])*(t[2][2]-t[0][2])-(t[1][2]-t[0][2])*(t[2][1]-t[0][1]);
+    let ny=(t[1][2]-t[0][2])*(t[2][0]-t[0][0])-(t[1][0]-t[0][0])*(t[2][2]-t[0][2]);
+    let nz=(t[1][0]-t[0][0])*(t[2][1]-t[0][1])-(t[1][1]-t[0][1])*(t[2][0]-t[0][0]);
+    const ln=Math.hypot(nx,ny,nz)||1; nx/=ln; ny/=ln; nz/=ln;
+    for(let i=0;i<3;i++){
+      const a=t[i], b=t[(i+1)%3], ka=kk(a), kb=kk(b);
+      const key = ka<kb ? ka+'|'+kb : kb+'|'+ka;
+      let e=map.get(key);
+      if(!e){ e={a:a,b:b,n:[]}; map.set(key,e); }
+      e.n.push(nx,ny,nz);
+    }
+  }
+  const out=[], COS=Math.cos(30*Math.PI/180);
+  map.forEach(e=>{
+    if(e.n.length<6){ out.push([e.a,e.b]); return; }
+    if(e.n[0]*e.n[3]+e.n[1]*e.n[4]+e.n[2]*e.n[5] < COS) out.push([e.a,e.b]);
+  });
+  return out;
+}
+
+const shiftZ=(tris,dz)=>tris.map(t=>[
+  [t[0][0],t[0][1],t[0][2]+dz],[t[1][0],t[1][1],t[1][2]+dz],[t[2][0],t[2][1],t[2][2]+dz]]);
+
+// brackets and board don't move when the projector tilts, so keep them
+const staticSig=()=>JSON.stringify(Object.keys(P).filter(k=>k!=='devTilt').sort().map(k=>P[k]));
+let _cache={sig:null};
+
+function buildScene(geo){
+  const out=[], fitPts=[];
+  scenePieces=[];
+  const add=(key,grp,label,color,tris,inFit)=>{
+    const pi=scenePieces.length;
+    scenePieces.push({key:key, grp:grp, label:label, color:color, edges:featureEdges(tris)});
+    tris.forEach(t=>{
+      out.push({v:t, c:color, pi:pi});
+      if(inFit!==false) fitPts.push(t[0],t[1],t[2]);
+    });
+    return pi;
+  };
+
+  const W=P.bracketW, n=Math.max(1,Math.round(P.count)), span=(n-1)*P.spacing;
+  const dir=geo.boardDir, nrm=geo.boardNrm, hb=P.boardT/2, th=P.lean*Math.PI/180;
+  const bw=Math.max(span+W+70, P.devW+40);
+
+  const sig=staticSig();
+  if(_cache.sig===sig){
+    scenePieces=_cache.pieces.slice();
+    _cache.tris.forEach(t=>out.push(t));
+    _cache.fit.forEach(p=>fitPts.push(p));
+  } else {
+    const bracket=mesh(geo.parts, W, geo.holes, geo.perf);
+    for(let i=0;i<n;i++){
+      add('b'+i, 'b'+i, n>1 ? 'bracket '+(i+1) : 'bracket', [196,72,28],
+          shiftZ(bracket, -span/2 + i*P.spacing - W/2));
+    }
+    const sF=(P.topEdge==='level') ?  hb*Math.tan(th) : 0;
+    const sB=(P.topEdge==='level') ? -hb*Math.tan(th) : 0;
+    const bot=Math.max(P.frontLeg,P.backLeg)+45;
+    const bp=[
+      [ nrm[0]*hb+dir[0]*sF,   nrm[1]*hb+dir[1]*sF  ],
+      [-nrm[0]*hb+dir[0]*sB,  -nrm[1]*hb+dir[1]*sB  ],
+      [-nrm[0]*hb+dir[0]*bot, -nrm[1]*hb+dir[1]*bot ],
+      [ nrm[0]*hb+dir[0]*bot,  nrm[1]*hb+dir[1]*bot ]
+    ];
+    add('board','board','headboard',[156,132,92], shiftZ(mesh([bp], bw), -bw/2));
+    _cache={sig:sig, pieces:scenePieces.slice(), tris:out.slice(), fit:fitPts.slice()};
+  }
+
+  // projector: foot and body share one hide group so they come and go together
+  const dg=deviceGeom(geo);
+  add('devfoot','dev','projector',[142,150,158], shiftZ(mesh([dg.foot], P.devW), -P.devW/2));
+  add('devbody','dev','projector',[178,186,193], shiftZ(mesh([dg.body], P.devBodyW), -P.devBodyW/2));
+
+  let wy0=1e9, wy1=-1e9;
+  fitPts.forEach(p=>{ if(p[1]<wy0)wy0=p[1]; if(p[1]>wy1)wy1=p[1]; });
+  dg.body.forEach(p=>{ if(p[1]<wy0)wy0=p[1]; if(p[1]>wy1)wy1=p[1]; });
+  const wt=14*geo.mir;
+  const wallPoly=[[dg.wallX,wy0-40],[dg.wallX-wt,wy0-40],[dg.wallX-wt,wy1+60],[dg.wallX,wy1+60]];
+  add('wall','wall','wall',[196,192,184], shiftZ(mesh([wallPoly], bw), -bw/2), false);
+
+  let x0=1e9,y0=1e9,z0=1e9,x1=-1e9,y1=-1e9,z1=-1e9;
+  fitPts.forEach(p=>{
+    if(p[0]<x0)x0=p[0]; if(p[0]>x1)x1=p[0];
+    if(p[1]<y0)y0=p[1]; if(p[1]>y1)y1=p[1];
+    if(p[2]<z0)z0=p[2]; if(p[2]>z1)z1=p[2];
+  });
+  const c=[(x0+x1)/2,(y0+y1)/2,(z0+z1)/2];
+  let R=1;
+  fitPts.forEach(p=>{ const d=Math.hypot(p[0]-c[0],p[1]-c[1],p[2]-c[2]); if(d>R)R=d; });
+  sceneMeta={center:c, radius:R};
+  return out;
+}
+
+function draw3D(){
+  const cv=document.getElementById('cv3d');
+  if(!cv || !scene3d || !sceneMeta) return;
+  const rect=cv.getBoundingClientRect();
+  const cssW=Math.max(200, Math.round(rect.width))||600;
+  const cssH=Math.max(180, Math.round(rect.height))||450;
+
+  let dpr=Math.min(2, window.devicePixelRatio||1);
+  const cap=cam.fast ? 190000 : 760000;
+  if(cssW*cssH*dpr*dpr > cap) dpr=Math.sqrt(cap/(cssW*cssH));
+  const RW=Math.max(1,Math.round(cssW*dpr)), RH=Math.max(1,Math.round(cssH*dpr));
+  if(cv.width!==RW || cv.height!==RH){ cv.width=RW; cv.height=RH; }
+
+  const g=cv.getContext('2d');
+  if(!cv._img || cv._img.width!==RW || cv._img.height!==RH){
+    cv._img=g.createImageData(RW,RH);
+    cv._pix=new Uint32Array(cv._img.data.buffer);
+    cv._z=new Float32Array(RW*RH);
+    cv._id=new Int16Array(RW*RH);
+  }
+  const img=cv._img, pix=cv._pix, zbuf=cv._z, idbuf=cv._id;
+  pix.fill((255<<24)|(227<<16)|(234<<8)|233);
+  zbuf.fill(Infinity);
+  idbuf.fill(-1);
+
+  const cy=Math.cos(cam.yaw), sy=Math.sin(cam.yaw);
+  const cp=Math.cos(cam.pitch), sp=Math.sin(cam.pitch);
+  const C=sceneMeta.center;
+  const s=Math.min(RW,RH)/(2*sceneMeta.radius*1.12)*cam.zoom;
+  const ox=RW/2, oy=RH/2;
+  const L=[-0.38,0.60,-0.70];
+
+  viewXf={cy:cy, sy:sy, cp:cp, sp:sp, C:C, s:s, ox:ox, oy:oy};
+
+  const A=[0,0,0], B=[0,0,0], D=[0,0,0];
+  const put=(p,o)=>{
+    const a=p[0]-C[0], b=p[1]-C[1], d=p[2]-C[2];
+    const x=a*cy+d*sy, t=-a*sy+d*cy;
+    o[0]=ox+x*s; o[1]=oy-(b*cp-t*sp)*s; o[2]=b*sp+t*cp;
+  };
+
+  const raster=(tr, paint)=>{
+    put(tr.v[0],A); put(tr.v[1],B); put(tr.v[2],D);
+    if((B[0]-A[0])*(D[1]-A[1])-(B[1]-A[1])*(D[0]-A[0]) <= 0) return;
+    let word=0;
+    if(paint){
+      let nx=(tr.v[1][1]-tr.v[0][1])*(tr.v[2][2]-tr.v[0][2])-(tr.v[1][2]-tr.v[0][2])*(tr.v[2][1]-tr.v[0][1]);
+      let ny=(tr.v[1][2]-tr.v[0][2])*(tr.v[2][0]-tr.v[0][0])-(tr.v[1][0]-tr.v[0][0])*(tr.v[2][2]-tr.v[0][2]);
+      let nz=(tr.v[1][0]-tr.v[0][0])*(tr.v[2][1]-tr.v[0][1])-(tr.v[1][1]-tr.v[0][1])*(tr.v[2][0]-tr.v[0][0]);
+      const ln=Math.hypot(nx,ny,nz)||1; nx/=ln; ny/=ln; nz/=ln;
+      const rx=nx*cy+nz*sy, rt=-nx*sy+nz*cy;
+      const vy=ny*cp-rt*sp, vz=ny*sp+rt*cp;
+      const sh=0.34+0.66*Math.max(0, rx*L[0]+vy*L[1]+vz*L[2]);
+      word=(255<<24)|(Math.round(tr.c[2]*sh)<<16)|(Math.round(tr.c[1]*sh)<<8)|Math.round(tr.c[0]*sh);
+    }
+    const x0=Math.max(0,Math.floor(Math.min(A[0],B[0],D[0])));
+    const x1=Math.min(RW-1,Math.ceil(Math.max(A[0],B[0],D[0])));
+    const y0=Math.max(0,Math.floor(Math.min(A[1],B[1],D[1])));
+    const y1=Math.min(RH-1,Math.ceil(Math.max(A[1],B[1],D[1])));
+    if(x1<x0||y1<y0) return;
+    const det=(B[1]-D[1])*(A[0]-D[0])+(D[0]-B[0])*(A[1]-D[1]);
+    if(Math.abs(det)<1e-9) return;
+    for(let y=y0;y<=y1;y++){
+      const py=y+0.5, row=y*RW;
+      for(let x=x0;x<=x1;x++){
+        const px=x+0.5;
+        const w0=((B[1]-D[1])*(px-D[0])+(D[0]-B[0])*(py-D[1]))/det;
+        if(w0<0) continue;
+        const w1=((D[1]-A[1])*(px-D[0])+(A[0]-D[0])*(py-D[1]))/det;
+        if(w1<0) continue;
+        const w2=1-w0-w1;
+        if(w2<0) continue;
+        const idx=row+x;
+        if(paint){
+          const z=w0*A[2]+w1*B[2]+w2*D[2];
+          if(z<zbuf[idx]){ zbuf[idx]=z; pix[idx]=word; idbuf[idx]=tr.pi; }
+        } else if(idbuf[idx]===-1){
+          idbuf[idx]=tr.pi;                 // hidden bodies stay tappable where nothing covers them
+        }
+      }
+    }
+  };
+
+  for(const tr of scene3d) if(!hiddenPieces.has(scenePieces[tr.pi].grp)) raster(tr, true);
+  for(const tr of scene3d) if( hiddenPieces.has(scenePieces[tr.pi].grp)) raster(tr, false);
+  g.putImageData(img,0,0);
+
+  // ghost outlines for whatever is hidden
+  if(hiddenPieces.size){
+    g.save();
+    g.lineWidth=Math.max(1, dpr);
+    g.setLineDash([dpr*4, dpr*3.5]);
+    g.lineCap='butt';
+    scenePieces.forEach(pc=>{
+      if(!hiddenPieces.has(pc.grp)) return;
+      g.strokeStyle='rgba('+Math.round(pc.color[0]*0.62)+','+Math.round(pc.color[1]*0.62)+','+Math.round(pc.color[2]*0.62)+',0.85)';
+      g.beginPath();
+      pc.edges.forEach(e=>{
+        put(e[0],A); put(e[1],B);
+        g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]);
+      });
+      g.stroke();
+    });
+    g.restore();
+  }
+
+  const tag=document.getElementById('viewTag');
+  if(tag && view==='3d'){
+    const off=[];
+    scenePieces.forEach(p=>{ if(hiddenPieces.has(p.grp) && off.indexOf(p.label)<0) off.push(p.label); });
+    tag.textContent = off.length ? 'hidden: '+off.join(', ')+' · tap to restore'
+                                 : '3D · drag the projector to tilt it, tap a piece to hide';
+  }
+}
+
+function idAt(clientX, clientY){
+  const cv=document.getElementById('cv3d');
+  if(!cv || !cv._id) return -1;
+  const r=cv.getBoundingClientRect();
+  const x=Math.round((clientX-r.left)*cv.width/r.width);
+  const y=Math.round((clientY-r.top)*cv.height/r.height);
+  if(x<0||y<0||x>=cv.width||y>=cv.height) return -1;
+  return cv._id[y*cv.width+x];
+}
+
+function pickAt(clientX, clientY){
+  const id=idAt(clientX, clientY);
+  if(id<0){
+    if(hiddenPieces.size){ hiddenPieces.clear(); draw3D(); }   // tap the background to restore everything
+    return;
+  }
+  const grp=scenePieces[id].grp;
+  if(hiddenPieces.has(grp)) hiddenPieces.delete(grp); else hiddenPieces.add(grp);
+  draw3D();
+}
+
+// screen point -> the model's profile plane (model z = 0), which is where tilt lives
+function unprojectToProfile(clientX, clientY){
+  const cv=document.getElementById('cv3d');
+  if(!cv || !viewXf) return null;
+  const r=cv.getBoundingClientRect();
+  const sx=(clientX-r.left)*cv.width/r.width;
+  const sy_=(clientY-r.top)*cv.height/r.height;
+  const V=viewXf;
+  if(Math.abs(V.cy)<1e-4 || Math.abs(V.cp)<1e-4) return null;   // edge-on, no usable answer
+  const vx=(sx-V.ox)/V.s, vy=-(sy_-V.oy)/V.s;
+  const d=-V.C[2];
+  const a=(vx - d*V.sy)/V.cy;
+  const t=-a*V.sy + d*V.cy;
+  const b=(vy + t*V.sp)/V.cp;
+  return [V.C[0]+a, V.C[1]+b];
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  const geo = profile();
+  const svg = document.getElementById('dwg');
+  svg.textContent='';
+  const defs = el('defs',{},svg);
+  const hat = el('pattern',{id:'hatch',width:6,height:6,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'},defs);
+  el('rect',{width:6,height:6,fill:'rgba(140,115,70,.13)'},hat);
+  el('line',{x1:0,y1:0,x2:0,y2:6,stroke:'var(--board)','stroke-width':1,opacity:.55},hat);
+  const mk = el('marker',{id:'ar',markerWidth:9,markerHeight:9,refX:4.5,refY:4.5,orient:'auto',markerUnits:'strokeWidth'},defs);
+  el('path',{d:'M1,4.5 L8,2 L8,7 Z',fill:'var(--dim)'},mk);
+
+  const cv=document.getElementById('cv3d');
+  const is3d = (view==='3d');
+  // note: SVG elements have no .hidden property, so drive display directly
+  svg.style.display = is3d ? 'none' : 'block';
+  cv.style.display  = is3d ? 'block' : 'none';
+  cv.hidden = !is3d;
+  if(view==='3d'){
+    scene3d=buildScene(geo);
+    requestAnimationFrame(draw3D);
+    document.getElementById('viewTag').textContent='3D · drag the projector to tilt it, tap a piece to hide';
+  } else if(view==='side'){ drawSide(svg, geo); }
+  else { drawPlan(svg, geo); }
+  updateOutput(geo);
+  scheduleSave();
+}
+
+function drawSide(svg, geo){
+  const mainPoly = geo.parts[0];
+  const bb = bbox(mainPoly);
+  const dir = geo.boardDir, nrm = geo.boardNrm;
+  const hb = P.boardT/2;
+  const bBot = Math.max(P.frontLeg, P.backLeg) + 100;
+  // the board stops at its own top edge — square to the faces, or cut level
+  const thb = P.lean * Math.PI/180;
+  const sF = (P.topEdge === 'level') ?  hb*Math.tan(thb) : 0;
+  const sB = (P.topEdge === 'level') ? -hb*Math.tan(thb) : 0;
+  const board = [
+    [ nrm[0]*hb + dir[0]*sF,    nrm[1]*hb + dir[1]*sF   ],
+    [-nrm[0]*hb + dir[0]*sB,   -nrm[1]*hb + dir[1]*sB   ],
+    [-nrm[0]*hb + dir[0]*bBot, -nrm[1]*hb + dir[1]*bBot ],
+    [ nrm[0]*hb + dir[0]*bBot,  nrm[1]*hb + dir[1]*bBot ]
+  ];
+
+  const mir = geo.mir;
+  const dg = deviceGeom(geo);
+  const wallTop = Math.max.apply(null, dg.body.map(p=>p[1])) + 60;
+  const wallBot = -(Math.max(P.frontLeg,P.backLeg) + 120);
+  const wall = [[dg.wallX, wallBot],[dg.wallX, wallTop]];
+
+  const all = board.concat(dg.foot, dg.body, [[0,0],[dg.wallX, geo.shelfTopY]]);
+  geo.parts.forEach(p=>{ p.forEach(q=>all.push(q)); });
+  const ab = bbox(all);
+  const pad = 46;
+  const W = ab.x1-ab.x0+pad*2, H = ab.y1-ab.y0+pad*2;
+  const k = Math.max(W,H)/560;
+  svg.setAttribute('viewBox', (ab.x0-pad)+' '+(-(ab.y1+pad))+' '+W+' '+H);
+
+  const g = el('g',{transform:'scale(1,-1)'},svg);
+
+  const step = W>500 ? 50 : 20;
+  const grid = el('g',{},g);
+  for(let x=Math.ceil((ab.x0-pad)/step)*step; x<ab.x1+pad; x+=step)
+    el('line',{x1:x,y1:ab.y0-pad,x2:x,y2:ab.y1+pad,stroke:'var(--rule)','stroke-width':k*0.5,opacity:.55},grid);
+  for(let y=Math.ceil((ab.y0-pad)/step)*step; y<ab.y1+pad; y+=step)
+    el('line',{x1:ab.x0-pad,y1:y,x2:ab.x1+pad,y2:y,stroke:'var(--rule)','stroke-width':k*0.5,opacity:.55},grid);
+  el('line',{x1:ab.x0-pad,y1:0,x2:ab.x1+pad,y2:0,stroke:'var(--ink-3)','stroke-width':k*0.8,'stroke-dasharray':(k*8)+' '+(k*3)+' '+(k*1.5)+' '+(k*3)},g);
+
+  el('path',{d:pathOf(board),fill:'url(#hatch)',stroke:'var(--board)','stroke-width':k*1.3,'stroke-linejoin':'round'},g);
+  // wall
+  el('line',{x1:wall[0][0],y1:wall[0][1],x2:wall[1][0],y2:wall[1][1],
+    stroke:'var(--ink-2)','stroke-width':k*2},g);
+  for(let hy=wallBot; hy<wallTop; hy+=14){
+    el('line',{x1:dg.wallX,y1:hy,x2:dg.wallX-10*mir,y2:hy-10,
+      stroke:'var(--ink-3)','stroke-width':k*0.7,opacity:.75},g);
+  }
+  // projector: foot, then the tilting body
+  el('path',{d:pathOf(dg.foot),fill:'none',stroke:'var(--dev)','stroke-width':k*1.1,'stroke-dasharray':(k*5)+' '+(k*3)},g);
+  el('path',{d:pathOf(dg.body),fill:'none',
+    stroke:(dg.wallClear<0||dg.hitMount)?'var(--warn)':'var(--dev)',
+    'stroke-width':k*1.3,'stroke-dasharray':(k*5)+' '+(k*3)},g);
+  el('circle',{cx:dg.piv[0],cy:dg.piv[1],r:k*2.6,fill:'var(--dev)'},g);
+  geo.parts.forEach(p=>{
+    el('path',{d:pathOf(p),fill:'var(--part-fill)',stroke:'var(--part)','stroke-width':k*1.9,'stroke-linejoin':'round'},g);
+  });
+  (geo.holes||[]).forEach(h=>{
+    el('path',{d:pathOf(h),fill:'var(--paper)',stroke:'var(--part)','stroke-width':k*1.4,'stroke-linejoin':'round'},g);
+  });
+  (geo.perf||[]).forEach(pl=>{
+    const M=plateMap(pl), u=pl.u;
+    const seen={};
+    pl.holes.forEach(h=>{
+      let cs=0; h.forEach(q=>cs+=q[0]); cs/=h.length;
+      const key=cs.toFixed(2);
+      if(seen[key]) return;
+      seen[key]=1;
+      const a=M.ptA(cs), b2=M.ptB(cs);
+      const r=pl.d/2, px=-u[1]*r, py=u[0]*r;
+      el('path',{d:pathOf([[a[0]+px,a[1]+py],[b2[0]+px,b2[1]+py],[b2[0]-px,b2[1]-py],[a[0]-px,a[1]-py]]),
+        fill:'var(--paper)',stroke:'var(--part)','stroke-width':k*1.0,
+        'stroke-dasharray':(k*3)+' '+(k*2)},g);
+    });
+  });
+  if(P.dims){
+    const d = el('g',{},g);
+    const outward = mir>0 ? 1 : -1;
+    // shelf span, above the shelf
+    dim(d,[geo.shelfBackX, geo.shelfTopY],[geo.shelfFrontX, geo.shelfTopY], -18*k*outward,
+        Math.abs(geo.shelfFrontX-geo.shelfBackX).toFixed(0), k, true);
+    // shelf height above the board top edge, on the far side
+    const hx = mir>0 ? bb.x0 - 16*k : bb.x1 + 16*k;
+    dim(d,[hx,0],[hx,geo.shelfTopY], 0, geo.shelfTopY.toFixed(1), k, true);
+    // board thickness, below the saddle
+    const s0 = Math.max(P.frontLeg, P.backLeg) + 26;
+    dim(d,[ nrm[0]*hb+dir[0]*s0,  nrm[1]*hb+dir[1]*s0],
+          [-nrm[0]*hb+dir[0]*s0, -nrm[1]*hb+dir[1]*s0], 0, P.boardT.toFixed(1), k, true);
+    // bed-side leg drop
+    const lx = geo.legOuter*mir;
+    dim(d,[lx,0],[lx+dir[0]*P.frontLeg, dir[1]*P.frontLeg], -14*k*outward, P.frontLeg.toFixed(0), k, true);
+  }
+  document.getElementById('viewTag').textContent = 'side elevation · bed to the ' + (mir>0?'right':'left');
+}
+
+function drawPlan(svg, geo){
+  // plan y  ==  profile x, so the shelf and the projector always run the same way
+  const bb = bbox(geo.parts[0]);
+  const depth = bb.x1 - bb.x0;
+  const bw = P.boardW;
+  const n = Math.max(1, Math.round(P.count));
+  const span = (n-1)*P.spacing;
+  const mir = geo.mir;
+
+  const devY0 = mir>0 ? geo.shelfFrontX - P.lipT - P.devD : geo.shelfFrontX + P.lipT;
+  const yLo = Math.min(bb.x0, devY0, -P.boardT/2);
+  const yHi = Math.max(bb.x1, devY0+P.devD, P.boardT/2);
+
+  const pad = 55;
+  const W = Math.max(bw, span+P.bracketW, P.devW) + pad*2;
+  const H = (yHi-yLo) + pad*2;
+  const k = Math.max(W,H)/560;
+  svg.setAttribute('viewBox', (-W/2)+' '+(yLo-pad)+' '+W+' '+H);
+  const g = el('g',{},svg);
+
+  el('rect',{x:-bw/2,y:-P.boardT/2,width:bw,height:P.boardT,fill:'url(#hatch)',stroke:'var(--board)','stroke-width':k*1.3},g);
+
+  for(let i=0;i<n;i++){
+    const cx = -span/2 + i*P.spacing;
+    el('rect',{x:cx-P.bracketW/2,y:bb.x0,width:P.bracketW,height:depth,
+      fill:'var(--part-fill)',stroke:'var(--part)','stroke-width':k*1.7},g);
+  }
+
+  (geo.perf||[]).forEach(pl=>{
+    const M=plateMap(pl);
+    pl.holes.forEach(h=>{
+      let cs=0, cz=0; h.forEach(q=>{cs+=q[0];cz+=q[1];}); cs/=h.length; cz/=h.length;
+      const px=M.ptA(cs)[0];
+      for(let i=0;i<n;i++){
+        const off=-span/2 + i*P.spacing - P.bracketW/2;
+        el('circle',{cx:off+cz, cy:px, r:pl.d/2,
+          fill:'none',stroke:'var(--part)','stroke-width':k*1.0,opacity:pl.part?0.45:1},g);
+      }
+    });
+  });
+  el('rect',{x:-P.devW/2,y:devY0,width:P.devW,height:P.devD,
+    fill:'none',stroke:'var(--dev)','stroke-width':k*1.3,'stroke-dasharray':(k*5)+' '+(k*3)},g);
+  el('text',{x:0,y:devY0+P.devD/2,'text-anchor':'middle','dominant-baseline':'central',
+    fill:'var(--dev)','font-size':k*9,'font-family':'var(--mono)','letter-spacing':k*2},g).textContent='PROJECTOR';
+
+  if(P.dims && n>1){
+    const yl = (mir>0 ? yHi : yLo) + (mir>0 ? 22*k : -22*k);
+    dim(g,[-span/2,yl],[-span/2+P.spacing,yl],0,P.spacing.toFixed(0),k,false);
+  }
+  document.getElementById('viewTag').textContent = 'plan · looking down';
+}
+
+/* ---------------- numbers + checks ---------------- */
+function updateOutput(geo){
+  const main = geo.parts[0], bb = bbox(main);
+  const n = Math.max(1, Math.round(P.count));
+  const W = P.bracketW;
+
+  let A=0, per=0;
+  geo.parts.forEach(p=>{ A += Math.abs(area(p)); per += perim(p); });
+  (geo.holes||[]).forEach(h=>{ A -= Math.abs(area(h)); per += perim(h); });
+
+  const flatW = bb.x1-bb.x0, flatH = bb.y1-bb.y0;
+  let drilled=0;
+  (geo.perf||[]).forEach(pl=>{
+    const M=plateMap(pl);
+    pl.holes.forEach(h=>{
+      let cs=0; h.forEach(q=>cs+=q[0]); cs/=h.length;
+      const a=M.ptA(cs), b2=M.ptB(cs);
+      drilled += Math.abs(area(h))*Math.hypot(a[0]-b2[0], a[1]-b2[1]);
+    });
+  });
+  const vSolid = A*W - drilled;                                  // mm3, one bracket
+  const shellV = Math.min(vSolid, 2*A*0.6 + per*W*1.7); // 3 top/bottom layers + 4 perimeters
+  const vPrint = shellV + (vSolid - shellV)*(P.infill/100);
+  const grams = vPrint/1000 * 1.27 * n;                // PETG ~1.27 g/cm3
+  const shelfLen = Math.abs(geo.shelfFrontX - geo.shelfBackX);
+
+  document.getElementById('oFlat').innerHTML = flatW.toFixed(0)+'<span class="u">×</span>'+flatH.toFixed(0);
+  document.getElementById('oArea').innerHTML = shelfLen.toFixed(0)+'<span class="u">×</span>'+((n-1)*P.spacing+W).toFixed(0);
+  document.getElementById('oVol').innerHTML  = grams.toFixed(0)+'<span class="u"> g</span>';
+  let saved=0;
+  if(P.perf || P.perfStrut || P.taper<100){
+    const t=P.taper, pf=P.perf, ps=P.perfStrut;
+    P.taper=100; P.perf=false; P.perfStrut=false;
+    const base=profile();
+    let bA=0; base.parts.forEach(p=>bA+=Math.abs(area(p)));
+    P.taper=t; P.perf=pf; P.perfStrut=ps;
+    if(bA>0) saved=Math.max(0, (1-vSolid/(bA*W))*100);
+  }
+  document.getElementById('oVolU').textContent =
+    n+' brackets at '+P.infill+'% infill'+(saved>0.5 ? ' · '+saved.toFixed(0)+'% lighter' : '');
+  const dg=deviceGeom(geo);
+  const mt=maxSafeTilt(geo);
+  const tiltEl=document.getElementById('oTilt');
+  tiltEl.innerHTML = mt.overall.toFixed(0)+'<span class="u">°</span>';
+  tiltEl.style.color = (mt.overall<20 ? 'var(--warn)' : '');
+  document.getElementById('oTiltK').textContent =
+    'Max tilt · ' + ((mt.wall<=mt.mount) ? 'wall' : 'bracket');
+  document.getElementById('oTiltU').textContent =
+    'wall '+mt.wall.toFixed(0)+'° · bracket '+mt.mount.toFixed(0)+'°';
+
+  const tris = mesh(geo.parts, W, geo.holes, geo.perf);
+  document.getElementById('triTag').textContent = tris.length+' triangles · '+n+'× '+W+'mm wide';
+
+  const notes = [];
+  const binds = (mt.wall<=mt.mount) ? 'wall' : 'bracket';
+  const tiltTxt = (Math.round(P.devTilt*10)/10).toFixed(P.devTilt%1 ? 1 : 0);
+  if(dg.wallClear < 0)
+    notes.push([false, 'At '+tiltTxt+'° the body is '+(-dg.wallClear).toFixed(0)+'mm into the wall. Wall limit '+mt.wall.toFixed(0)+'°.']);
+  else if(dg.hitMount)
+    notes.push([false, 'At '+tiltTxt+'° the body fouls the bracket. Raise the hinge, move it forward, or lift the projector on a spacer.']);
+  else if(P.devTilt > 0)
+    notes.push([true, 'At '+tiltTxt+'°: '+dg.wallClear.toFixed(0)+'mm to the wall. Limit '+mt.overall.toFixed(0)+'° on the '+binds+'.']);
+  else
+    notes.push([mt.overall>=25, 'Upright it clears. Tilt runs out at '+mt.overall.toFixed(0)+'° on the '+binds+
+      (mt.overall<25 ? ' — too little to aim at the ceiling.' : '.')]);
+
+  const flatFits = (flatW<=P.bedX && flatH<=P.bedY) || (flatW<=P.bedY && flatH<=P.bedX);
+  const flatDiag = Math.hypot(flatW,flatH) <= Math.hypot(P.bedX,P.bedY)*0.92;
+  const zFits = W <= P.bedZ;
+
+  if(flatFits && zFits)
+    notes.push([true, 'Prints flat: '+flatW.toFixed(0)+'×'+flatH.toFixed(0)+' on the plate, '+W+'mm up in Z. No supports.']);
+  else if(!zFits && (flatFits || flatDiag))
+    notes.push([false, 'A '+W+'mm wide bracket needs '+W+'mm of Z but you have '+P.bedZ+'. Narrow it, or split the width across '+Math.ceil(W/P.bedZ)+' brackets side by side.']);
+  else if(flatDiag)
+    notes.push([false, 'Too big square-on, but '+flatW.toFixed(0)+'×'+flatH.toFixed(0)+' fits diagonally. Rotate 45° in the slicer, or shorten the shelf.']);
+  else
+    notes.push([false, "Won't fit a "+P.bedX+'×'+P.bedY+' plate at '+flatW.toFixed(0)+'×'+flatH.toFixed(0)+'. Reduce shelf depth or leg drop.']);
+
+  const outer = (n-1)*P.spacing + W;
+  if(n===1){
+    if(W < P.devW*0.5)
+      notes.push([false, 'One bracket '+W+'mm wide under a '+P.devW+'mm projector will let it rock sideways. Widen to at least '+Math.ceil(P.devW*0.6)+', or print two.']);
+    else
+      notes.push([true, 'Single bracket '+W+'mm wide under a '+P.devW+'mm projector — no spacing to get wrong, and the tray is continuous.']);
+  } else {
+    if(P.devW < outer*0.8) notes.push([false, 'Projector is '+P.devW+' wide but the brackets span '+outer.toFixed(0)+'. Bring spacing down to about '+(Math.round(P.devW*0.6/5)*5)+'.']);
+    else if(P.spacing < W) notes.push([false, 'Spacing is less than the bracket width — they overlap. Increase spacing or use one wide bracket.']);
+    else notes.push([true, 'Projector bridges both brackets with '+((P.devW-outer)/2).toFixed(0)+'mm each side to spare.']);
+  }
+  if(P.shelfDepth < P.devD + P.lipT + 4) notes.push([false, 'Shelf is '+P.shelfDepth+' deep, projector is '+P.devD+'. Go to at least '+Math.ceil(P.devD+P.lipT+6)+'.']);
+  if(P.gussetStyle==='none' && P.shelfDepth > 90) notes.push([false, 'A '+P.shelfDepth+'mm unbraced shelf '+P.shelfT+'mm thick will sag. Add the strut.']);
+  if(P.gussetStyle==='solid') notes.push([false, 'Solid brace costs roughly three times the plastic of the strut for a few percent more stiffness.']);
+  if(P.gussetDrop > P.frontLeg) notes.push([false, 'Brace landing capped at the leg drop ('+P.frontLeg+').']);
+  if(P.perf || P.perfStrut){
+    const pls=geo.perf||[];
+    const tray=pls.filter(p=>!p.part).reduce((a,p)=>a+p.holes.length,0);
+    const brace=pls.filter(p=>p.part).reduce((a,p)=>a+p.holes.length,0);
+    if(P.gussetStyle==='solid')
+      notes.push([false, 'A solid brace has no plate to drill and fills the underside. Switch the brace to Strut.']);
+    else if(P.perfStrut && P.gussetStyle==='none')
+      notes.push([false, 'There is no brace to perforate. Set the brace to Strut first.']);
+    else if(!tray && !brace)
+      notes.push([false, 'No holes fit. '+P.holeD+'mm holes plus a '+P.perfMargin+'mm border need more room than there is — shrink the holes or the margin.']);
+    else
+      notes.push([true, (tray?tray+' through the tray':'')+(tray&&brace?', ':'')+(brace?brace+' through the brace':'')
+        +' — '+saved.toFixed(0)+'% less plastic, and airflow under the projector.']);
+  } else if(P.taper<100 && saved>0.5){
+    notes.push([true, 'Tapered shelf saves '+saved.toFixed(0)+'%. Perforating the tray as well would remove more.']);
+  } else if(P.bracketW*Math.max(1,Math.round(P.count)) > 200 && P.taper>=100){
+    notes.push([false, (P.bracketW*Math.max(1,Math.round(P.count)))+'mm of bracket width, solid throughout. Tapering and perforating typically cut a quarter of the plastic.']);
+  }
+  if(P.fillet - geo.filletUsed > 0.05) notes.push([false, 'Edge rounding capped at '+geo.filletUsed.toFixed(1)+'mm — a '+P.fillet+'mm radius would eat the '+P.wall+'mm wall.']);
+  if(P.wall < 3.5) notes.push([false, P.wall+'mm walls are thinner than four perimeters. Use 4 or more.']);
+  if(P.frontLeg < P.boardT*2) notes.push([false, 'Short bed-side leg on a '+P.boardT+'mm board — it will rock forward under load. Try '+Math.ceil(P.boardT*3)+'mm.']);
+  if(P.clearance < 0.3) notes.push([false, P.clearance+'mm clearance will not slide on after printing. 0.6 to 1.0 is realistic.']);
+  if(P.lipH>0 && P.lipH<5) notes.push([false, 'A '+P.lipH+'mm lip is decorative. 8mm or more actually stops a slide.']);
+
+  const host = document.getElementById('notes');
+  host.textContent='';
+  notes.slice(0,5).forEach(nt=>{
+    const d=document.createElement('div');
+    d.className='note'+(nt[0]?'':' bad');
+    d.innerHTML='<span>'+(nt[0]?'✓':'!')+'</span><span>'+nt[1]+'</span>';
+    host.appendChild(d);
+  });
+}
+
+/* ---------------- events ---------------- */
+const TABS={side:'tabSide', plan:'tabPlan', '3d':'tab3d'};
+function setView(v){
+  view=v;
+  for(const k in TABS) document.getElementById(TABS[k]).setAttribute('aria-pressed', String(k===v));
+  render();
+}
+Object.keys(TABS).forEach(k=>document.getElementById(TABS[k]).addEventListener('click',()=>setView(k)));
+
+/* drag to rotate, drag the projector to tilt it, pinch to zoom, tap to hide */
+(function(){
+  const cv=document.getElementById('cv3d');
+  const ptrs=new Map();
+  let pinch=0, travel=0, tapX=0, tapY=0;
+  let mode='orbit', tiltStart=0, angStart=0, pivot=null;
+
+  const setField=(k,v)=>{ const el=document.getElementById('n_'+k); if(el) el.value=Math.round(v*10)/10; };
+
+  cv.addEventListener('pointerdown',e=>{
+    cv.setPointerCapture(e.pointerId);
+    cam.fast=true;
+    if(ptrs.size===0){
+      travel=0; tapX=e.clientX; tapY=e.clientY; mode='orbit';
+      const id=idAt(e.clientX,e.clientY);
+      if(id>=0 && scenePieces[id].key==='devbody' && !hiddenPieces.has('dev')){
+        const m=unprojectToProfile(e.clientX,e.clientY);
+        if(m){
+          const geo=profile();
+          pivot=deviceGeom(geo).piv;
+          angStart=Math.atan2(m[1]-pivot[1], m[0]-pivot[0]);
+          tiltStart=P.devTilt; mode='tilt';
+          cv.style.cursor='grabbing';
+        }
+      }
+    }
+    ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+    if(ptrs.size===2){
+      const v=[...ptrs.values()];
+      pinch=Math.hypot(v[0][0]-v[1][0], v[0][1]-v[1][1]);
+      mode='orbit';
+    }
+  });
+
+  cv.addEventListener('pointermove',e=>{
+    if(!ptrs.has(e.pointerId)){
+      // hovering the body advertises that it can be dragged
+      if(ptrs.size===0 && view==='3d'){
+        const id=idAt(e.clientX,e.clientY);
+        cv.style.cursor=(id>=0 && scenePieces[id].key==='devbody' && !hiddenPieces.has('dev')) ? 'grab' : 'pointer';
+      }
+      return;
+    }
+    const prev=ptrs.get(e.pointerId);
+    const dx=e.clientX-prev[0], dy=e.clientY-prev[1];
+    ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+    travel+=Math.abs(dx)+Math.abs(dy);
+
+    if(ptrs.size===1 && mode==='tilt'){
+      const m=unprojectToProfile(e.clientX,e.clientY);
+      if(!m || !pivot) return;
+      const geo=profile();
+      const ang=Math.atan2(m[1]-pivot[1], m[0]-pivot[0]);
+      let delta=(ang-angStart)*180/Math.PI*geo.mir;
+      while(delta> 180) delta-=360;
+      while(delta<-180) delta+=360;
+      P.devTilt=Math.round(Math.max(0, Math.min(120, tiltStart+delta))*10)/10;
+      setField('devTilt', P.devTilt);
+      scene3d=buildScene(geo);
+      draw3D();
+      updateOutput(geo);
+      return;
+    }
+
+    if(ptrs.size===1){
+      cam.yaw   -= dx*0.010;   // the model turns with the finger, not against it
+      cam.pitch -= dy*0.010;
+      cam.pitch = Math.max(-1.45, Math.min(1.45, cam.pitch));
+      draw3D();
+    } else if(ptrs.size===2 && pinch>0){
+      const v=[...ptrs.values()];
+      const d=Math.hypot(v[0][0]-v[1][0], v[0][1]-v[1][1]);
+      cam.zoom=Math.max(0.35, Math.min(6, cam.zoom*(d/pinch)));
+      pinch=d;
+      draw3D();
+    }
+  });
+
+  const end=e=>{
+    const wasLast = ptrs.size===1 && ptrs.has(e.pointerId);
+    const wasTilt = (mode==='tilt');
+    ptrs.delete(e.pointerId);
+    if(ptrs.size<2) pinch=0;
+    if(ptrs.size===0){
+      cam.fast=false; mode='orbit'; cv.style.cursor='pointer';
+      if(wasTilt){ scheduleSave(); draw3D(); }
+      else draw3D();
+      if(wasLast && !wasTilt && travel<7) pickAt(tapX, tapY);
+    }
+  };
+  cv.addEventListener('pointerup',end);
+  cv.addEventListener('pointercancel',end);
+  cv.addEventListener('wheel',e=>{
+    e.preventDefault();
+    cam.zoom=Math.max(0.35, Math.min(6, cam.zoom*(e.deltaY<0?1.12:0.89)));
+    draw3D();
+  },{passive:false});
+  window.addEventListener('resize',()=>{ if(view==='3d') draw3D(); });
+})();
+document.getElementById('dl').addEventListener('click',()=>{
+  const geo=profile();
+  const url=URL.createObjectURL(stlBlob(mesh(geo.parts,P.bracketW)));
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='headboard-bracket_'+P.boardT+'mm_'+P.lean+'deg_'+P.shelfDepth+'deep.stl';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+document.getElementById('dlStep').addEventListener('click',()=>{
+  const geo=profile();
+  const name='headboard-bracket_'+P.boardT+'mm_'+P.lean+'deg_'+P.shelfDepth+'deep';
+  const blob=new Blob([buildSTEP(geo.parts, geo.holes, P.bracketW, name, geo.perf)], {type:'application/step'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name+'.step';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+
+document.getElementById('reset').addEventListener('click',()=>{
+  clearSaved();
+  cam.yaw=0.72; cam.pitch=-0.38; cam.zoom=1; hiddenPieces.clear();
+  ['grpBoard','grpSaddle','grpShelf','grpLight','grpPrint','grpDev'].forEach(id=>document.getElementById(id).textContent='');
+  DEFS.forEach(d=>P[d.k]=d.val);
+  buildControls(); render(); showStoreStatus();
+});
+
+loadSaved();
+buildControls();
+render();
+showStoreStatus();
+</script>
+</body>
+</html>
