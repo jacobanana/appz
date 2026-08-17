@@ -13,6 +13,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 🫁 Breathing Flow Log | [`breathing-flow-log/`](breathing-flow-log/) | Peak-flow diary — log the morning and evening blow, see which zone each reading lands in (green / amber / red, worked out from your own best), and follow the trend, the daily swing and the running averages. |
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
 | 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
+| 📐 Headboard Bracket | [`headboard-bracket/`](headboard-bracket/) | Parametric designer for a printed saddle bracket that hangs over a headboard and carries a projector. Type your board thickness and lean and the profile redraws — side elevation, plan, and a spinnable 3D preview where the projector swings on its hinge until it fouls the wall or the bracket. Exports a watertight STL and a real STEP solid. |
 | 🐷 Piggy | [moved to its own repo →](https://github.com/jacobanana/piggy) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. Now a Vite app at [jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/), with a FastAPI + Postgres backend growing beside it. |
 
 ## How it's laid out
@@ -24,6 +25,7 @@ yaniv/index.html
 breathing-flow-log/index.html
 sensor-readout/index.html
 tpg-pulse/index.html
+headboard-bracket/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
@@ -133,6 +135,34 @@ they're at. Dot colour is the first component in both views, which is the point
 has very little to do with where it is. Click one and dashed threads join it to
 the five stops whose year looks most like its own; in map view they run clean
 across Geneva.
+
+### What the bracket designer does, and what it keeps
+
+`headboard-bracket/` is a CAD kernel small enough to read. The bracket is one
+2D profile — a saddle that grips the board, a shelf cantilevered off it and a
+diagonal strut — extruded to the bracket's width, so every question about the
+part is a question about that outline. Corners are filleted on the polygon,
+with the four that grip the board held square; a keep-out pass then guarantees
+no vertex ends up inside the volume the board occupies, whatever the lean.
+
+| It writes | What's in it |
+| --- | --- |
+| `headboard_bracket_v1` | Every parameter on the page — board, saddle, shelf, lightening, printer, projector. Saved as you type, in that browser only, never uploaded. **Reset to defaults** clears it. |
+
+Both exports come out of the same profile. **STL** is triangles: holes are
+stitched into their parent outline with a zero-width bridge, then ear-clipped —
+so the perforated tray meshes as one closed shell rather than a lid floating
+over a box. **STEP** is a real B-rep solid: the saddle and the strut are unioned
+in 2D first (the strut leaves a triangular void, which becomes an inner ring),
+and each region is written out as planar faces sharing their edges, so CAD gets
+something it can fillet and cut rather than a triangle soup.
+
+The clash test is the other half. The projector rotates about its hinge in the
+profile plane, and the page sweeps the tilt half a degree at a time to find the
+angle where the body first touches the wall and where it first fouls the bracket
+— reported separately, because those two limits move independently as you change
+the shelf. In the 3D view you can drag the projector to tilt it and tap any piece
+to hide it.
 
 ## Adding a new app
 
