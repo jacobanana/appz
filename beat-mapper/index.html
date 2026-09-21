@@ -311,6 +311,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
             <button class="btn" id="slAll" title="Keep every slice again" aria-label="Keep every slice">all</button>
             <span class="sep"></span>
             <button class="btn" id="slWav" title="Save the selected slice as one .wav"><svg class="ic"><use href="#i-export"/></svg>WAV</button>
+            <button class="btn" id="slLoop" title="Save the whole loop as one .wav, named with its bars and BPM. No fades, so it loops seamlessly"><svg class="ic"><use href="#i-loop"/></svg>LOOP</button>
             <button class="btn primary" id="slZip" title="Save every kept slice as .wav files in a .zip"><svg class="ic"><use href="#i-export"/></svg>ZIP</button>
             <button class="btn" id="slRpp" title="Save a REAPER project with every kept slice in place, and the .wav files beside it"><svg class="ic"><use href="#i-export"/></svg>REAPER</button>
             <label class="chk" title="Add a .csv list of the slices to the zip"><input type="checkbox" id="slCsv" checked>csv</label>
@@ -375,6 +376,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><svg class="ic"><use href="#i-wave"/></svg><span>What each .wav gets: click-free fades, per-slice normalizing to the target dBFS, source channels or a mono mix, 16 or 24-bit at the file's sample rate</span><span></span></div>
     <div><svg class="ic"><use href="#i-play"/></svg><span>Play the selected slice on its own, exactly as it will be written · a slice you click or step onto plays too</span><span><kbd>E</kbd></span></div>
     <div><svg class="ic"><use href="#i-clear"/></svg><span>Keep or drop the selected slice</span><span><kbd>X</kbd></span></div>
+    <div><svg class="ic"><use href="#i-loop"/></svg><span>Save the whole loop as one .wav, named with the bars and BPM it works out at – written without fades so it loops seamlessly</span><span></span></div>
     <div><svg class="ic"><use href="#i-export"/></svg><span>Save the selected slice, every kept slice as a .zip of .wav files, or a REAPER project with the slices in place</span><span></span></div>
   </div>
   <h2 style="margin-top:18px">Keyboard shortcuts</h2>
@@ -417,7 +419,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span><kbd>E</kbd></span><span>Play the selected slice on its own</span></div>
     <div><span><kbd>X</kbd></span><span>Keep or drop the selected slice</span></div>
     <div><span>Tap the waveform</span><span>Plays the slice under the pointer · double-tap keeps or drops it</span></div>
-    <div><span>Loop</span><span>With the loop on, only what is inside it is sliced and exported</span></div>
+    <div><span>Loop</span><span>With the loop on, only what is inside it is sliced and exported, and every file saved is named with the loop's bars and BPM</span></div>
     <h3>Where you touch decides what happens</h3>
     <div><span>Top strip</span><span>Loop: drag to draw, drag edges or middle to adjust, tap it to switch on/off, double-tap to loop a bar</span></div>
     <div><span>Bar ruler</span><span>Drag pins and bar lines (step 2)</span></div>
@@ -430,6 +432,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span>Session</span><span>Your work is kept in this browser per audio file and comes back when you open the same file. The session file carries it to another device; it holds no audio</span></div>
     <div><span>REAPER</span><span>.rpp with the tempo map in place. Keep it in the same folder as the audio</span></div>
     <div><span>Slices</span><span>One .wav per slice in a .zip, at the file's own sample rate, plus a .csv listing where each one came from. The REAPER zip adds a .rpp holding every slice at the time it was cut from, with the tempo map when there is one</span></div>
+    <div><span>Loop</span><span>name_8bars_96.31bpm.wav – the bar count the loop comes closest to, and the tempo that bar count implies for its exact length</span></div>
   </div>
   <div style="margin-top:14px;text-align:right"><button class="btn" id="helpClose">Close</button></div>
 </dialog>
@@ -1437,9 +1440,9 @@ function renderSliceTable(){ if($('p4').hidden) return; const tb=$('sliceRows'),
     btn.dataset.p=sl.i; btn.title='Preview slice '+(sl.i+1); btn.setAttribute('aria-label',btn.title); }
   let tot=0, on=0; for(const sl of S.slices) if(!sl.off){ tot+=sl.t1-sl.t0; on++; }
   if(!S.slices.length) $('slSum').textContent=S.x? 'No slices – add transients in step 1, or lower the minimum length.' : '';
-  else { const b=zipEstimate(), r=sliceRange();
+  else { const b=zipEstimate(), L=loopInfo();
     $('slSum').textContent=`${on} of ${S.slices.length} slices · ${fmtT(tot)} of audio · zip about ${b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}`
-      +(r.loop? ` · inside the loop only (${fmtT(r.from)}–${fmtT(r.to)})`:'')
+      +(L? ` · loop only: ${L.bars} bar${L.bars===1?'':'s'} at ${fmtBpm(L.bpm)} BPM (${fmtT(L.a)}–${fmtT(L.b)})`:'')
       +(n<S.slices.length? ` · first ${n} listed`:''); } }
 function selectSlice(i){ const sl=S.slices[i]; if(!sl) return; S.slSel=i; dirty=true; renderSliceTable();
   const row=$('sliceRows').querySelector(`tr[data-i="${i}"]`); if(row&&row.scrollIntoView) row.scrollIntoView({block:'nearest'}); }
@@ -1466,6 +1469,14 @@ function previewSlice(i){ const sl=S.slices[i]; if(!sl) return toast('No slice t
   selectSlice(i); reveal(sl.t0); S.playhead=sl.t0; dirty=true; }
 
 function sliceBase(){ return (S.name||'audio').replace(/[^\w\-]+/g,'-').slice(0,60)||'audio'; }
+// What the loop is worth musically: the bar count it comes closest to, and the tempo that bar count
+// implies for its exact length – so the name a loop is saved under always adds up.
+function loopInfo(){ const L=S.loop; if(!(S.loopOn&&L&&L.b-L.a>0.01)) return null;
+  const dur=L.b-L.a, q=S.anchors.length? Math.abs(timeToPos(L.b)-timeToPos(L.a)) : dur*S.baseBpm/60;
+  const bars=Math.max(1,Math.round(q/barQ()));
+  return { a:L.a, b:L.b, dur, bars, bpm:60*bars*barQ()/dur }; }
+const fmtBpm=b=>String(+b.toFixed(2));
+function loopTag(){ const L=loopInfo(); return L? `_${L.bars}bar${L.bars===1?'':'s'}_${fmtBpm(L.bpm)}bpm` : ''; }
 function sliceName(base,i,pad,sl){ let n=base+'_'+String(i+1).padStart(pad,'0');
   if(S.sl.naming==='time') n+='_'+fmtT(sl.t0).replace(/[:.]/g,'-'); return n+'.wav'; }
 function slicesCsv(list,base,pad){ const L=['file,start_seconds,length_seconds,start_time'];
@@ -1489,6 +1500,13 @@ async function renderSliceFiles(list,base,pad){ const o=sliceRenderOpts(), chans
     files.push({name:sliceName(base,i,pad,list[i]),data:Core.wavEncode(r.chans,S.sr,S.sl.bits)});
     if((i&3)===0){ busy('Rendering slices',0.02+0.86*(i+1)/list.length); await new Promise(res=>setTimeout(res,0)); } }
   return files; }
+// The loop itself, untouched apart from the channel, level and depth settings: fades would dip the
+// seam where the end meets the start, so a loop is written without them.
+async function saveLoopWav(){ if(!S.x) return toast('Open an audio file first.');
+  const L=loopInfo(); if(!L) return toast('Switch the loop on first – drag in the top strip to draw one.');
+  const o=sliceRenderOpts(), r=Core.renderSlice(chansOf(),S.sr,L.a,L.b,{...o,fadeIn:0,fadeOut:0});
+  await saveBinary(sliceBase()+loopTag()+'.wav',Core.wavEncode(r.chans,S.sr,S.sl.bits),'audio/wav',
+    `Loop saved · ${L.bars} bar${L.bars===1?'':'s'} at ${fmtBpm(L.bpm)} BPM`); }
 async function exportSliceZip(withRpp){ const list=keptSlices(); if(!list) return;
   const base=sliceBase(), pad=String(list.length).length;
   busy('Rendering slices',0.02); await new Promise(res=>setTimeout(res,20));
@@ -1500,7 +1518,7 @@ async function exportSliceZip(withRpp){ const list=keptSlices(); if(!list) retur
     if($('slCsv').checked) files.push({name:base+'-slices.csv',data:new TextEncoder().encode(slicesCsv(list,base,pad))});
     busy('Packing the zip',0.94); await new Promise(res=>setTimeout(res,20));
     const zip=Core.zipFiles(files); $('busy').hidden=true;
-    await saveBinary(base+(withRpp?'-slices-reaper.zip':'-slices.zip'),zip,'application/zip',
+    await saveBinary(base+loopTag()+(withRpp?'-slices-reaper.zip':'-slices.zip'),zip,'application/zip',
       withRpp? `${list.length} slice${list.length===1?'':'s'} saved. Unzip, then open the .rpp in REAPER.` : `${list.length} slice${list.length===1?'':'s'} saved. Unzip to get the .wav files.`);
   }catch(e){ console.error(e); $('busy').hidden=true;
     toast('Too much audio for one zip – loop a shorter part, drop some slices, or use 16-bit mono.'); } }
@@ -1510,6 +1528,7 @@ $('slPrev').onclick=()=>tabSlice(-1); $('slNext').onclick=()=>tabSlice(1);
 $('slPlay').onclick=()=>previewSlice(S.slSel==null?0:S.slSel);
 $('slOff').onclick=()=>{ if(S.slSel==null) return toast('Select a slice first.'); toggleSlice(S.slSel); };
 $('slAll').onclick=keepAllSlices; $('slWav').onclick=saveSliceWav;
+$('slLoop').onclick=saveLoopWav;
 $('slZip').onclick=()=>exportSliceZip(false); $('slRpp').onclick=()=>exportSliceZip(true);
 $('sliceRows').addEventListener('click',e=>{ const box=e.target.closest('input[type=checkbox]');
   if(box){ toggleSlice(+box.dataset.i); return; }
