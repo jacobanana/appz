@@ -14,7 +14,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
 | 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 📐 Headboard Bracket | [`headboard-bracket/`](headboard-bracket/) | Parametric designer for a printed saddle bracket that hangs over a headboard and carries a projector. Type your board thickness and lean and the profile redraws — side elevation, plan, and a spinnable 3D preview where the projector swings on its hinge until it fouls the wall or the bracket. Exports a watertight STL and a real STEP solid. |
-| 🥁 Barline | [`barline/`](barline/) | Tempo map from a recording — drop in the audio, let it find every hit, set bar 1 and it follows the beat from there, pinning each beat to a real transient. Loop the part that feels right and it rebuilds the rest to match. Exports a MIDI tempo map (with a click track) or a REAPER project with the audio already in place, and keeps a per-file session so you can pick up where you left off. |
+| 🥁 BeatMapper | [`beat-mapper/`](beat-mapper/) | Tempo map from a recording — drop in the audio, let it find every hit, set bar 1 and it follows the beat from there, pinning each beat to a real transient. Loop the part that feels right and it rebuilds the rest to match. Exports a MIDI tempo map (with a click track) or a REAPER project with the audio already in place, and keeps a per-file session so you can pick up where you left off. |
 | 🐷 Piggy | [moved to its own repo →](https://github.com/jacobanana/piggy) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. Now a Vite app at [jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/), with a FastAPI + Postgres backend growing beside it. |
 
 ## How it's laid out
@@ -27,7 +27,7 @@ breathing-flow-log/index.html
 sensor-readout/index.html
 tpg-pulse/index.html
 headboard-bracket/index.html
-barline/index.html
+beat-mapper/index.html
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
@@ -166,9 +166,9 @@ angle where the body first touches the wall and where it first fouls the bracket
 the shelf. In the 3D view you can drag the projector to tilt it and tap any piece
 to hide it.
 
-### What Barline hears, and what it keeps
+### What BeatMapper hears, and what it keeps
 
-`barline/` decodes the audio with the browser's own `AudioContext`, then runs a
+`beat-mapper/` decodes the audio with the browser's own `AudioContext`, then runs a
 spectral-flux onset detector over it in three bands (everything, lows, highs).
 Each candidate hit is refined down to the sample where the signal first leaves
 the noise floor, so a marker sits on the *attack*, not the peak. Sensitivity
@@ -185,8 +185,8 @@ bars — and rebuilds everything outside it from that tempo.
 
 | It writes | What's in it |
 | --- | --- |
-| `barline:s:<file name>\|<duration in ms>` | One session per audio file: detection settings, hand-added and removed markers, pins, time signature, loop, view and export choices. **No audio.** Saved every 1.5 s while you work and on leaving the page; opening the same file brings it back. |
-| `barline:index` | The eight most recent session keys — older ones are dropped. |
+| `beatmapper:s:<file name>\|<duration in ms>` | One session per audio file: detection settings, hand-added and removed markers, pins, time signature, loop, view and export choices. **No audio.** Saved every 1.5 s while you work and on leaving the page; opening the same file brings it back. |
+| `beatmapper:index` | The eight most recent session keys — older ones are dropped. |
 
 All of that stays in that browser's `localStorage`; nothing is uploaded. The
 **Save session** button writes the same object to a `.json` file so it can

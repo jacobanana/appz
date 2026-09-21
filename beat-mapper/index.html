@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Barline – tempo map from audio</title>
+<title>BeatMapper – tempo map from audio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -616,7 +616,7 @@ const Core = (() => {
     return {wav:'WAVE',wave:'WAVE',bwf:'WAVE',w64:'WAVE',aif:'WAVE',aiff:'WAVE',mp3:'MP3',flac:'FLAC',ogg:'VORBIS',oga:'VORBIS',opus:'OPUS'}[e]||'VIDEO'; }
   function buildRpp(o){
     const plan=planExport(o), L=[], pts=plan.points, f=plan.points[0], sig0=f.sig||[o.num,o.den];
-    L.push(`<REAPER_PROJECT 0.1 "7.0/Barline" ${Math.floor(Date.now()/1000)}`,'  RIPPLE 0',`  TEMPO ${f.bpm.toFixed(10)} ${sig0[0]} ${sig0[1]}`);
+    L.push(`<REAPER_PROJECT 0.1 "7.0/BeatMapper" ${Math.floor(Date.now()/1000)}`,'  RIPPLE 0',`  TEMPO ${f.bpm.toFixed(10)} ${sig0[0]} ${sig0[1]}`);
     L.push('  <TEMPOENVEX','    ACT 1 -1','    VIS 1 0 1','    LANEHEIGHT 0 0','    ARM 0','    DEFSHAPE 1 -1 -1');
     let prevB=-1; for(const p of pts){ if(!p.sig&&Math.abs(p.bpm-prevB)<1e-7) continue; prevB=p.bpm; L.push(`    PT ${Math.max(0,p.time).toFixed(12)} ${p.bpm.toFixed(10)} 1`+(p.sig? ` ${65536*p.sig[1]+p.sig[0]} 0 1`:'')); }
     L.push('  >');
@@ -723,7 +723,7 @@ function syncAll(){ syncInputs(); $('sens').value=S.sens; $('sensO').textContent
 
 // ---------- session: metadata only, never audio ----------
 const fin=(v,d)=>Number.isFinite(+v)? +v : d;
-function sessionData(){ return { format:'barline-session', version:1, audio:{name:S.name,fileName:S.fileName,duration:S.dur,sampleRate:S.sr},
+function sessionData(){ return { format:'beatmapper-session', version:1, audio:{name:S.name,fileName:S.fileName,duration:S.dur,sampleRate:S.sr},
   detection:{sens:S.sens,gap:S.gap,band:S.band}, markers:{manual:S.manual.map(m=>m.t),removed:S.cands.filter(c=>c.off).map(c=>c.t)},
   beats:{num:S.num,den:S.den,grid:S.grid,baseBpm:S.baseBpm,mapEvery:S.mapEvery,tol:S.tol,snap:S.snap,anchors:S.anchors.map(a=>({q:a.q,t:a.t,manual:!!a.manual}))},
   transport:{loop:S.loop,loopOn:S.loopOn,start:S.start,playhead:playing?S.start:S.playhead,stay:S.stay,click:S.click}, view:S.view, step:S.step,
@@ -741,15 +741,15 @@ function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beat
   if(ex.lead==='trim'||ex.lead==='full') $('lead').value=ex.lead; if(['pins','bar','beat'].includes(ex.res)) $('res').value=ex.res; if('clicks' in ex) $('clicks').checked=!!ex.clicks; if('rppAudio' in ex) $('rppAudio').checked=!!ex.rppAudio;
   S.sel=null; syncAll(); recalcMarkers(); anchorsChanged(); setStep([1,2,3].includes(d.step)?d.step:1);
   if(d.view&&T(d.view.t0)&&T(d.view.t1)&&d.view.t1>d.view.t0) setView(d.view.t0,d.view.t1); }
-const sessKey=()=>`barline:s:${S.fileName||S.name}|${Math.round(S.dur*1000)}`; let lastSaved='';
+const sessKey=()=>`beatmapper:s:${S.fileName||S.name}|${Math.round(S.dur*1000)}`; let lastSaved='';
 function autosave(){ if(!S.x||drag||$('busy').hidden===false) return; try{ const js=JSON.stringify(sessionData()); if(js===lastSaved) return; lastSaved=js; const k=sessKey(); localStorage.setItem(k,js);
-    let idx=[]; try{ idx=JSON.parse(localStorage.getItem('barline:index')||'[]'); }catch(e){} idx=[k,...idx.filter(x=>x!==k)]; for(const old of idx.splice(8)) localStorage.removeItem(old); localStorage.setItem('barline:index',JSON.stringify(idx)); }catch(e){} }
+    let idx=[]; try{ idx=JSON.parse(localStorage.getItem('beatmapper:index')||'[]'); }catch(e){} idx=[k,...idx.filter(x=>x!==k)]; for(const old of idx.splice(8)) localStorage.removeItem(old); localStorage.setItem('beatmapper:index',JSON.stringify(idx)); }catch(e){} }
 setInterval(autosave,1500); addEventListener('pagehide',autosave); document.addEventListener('visibilitychange',()=>{ if(document.hidden) autosave(); });
 function restoreFor(){ let d=S.pending, from='file'; S.pending=null;
   if(!d){ from='saved'; try{ const js=localStorage.getItem(sessKey()); if(js) d=JSON.parse(js); }catch(e){} }
-  if(!d||d.format!=='barline-session') return; const off=Math.abs(fin(d.audio&&d.audio.duration,S.dur)-S.dur)>0.05;
+  if(!d||d.format!=='beatmapper-session') return; const off=Math.abs(fin(d.audio&&d.audio.duration,S.dur)-S.dur)>0.05;
   try{ applySession(d); undo.length=0; redo.length=0; toast(off?'Session applied, but this audio has a different length – check the markers.':from==='saved'?'Picked up where you left off':'Session loaded'); }catch(e){ console.error(e); toast("Couldn't read that session."); } }
-async function importSession(file){ let d; try{ d=JSON.parse(await file.text()); }catch(e){ return toast('That is not a Barline session file.'); } if(!d||d.format!=='barline-session') return toast('That is not a Barline session file.');
+async function importSession(file){ let d; try{ d=JSON.parse(await file.text()); }catch(e){ return toast('That is not a BeatMapper session file.'); } if(!d||d.format!=='beatmapper-session') return toast('That is not a BeatMapper session file.');
   if(S.x){ S.pending=d; restoreFor(); } else { S.pending=d; toast('Session ready. Now open '+((d.audio&&(d.audio.fileName||d.audio.name))||'the audio')+'.'); } }
 async function exportSession(){ if(!S.x) return toast('Open an audio file first.'); const base=(S.name||'audio').replace(/[^\w\-]+/g,'-').slice(0,60)+'-session.json', text=JSON.stringify(sessionData(),null,1);
   const dl=await Promise.race([dlReady,new Promise(r=>setTimeout(()=>r(null),1500))]);
