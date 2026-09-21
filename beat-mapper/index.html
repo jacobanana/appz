@@ -437,6 +437,19 @@ const Core = (() => {
     return Math.max(0,(on-1)/sr);
   }
 
+  // Pulls a time onto a zero crossing so the marker sits where the waveform is at rest, not mid-swing.
+  // Looks back first (up to 10 ms): landing before the hit keeps the whole attack. Only when nothing
+  // behind crosses zero does it look ahead, and then just 3 ms; otherwise the time is left alone.
+  function snapToZero(x, sr, t){
+    const n=x.length; if(n<2) return t;
+    const i=Math.max(1,Math.min(n-1,Math.round(t*sr)));
+    const cross=(k)=>{ const a=x[k-1], b=x[k]; if(a===0) return k-1; if(b===0) return k; return (a<0)!==(b<0)? k-1+a/(a-b) : -1; };
+    const back=Math.round(sr*0.01), fwd=Math.round(sr*0.003);
+    for(let k=i;k>=1&&k>i-back;k--){ const c=cross(k); if(c>=0) return c/sr; }
+    for(let k=i+1;k<n&&k<=i+fwd;k++){ const c=cross(k); if(c>=0) return c/sr; }
+    return t;
+  }
+
   function pickCandidates(an, band, x, sr){
     const odf=an.odf[band], fr=an.fr, d=localDiff(odf, Math.max(2,Math.round(0.1*fr))), m=Math.max(1,Math.round(0.016*fr));
     const raw=[];
@@ -452,7 +465,7 @@ const Core = (() => {
     for(const r of raw){
       const s=Math.min(1,r.d/ref); if(s<0.02) continue;
       const tc=(r.n*an.hop-an.pad+0.6*an.N)/sr;
-      out.push({t:refineOnset(x,sr,tc), s, off:false});
+      out.push({t:snapToZero(x,sr,refineOnset(x,sr,tc)), s, off:false});
     }
     out.sort((a,b)=>a.t-b.t);
     return out;
@@ -671,7 +684,7 @@ const Core = (() => {
     return { x, beats, onsets, dur };
   }
 
-  return { analyze, pickCandidates, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, planExport, wavBytes, zipFiles, zipStore, crc32, synthDemo, lowerBound };
+  return { analyze, pickCandidates, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, planExport, wavBytes, zipFiles, zipStore, crc32, synthDemo, lowerBound, snapToZero };
 })();
 //#endregion core
 
@@ -732,7 +745,7 @@ function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beat
   S.sens=clamp(fin(det.sens,55),0,100); S.gap=clamp(fin(det.gap,60),10,300);
   if(['full','low','high'].includes(det.band)&&det.band!==S.band){ S.band=det.band; S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr); }
   S.cands.forEach(c=>c.off=false);
-  for(const t of (mk.removed||[])){ if(!T(t)) continue; const i=Core.lowerBound(S.cands,t-0.0006), c=S.cands[i]; if(c&&Math.abs(c.t-t)<0.0006) c.off=true; }
+  for(const t of (mk.removed||[])){ if(!T(t)) continue; let best=null; for(let i=Core.lowerBound(S.cands,t-0.008); i<S.cands.length&&S.cands[i].t<=t+0.008; i++){ const c=S.cands[i]; if(!best||Math.abs(c.t-t)<Math.abs(best.t-t)) best=c; } if(best) best.off=true; }
   S.manual=(mk.manual||[]).filter(T).sort((a,b)=>a-b).map(t=>({t,s:1,manual:true}));
   S.num=clamp(Math.round(fin(bt.num,4)),1,32); S.den=[2,4,8,16].includes(+bt.den)? +bt.den : 4; S.grid=['bar','2','4','8','16','32','4t','8t','16t'].includes(String(bt.grid))? String(bt.grid) : '16';
   S.baseBpm=clamp(fin(bt.baseBpm,S.baseBpm),20,400); S.mapEvery=bt.mapEvery==='bar'?'bar':'beat'; S.tol=clamp(fin(bt.tol,20),5,45); S.snap=bt.snap!==false;
@@ -927,7 +940,7 @@ function selectMarker(m,move=true){ S.sel=m?{type:'m',ref:m}:null; if(m&&move){ 
 function tabMarker(dir){ if(!S.markers.length) return; const t=S.playhead, M=S.markers; let i;
   if(dir>0){ i=Core.lowerBound(M,t+1e-4); if(i>=M.length) return toast('No more transients'); } else { i=Core.lowerBound(M,t-1e-4)-1; if(i<0) return toast('No earlier transients'); }
   selectMarker(M[i]); }
-function addMarker(t){ if(!S.x) return; if(S.markers.some(m=>Math.abs(m.t-t)<0.003)) return; pushUndo(); const m={t:clamp(t,0,S.dur),s:1,manual:true}; S.manual.push(m); recalcMarkers(); S.sel={type:'m',ref:m}; }
+function addMarker(t){ if(!S.x) return; t=Core.snapToZero(S.x,S.sr,clamp(t,0,S.dur)); if(S.markers.some(m=>Math.abs(m.t-t)<0.003)) return; pushUndo(); const m={t,s:1,manual:true}; S.manual.push(m); recalcMarkers(); S.sel={type:'m',ref:m}; }
 function removeMarker(m){ pushUndo(); if(m.manual) S.manual=S.manual.filter(k=>k!==m); else m.off=true; S.sel=null; recalcMarkers(); }
 function toManual(m){ if(m.manual) return m; m.off=true; const k={t:m.t,s:1,manual:true}; S.manual.push(k); recalcMarkers(); return k; }
 function ensureDownbeat(){ if(S.anchors.length) return; const t=S.markers.length?S.markers[0].t:0; S.anchors=[{q:0,t,manual:true}]; anchorsChanged(); toast('Bar 1 set on the first transient'); }
