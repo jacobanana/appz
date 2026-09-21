@@ -104,6 +104,8 @@ td.up{color:var(--mark)} td.dn{color:var(--beat)}
 .mini:hover{border-color:var(--dim);color:var(--ink)}
 #p4 input[type=number]{width:58px}
 #p4 .sl input[type=number]{width:52px} #slLen{width:68px}
+#p4 .col{flex:2 1 470px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.sect{color:var(--dim);display:inline-flex;align-items:center;flex:none}
 #expInfo{flex-basis:100%;margin:0}
 
 dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:min(760px,94vw);max-height:88vh}
@@ -283,28 +285,36 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
       </div>
 
       <div class="pane" id="p4" hidden>
-        <div class="bar" style="flex:2 1 460px">
-          <select id="slRange" title="What to slice" aria-label="What to slice"><option value="file">Whole file</option><option value="loop">Loop only</option></select>
-          <select id="slMode" title="Where each slice ends" aria-label="Where each slice ends"><option value="gap">to next transient</option><option value="fixed">fixed length</option></select>
-          <span class="sl" title="Fixed slice length, and the tail kept past the next transient (ms)">len<input type="number" id="slLen" min="5" max="60000" step="5" value="500" aria-label="Fixed slice length in ms"><input type="number" id="slTail" min="0" max="5000" step="5" value="20" aria-label="Tail past the next transient in ms"></span>
-          <span class="sl" title="Fade in / fade out of every slice (ms)">fade<input type="number" id="slFadeIn" min="0" max="500" step="1" value="1" aria-label="Fade in, ms"><input type="number" id="slFadeOut" min="0" max="2000" step="1" value="8" aria-label="Fade out, ms"></span>
-          <span class="sl" title="Skip transients closer together than this (ms)"><svg class="ic"><use href="#i-gap"/></svg><input type="number" id="slMin" min="0" max="5000" step="5" value="40" aria-label="Minimum slice length in ms"></span>
-          <label class="chk" title="Normalize each slice to the target level"><input type="checkbox" id="slNorm">norm</label>
-          <input type="number" id="slTarget" min="-24" max="0" step="0.5" value="-1" title="Normalize target (dBFS)" aria-label="Normalize target in dBFS">
-          <select id="slMono" title="Channels" aria-label="Channels"><option value="src">as source</option><option value="mono">mono</option></select>
-          <select id="slBits" title="Bit depth" aria-label="Bit depth"><option value="16">16-bit</option><option value="24">24-bit</option></select>
-          <select id="slName" title="File names" aria-label="File names"><option value="num">name_01</option><option value="time">name_01_0-00-000</option></select>
-          <span class="sep"></span>
-          <button class="btn" id="slPrev" title="Previous slice (Shift+Tab)" aria-label="Previous slice"><svg class="ic"><use href="#i-prev"/></svg></button>
-          <button class="btn" id="slNext" title="Next slice (Tab)" aria-label="Next slice"><svg class="ic"><use href="#i-next"/></svg></button>
-          <button class="btn" id="slPlay" title="Preview the selected slice (E)" aria-label="Preview slice"><svg class="ic"><use href="#i-play"/></svg></button>
-          <button class="btn" id="slOff" title="Keep or drop the selected slice (X)" aria-label="Keep or drop slice"><svg class="ic"><use href="#i-clear"/></svg></button>
-          <button class="btn" id="slAll" title="Keep every slice again" aria-label="Keep every slice">all</button>
-          <span class="sep"></span>
-          <button class="btn" id="slWav" title="Save the selected slice as one .wav"><svg class="ic"><use href="#i-export"/></svg>WAV</button>
-          <button class="btn primary" id="slZip" title="Save every kept slice as .wav files in a .zip"><svg class="ic"><use href="#i-export"/></svg>ZIP</button>
-          <label class="chk" title="Add a .csv list of the slices to the zip"><input type="checkbox" id="slCsv" checked>csv</label>
-          <span class="num" id="slCount" title="Kept / found"></span>
+        <div class="col">
+          <div class="bar">
+            <span class="sect" title="Where the cuts go: every transient starts a slice"><svg class="ic"><use href="#i-slice"/></svg></span>
+            <select id="slMode" title="Where each slice ends" aria-label="Where each slice ends"><option value="gap">to next transient</option><option value="fixed">fixed length</option></select>
+            <span class="sl" title="Fixed slice length (ms)">len<input type="number" id="slLen" min="5" max="60000" step="5" value="500" aria-label="Fixed slice length in ms"></span>
+            <span class="sl" title="Audio kept past the next transient (ms)">tail<input type="number" id="slTail" min="0" max="5000" step="5" value="0" aria-label="Tail past the next transient in ms"></span>
+            <span class="sl" title="Skip transients closer together than this (ms)"><svg class="ic"><use href="#i-gap"/></svg><input type="number" id="slMin" min="0" max="5000" step="5" value="40" aria-label="Minimum slice length in ms"></span>
+            <span class="num" id="slCount" title="Kept / found"></span>
+          </div>
+          <div class="bar">
+            <span class="sect" title="What every .wav gets"><svg class="ic"><use href="#i-wave"/></svg></span>
+            <span class="sl" title="Fade in / fade out of every slice (ms)">fade<input type="number" id="slFadeIn" min="0" max="500" step="1" value="1" aria-label="Fade in, ms"><input type="number" id="slFadeOut" min="0" max="2000" step="1" value="8" aria-label="Fade out, ms"></span>
+            <label class="chk" title="Normalize each slice to the target level"><input type="checkbox" id="slNorm">norm</label>
+            <input type="number" id="slTarget" min="-24" max="0" step="0.5" value="-1" title="Normalize target (dBFS)" aria-label="Normalize target in dBFS">
+            <select id="slMono" title="Channels" aria-label="Channels"><option value="src">as source</option><option value="mono">mono</option></select>
+            <select id="slBits" title="Bit depth" aria-label="Bit depth"><option value="16">16-bit</option><option value="24">24-bit</option></select>
+            <select id="slName" title="File names: name_01.wav, or with the slice's start time in it" aria-label="File names"><option value="num">01</option><option value="time">01 + time</option></select>
+          </div>
+          <div class="bar">
+            <button class="btn" id="slPrev" title="Previous slice, and hear it (Shift+Tab)" aria-label="Previous slice"><svg class="ic"><use href="#i-prev"/></svg></button>
+            <button class="btn" id="slNext" title="Next slice, and hear it (Tab)" aria-label="Next slice"><svg class="ic"><use href="#i-next"/></svg></button>
+            <button class="btn" id="slPlay" title="Play the selected slice on its own (E)" aria-label="Play slice"><svg class="ic"><use href="#i-play"/></svg></button>
+            <button class="btn" id="slOff" title="Keep or drop the selected slice (X)" aria-label="Keep or drop slice"><svg class="ic"><use href="#i-clear"/></svg></button>
+            <button class="btn" id="slAll" title="Keep every slice again" aria-label="Keep every slice">all</button>
+            <span class="sep"></span>
+            <button class="btn" id="slWav" title="Save the selected slice as one .wav"><svg class="ic"><use href="#i-export"/></svg>WAV</button>
+            <button class="btn primary" id="slZip" title="Save every kept slice as .wav files in a .zip"><svg class="ic"><use href="#i-export"/></svg>ZIP</button>
+            <button class="btn" id="slRpp" title="Save a REAPER project with every kept slice in place, and the .wav files beside it"><svg class="ic"><use href="#i-export"/></svg>REAPER</button>
+            <label class="chk" title="Add a .csv list of the slices to the zip"><input type="checkbox" id="slCsv" checked>csv</label>
+          </div>
         </div>
         <div class="bars">
           <p id="slSum"></p>
@@ -360,12 +370,12 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><svg class="ic"><use href="#i-import"/></svg><span>Open session file, then the same audio</span><span></span></div>
     <div><svg class="ic"><use href="#i-export"/></svg><span>Save MIDI / REAPER project</span><span><kbd>Ctrl/⌘</kbd><kbd>E</kbd></span></div>
     <h3>Slice samples</h3>
-    <div><span>Where slices come from</span><span>Every transient from step 1 starts a slice. Whole file or loop only; each slice runs to the next transient (plus a tail) or for a fixed length</span></div>
+    <div><svg class="ic"><use href="#i-slice"/></svg><span>Every transient from step 1 starts a slice, running to the next transient (plus a tail) or for a fixed length. Switch the loop on and only what is inside it is sliced</span><span></span></div>
     <div><svg class="ic"><use href="#i-gap"/></svg><span>Transients closer together than this are skipped, so the slice before them keeps running</span><span></span></div>
-    <div><span>fade · norm · channels · bit depth</span><span>What each .wav gets: click-free fades, per-slice normalizing to the target dBFS, source channels or a mono mix, 16 or 24-bit at the file's sample rate</span></div>
-    <div><svg class="ic"><use href="#i-play"/></svg><span>Preview the selected slice exactly as it will be written</span><span><kbd>E</kbd></span></div>
+    <div><svg class="ic"><use href="#i-wave"/></svg><span>What each .wav gets: click-free fades, per-slice normalizing to the target dBFS, source channels or a mono mix, 16 or 24-bit at the file's sample rate</span><span></span></div>
+    <div><svg class="ic"><use href="#i-play"/></svg><span>Play the selected slice on its own, exactly as it will be written · a slice you click or step onto plays too</span><span><kbd>E</kbd></span></div>
     <div><svg class="ic"><use href="#i-clear"/></svg><span>Keep or drop the selected slice</span><span><kbd>X</kbd></span></div>
-    <div><svg class="ic"><use href="#i-export"/></svg><span>Save the selected slice, or every kept slice as a .zip of .wav files</span><span></span></div>
+    <div><svg class="ic"><use href="#i-export"/></svg><span>Save the selected slice, every kept slice as a .zip of .wav files, or a REAPER project with the slices in place</span><span></span></div>
   </div>
   <h2 style="margin-top:18px">Keyboard shortcuts</h2>
   <div class="keys">
@@ -403,10 +413,11 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span><kbd>S</kbd></span><span>Snap to transients on/off</span></div>
     <div><span><kbd>Del</kbd></span><span>Unpin selected</span></div>
     <h3>Step 4 – Slice samples</h3>
-    <div><span><kbd>Tab</kbd> <kbd>⇧</kbd><kbd>Tab</kbd></span><span>Next / previous slice</span></div>
-    <div><span><kbd>E</kbd></span><span>Preview the selected slice</span></div>
+    <div><span><kbd>Tab</kbd> <kbd>⇧</kbd><kbd>Tab</kbd></span><span>Next / previous slice, and hear it</span></div>
+    <div><span><kbd>E</kbd></span><span>Play the selected slice on its own</span></div>
     <div><span><kbd>X</kbd></span><span>Keep or drop the selected slice</span></div>
-    <div><span>Tap the waveform</span><span>Selects the slice under the pointer · double-tap previews it</span></div>
+    <div><span>Tap the waveform</span><span>Plays the slice under the pointer · double-tap keeps or drops it</span></div>
+    <div><span>Loop</span><span>With the loop on, only what is inside it is sliced and exported</span></div>
     <h3>Where you touch decides what happens</h3>
     <div><span>Top strip</span><span>Loop: drag to draw, drag edges or middle to adjust, tap it to switch on/off, double-tap to loop a bar</span></div>
     <div><span>Bar ruler</span><span>Drag pins and bar lines (step 2)</span></div>
@@ -418,7 +429,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span>MIDI</span><span>Saved inside a .zip here. Logic, Pro Tools, Cubase, Studio One and Reaper import its tempo map; Ableton Live ignores it</span></div>
     <div><span>Session</span><span>Your work is kept in this browser per audio file and comes back when you open the same file. The session file carries it to another device; it holds no audio</span></div>
     <div><span>REAPER</span><span>.rpp with the tempo map in place. Keep it in the same folder as the audio</span></div>
-    <div><span>Slices</span><span>One .wav per slice in a .zip, at the file's own sample rate, plus a .csv listing where each one came from</span></div>
+    <div><span>Slices</span><span>One .wav per slice in a .zip, at the file's own sample rate, plus a .csv listing where each one came from. The REAPER zip adds a .rpp holding every slice at the time it was cut from, with the tempo map when there is one</span></div>
   </div>
   <div style="margin-top:14px;text-align:right"><button class="btn" id="helpClose">Close</button></div>
 </dialog>
@@ -771,6 +782,25 @@ const Core = (() => {
     return { text:L.join('\n'), info:plan.info, points:pts };
   }
 
+  // A REAPER project holding the slices: one item per slice on a single track, each at the time it was
+  // cut from, so the arrangement is rebuilt from the .wav files beside the .rpp. The tempo map rides
+  // along whenever the beats have been mapped.
+  function buildRppSlices(o){
+    let plan=null; if(o.anchors&&o.anchors.length){ try{ plan=planExport(o); }catch(e){ plan=null; } }
+    const f=plan&&plan.points[0], sig=(f&&f.sig)||[o.num,o.den], bpm=f? f.bpm : o.baseBpm, L=[];
+    L.push(`<REAPER_PROJECT 0.1 "7.0/BeatMapper" ${Math.floor(Date.now()/1000)}`,'  RIPPLE 0',`  TEMPO ${bpm.toFixed(10)} ${sig[0]} ${sig[1]}`);
+    if(plan){
+      L.push('  <TEMPOENVEX','    ACT 1 -1','    VIS 1 0 1','    LANEHEIGHT 0 0','    ARM 0','    DEFSHAPE 1 -1 -1');
+      let prevB=-1; for(const p of plan.points){ if(!p.sig&&Math.abs(p.bpm-prevB)<1e-7) continue; prevB=p.bpm; L.push(`    PT ${Math.max(0,p.time).toFixed(12)} ${p.bpm.toFixed(10)} 1`+(p.sig? ` ${65536*p.sig[1]+p.sig[0]} 0 1`:'')); }
+      L.push('  >');
+    }
+    L.push('  <TRACK',`    NAME ${rppQuote(o.trackName||'Slices')}`,'    BEAT 0');
+    for(const sl of o.slices) L.push('    <ITEM',`      POSITION ${Math.max(0,sl.t0).toFixed(12)}`,`      LENGTH ${(sl.t1-sl.t0).toFixed(12)}`,'      LOOP 0','      BEAT 0',
+      `      NAME ${rppQuote(sl.name)}`,'      SOFFS 0',`      <SOURCE ${rppSourceType(sl.name)}`,`        FILE ${rppQuote(sl.name)}`,'      >','    >');
+    L.push('  >','>','');
+    return L.join('\n');
+  }
+
   // ---- WAV (PCM, interleaved, 16 or 24-bit) ----
   function wavEncode(chans, sr, bits){
     const ch=chans.length, n=chans[0].length, bps=bits===24?3:2, dataLen=n*ch*bps;
@@ -858,7 +888,7 @@ const Core = (() => {
     return { x, beats, onsets, dur };
   }
 
-  return { analyze, pickCandidates, ALGOS, odfOf, odfRef, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, planExport, wavBytes, wavEncode,
+  return { analyze, pickCandidates, ALGOS, odfOf, odfRef, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, buildRppSlices, planExport, wavBytes, wavEncode,
     planSlices, renderSlice, zipFiles, zipStore, crc32, synthDemo, lowerBound, snapToZero };
 })();
 //#endregion core
@@ -869,7 +899,7 @@ const cv=$('cv'), g=cv.getContext('2d'), ov=$('ov'), og=ov.getContext('2d');
 const S={ file:null, fileName:'', buf:null, x:null, sr:44100, dur:0, name:'', peak:1, pyr:[], an:null, cands:[], manual:[], markers:[], anchors:[], bars:[],
   baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', algo:'flux', showOdf:true, snap:true, click:false, tol:20, mapEvery:'beat',
   view:{t0:0,t1:1}, playhead:0, start:0, loop:null, loopOn:false, scrubMode:false, stay:false, pending:null, sel:null, hover:null, amp:1, visLevel:0,
-  slices:[], slSel:null, slExcl:[], sl:{range:'file',mode:'gap',len:500,tail:20,fadeIn:1,fadeOut:8,min:40,mono:false,bits:16,norm:false,target:-1,naming:'num'} };
+  slices:[], slSel:null, slExcl:[], sl:{mode:'gap',len:500,tail:0,fadeIn:1,fadeOut:8,min:40,mono:false,bits:16,norm:false,target:-1,naming:'num'} };
 const undo=[], redo=[];
 let C={}, dirty=true, barsDirty=true, waveKey='', waveCache=document.createElement('canvas'), ovCache=document.createElement('canvas'), ovKey='';
 const LOOPH=20, RULH=22, RUL=LOOPH+RULH, TIME=22, EDIT=0.5;
@@ -931,7 +961,7 @@ function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beat
   S.loop=tr.loop&&T(tr.loop.a)&&T(tr.loop.b)&&tr.loop.b>tr.loop.a? {a:tr.loop.a,b:tr.loop.b} : null; S.loopOn=!!tr.loopOn&&!!S.loop; S.start=T(tr.start)?tr.start:0; S.playhead=T(tr.playhead)?tr.playhead:S.start; S.stay=!!tr.stay; S.click=!!tr.click;
   if(ex.lead==='trim'||ex.lead==='full') $('lead').value=ex.lead; if(['pins','bar','beat'].includes(ex.res)) $('res').value=ex.res; if('clicks' in ex) $('clicks').checked=!!ex.clicks; if('rppAudio' in ex) $('rppAudio').checked=!!ex.rppAudio;
   { const sl=d.slicer||{}, o=S.sl;
-    o.range=sl.range==='loop'?'loop':'file'; o.mode=sl.mode==='fixed'?'fixed':'gap'; o.len=clamp(fin(sl.len,500),5,60000); o.tail=clamp(fin(sl.tail,20),0,5000);
+    o.mode=sl.mode==='fixed'?'fixed':'gap'; o.len=clamp(fin(sl.len,500),5,60000); o.tail=clamp(fin(sl.tail,0),0,5000);
     o.fadeIn=clamp(fin(sl.fadeIn,1),0,500); o.fadeOut=clamp(fin(sl.fadeOut,8),0,2000); o.min=clamp(fin(sl.min,40),0,5000);
     o.mono=!!sl.mono; o.bits=+sl.bits===24?24:16; o.norm=!!sl.norm; o.target=clamp(fin(sl.target,-1),-24,0); o.naming=sl.naming==='time'?'time':'num';
     S.slExcl=Array.isArray(sl.excluded)? sl.excluded.filter(T).slice(0,5000) : []; S.slSel=null;
@@ -1217,7 +1247,7 @@ function schedule(){ if(!playing) return; const eNow=actx.currentTime-pCtx0; if(
 
 // loop
 function syncTransport(){ $('stayBtn').classList.toggle('on',S.stay); $('stayBtn').setAttribute('aria-pressed',S.stay); $('loopBtn').classList.toggle('on',S.loopOn); $('loopBtn').setAttribute('aria-pressed',S.loopOn); $('scrubBtn').classList.toggle('on',S.scrubMode); $('scrubBtn').setAttribute('aria-pressed',S.scrubMode); dirty=true; }
-function loopChanged(){ if(playing) play(nowPos()); if(S.sl.range==='loop') recalcSlices(); syncTransport(); }
+function loopChanged(){ if(playing) play(nowPos()); recalcSlices(); syncTransport(); }
 function defaultLoop(){ const t=S.playhead; if(S.anchors.length&&timeToPos(t)>=0){ const b=Math.floor(timeToPos(t)/barQ()+1e-9); return {a:posToTime(b*barQ()),b:Math.min(S.dur,posToTime((b+1)*barQ()))}; } return {a:t,b:Math.min(S.dur,t+2)}; }
 function toggleLoop(){ if(!S.x) return; if(!S.loop||S.loop.b-S.loop.a<0.01){ S.loop=defaultLoop(); S.loopOn=true; toast(S.anchors.length?'Looping this bar. Drag in the bar ruler to change it.':'Looping 2 seconds. Drag in the top ruler to change it.'); } else S.loopOn=!S.loopOn; loopChanged(); }
 function setLoopEdge(which){ if(!S.x) return; const t=clamp(nowPos(),0,S.dur); let L=S.loop? {...S.loop} : (which==='a'?{a:t,b:S.dur}:{a:0,b:t}); L[which]=t; if(L.b-L.a<0.01){ if(which==='a') L.b=S.dur; else L.a=0; } S.loop=L; S.loopOn=true; loopChanged(); }
@@ -1285,7 +1315,7 @@ function endPtr(e){ ptrs.delete(e.pointerId); if(pinch){ if(ptrs.size<2) pinch=n
     if(S.step===1&&d.zone==='edit'){ d.hit? removeMarker(d.hit.ref) : addMarker(tOf(x)); }
     else if(S.step===2){ if(d.hit&&d.hit.type==='a') unpin(d.hit.ref); else if(d.hit&&d.hit.type==='g') pinAt(posToTime(d.hit.q),d.hit.q); else if(d.zone==='edit') pinAt(tOf(x)); } return; }
   if(S.step===4&&(d.zone==='edit'||d.zone==='nav')&&!S.scrubMode){ const i=sliceAt(tOf(x));
-    if(i>=0){ selectSlice(i); if(dbl) previewSlice(i); else seek(S.slices[i].t0); return; } }
+    if(i>=0){ selectSlice(i); if(dbl){ stopPreview(); toggleSlice(i); } else { seek(S.slices[i].t0,true); previewSlice(i); } return; } }
   if(d.hit&&d.hit.type!=='g'){ S.sel={type:d.hit.type,ref:d.hit.ref}; seek(d.hit.ref.t); } else { S.sel=null; seek(tOf(x)); } }
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
 cv.addEventListener('pointerleave',()=>{ if(S.hover){ S.hover=null; dirty=true; } });
@@ -1365,18 +1395,18 @@ $('sessOpen').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ 
 // ---------- sample slicer ----------
 const SL_ROWS=1500;
 function chansOf(){ const b=S.buf; if(!b) return [S.x]; const c=[]; for(let i=0;i<b.numberOfChannels;i++) c.push(b.getChannelData(i)); return c; }
-function sliceRange(){ return (S.sl.range==='loop'&&S.loop&&S.loop.b-S.loop.a>0.01)? {from:S.loop.a,to:S.loop.b} : {from:0,to:S.dur}; }
+// With the loop switched on, only what is inside it is sliced – and so only that is exported.
+function sliceRange(){ return (S.loopOn&&S.loop&&S.loop.b-S.loop.a>0.01)? {from:S.loop.a,to:S.loop.b,loop:true} : {from:0,to:S.dur,loop:false}; }
 function sliceRenderOpts(){ const o=S.sl; return {fadeIn:o.fadeIn/1000, fadeOut:o.fadeOut/1000, mono:o.mono, normalize:o.norm, target:Math.pow(10,o.target/20)}; }
 function syncSliceUI(){ const o=S.sl;
-  $('slRange').value=o.range; $('slMode').value=o.mode; $('slLen').value=o.len; $('slTail').value=o.tail; $('slFadeIn').value=o.fadeIn; $('slFadeOut').value=o.fadeOut; $('slMin').value=o.min;
+  $('slMode').value=o.mode; $('slLen').value=o.len; $('slTail').value=o.tail; $('slFadeIn').value=o.fadeIn; $('slFadeOut').value=o.fadeOut; $('slMin').value=o.min;
   $('slMono').value=o.mono?'mono':'src'; $('slBits').value=o.bits; $('slNorm').checked=o.norm; $('slTarget').value=o.target; $('slName').value=o.naming;
   $('slLen').disabled=o.mode!=='fixed'; $('slTail').disabled=o.mode==='fixed'; $('slTarget').disabled=!o.norm; }
 function readSliceUI(){ const o=S.sl;
-  o.range=$('slRange').value==='loop'?'loop':'file'; o.mode=$('slMode').value==='fixed'?'fixed':'gap';
+  o.mode=$('slMode').value==='fixed'?'fixed':'gap';
   o.len=clamp(+$('slLen').value||500,5,60000); o.tail=clamp(+$('slTail').value||0,0,5000);
   o.fadeIn=clamp(+$('slFadeIn').value||0,0,500); o.fadeOut=clamp(+$('slFadeOut').value||0,0,2000); o.min=clamp(+$('slMin').value||0,0,5000);
   o.mono=$('slMono').value==='mono'; o.bits=+$('slBits').value===24?24:16; o.norm=$('slNorm').checked; o.target=clamp(+$('slTarget').value||-1,-24,0); o.naming=$('slName').value==='time'?'time':'num';
-  if(o.range==='loop'&&!(S.loop&&S.loop.b-S.loop.a>0.01)) toast('No loop yet – draw one in the top strip. Slicing the whole file meanwhile.');
   syncSliceUI(); recalcSlices(); }
 function recalcSlices(){ if(!S.x){ S.slices=[]; S.slSel=null; return; }
   const o=S.sl, r=sliceRange(), keep=S.slSel!=null&&S.slices[S.slSel]? S.slices[S.slSel].t0 : null;
@@ -1407,13 +1437,15 @@ function renderSliceTable(){ if($('p4').hidden) return; const tb=$('sliceRows'),
     btn.dataset.p=sl.i; btn.title='Preview slice '+(sl.i+1); btn.setAttribute('aria-label',btn.title); }
   let tot=0, on=0; for(const sl of S.slices) if(!sl.off){ tot+=sl.t1-sl.t0; on++; }
   if(!S.slices.length) $('slSum').textContent=S.x? 'No slices – add transients in step 1, or lower the minimum length.' : '';
-  else { const b=zipEstimate(); $('slSum').textContent=`${on} of ${S.slices.length} slices · ${fmtT(tot)} of audio · zip about ${b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}`
+  else { const b=zipEstimate(), r=sliceRange();
+    $('slSum').textContent=`${on} of ${S.slices.length} slices · ${fmtT(tot)} of audio · zip about ${b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}`
+      +(r.loop? ` · inside the loop only (${fmtT(r.from)}–${fmtT(r.to)})`:'')
       +(n<S.slices.length? ` · first ${n} listed`:''); } }
 function selectSlice(i){ const sl=S.slices[i]; if(!sl) return; S.slSel=i; dirty=true; renderSliceTable();
   const row=$('sliceRows').querySelector(`tr[data-i="${i}"]`); if(row&&row.scrollIntoView) row.scrollIntoView({block:'nearest'}); }
 function tabSlice(dir){ if(!S.slices.length) return toast('No slices yet.');
-  const i=S.slSel==null? (dir>0?0:S.slices.length-1) : clamp(S.slSel+dir,0,S.slices.length-1); const sl=S.slices[i];
-  selectSlice(i); reveal(sl.t0); seek(sl.t0,true); }
+  const i=S.slSel==null? (dir>0?0:S.slices.length-1) : clamp(S.slSel+dir,0,S.slices.length-1);
+  seek(S.slices[i].t0,true); previewSlice(i); }
 function sliceAt(t){ let hit=-1; for(const sl of S.slices){ if(sl.t0>t+1e-9) break; if(t<sl.t1) hit=sl.i; } return hit; }
 function toggleSlice(i){ const sl=S.slices[i]; if(!sl) return; sl.off=!sl.off;
   if(sl.off){ S.slExcl.push(sl.t0); if(S.slExcl.length>5000) S.slExcl.shift(); } else S.slExcl=S.slExcl.filter(t=>Math.abs(ms(t)-ms(sl.t0))>1);
@@ -1448,32 +1480,42 @@ async function saveSliceWav(){ if(!S.slices.length) return toast('No slices yet.
   const i=S.slSel==null?0:S.slSel, sl=S.slices[i]; selectSlice(i);
   const r=Core.renderSlice(chansOf(),S.sr,sl.t0,sl.t1,sliceRenderOpts()), base=sliceBase();
   await saveBinary(sliceName(base,i,String(S.slices.length).length,sl),Core.wavEncode(r.chans,S.sr,S.sl.bits),'audio/wav','Slice '+(i+1)+' saved'); }
-async function exportSlices(){ if(!S.x) return toast('Open an audio file first.');
+function keptSlices(){ if(!S.x){ toast('Open an audio file first.'); return null; }
   const list=S.slices.filter(sl=>!sl.off);
-  if(!list.length) return toast(S.slices.length?'Every slice is dropped – press “all” to keep them again.':'No slices yet – add transients in step 1.');
-  const base=sliceBase(), pad=String(list.length).length, o=sliceRenderOpts(), chans=chansOf(), files=[];
+  if(!list.length){ toast(S.slices.length?'Every slice is dropped – press “all” to keep them again.':'No slices yet – add transients in step 1.'); return null; }
+  return list; }
+async function renderSliceFiles(list,base,pad){ const o=sliceRenderOpts(), chans=chansOf(), files=[];
+  for(let i=0;i<list.length;i++){ const r=Core.renderSlice(chans,S.sr,list[i].t0,list[i].t1,o);
+    files.push({name:sliceName(base,i,pad,list[i]),data:Core.wavEncode(r.chans,S.sr,S.sl.bits)});
+    if((i&3)===0){ busy('Rendering slices',0.02+0.86*(i+1)/list.length); await new Promise(res=>setTimeout(res,0)); } }
+  return files; }
+async function exportSliceZip(withRpp){ const list=keptSlices(); if(!list) return;
+  const base=sliceBase(), pad=String(list.length).length;
   busy('Rendering slices',0.02); await new Promise(res=>setTimeout(res,20));
   try{
-    for(let i=0;i<list.length;i++){ const r=Core.renderSlice(chans,S.sr,list[i].t0,list[i].t1,o);
-      files.push({name:sliceName(base,i,pad,list[i]),data:Core.wavEncode(r.chans,S.sr,S.sl.bits)});
-      if((i&3)===0){ busy('Rendering slices',0.02+0.88*(i+1)/list.length); await new Promise(res=>setTimeout(res,0)); } }
+    const files=await renderSliceFiles(list,base,pad);
+    if(withRpp){ const named=list.map((sl,i)=>({t0:sl.t0,t1:sl.t1,name:files[i].name}));
+      const text=Core.buildRppSlices({...exportOpts(),trimmed:false,slices:named,trackName:(S.name||'Audio')+' slices'});
+      files.push({name:base+'-slices.rpp',data:new TextEncoder().encode(text)}); }
     if($('slCsv').checked) files.push({name:base+'-slices.csv',data:new TextEncoder().encode(slicesCsv(list,base,pad))});
     busy('Packing the zip',0.94); await new Promise(res=>setTimeout(res,20));
     const zip=Core.zipFiles(files); $('busy').hidden=true;
-    await saveBinary(base+'-slices.zip',zip,'application/zip',`${list.length} slice${list.length===1?'':'s'} saved. Unzip to get the .wav files.`);
+    await saveBinary(base+(withRpp?'-slices-reaper.zip':'-slices.zip'),zip,'application/zip',
+      withRpp? `${list.length} slice${list.length===1?'':'s'} saved. Unzip, then open the .rpp in REAPER.` : `${list.length} slice${list.length===1?'':'s'} saved. Unzip to get the .wav files.`);
   }catch(e){ console.error(e); $('busy').hidden=true;
-    toast('Too much audio for one zip – slice a shorter range, drop some slices, or use 16-bit mono.'); } }
+    toast('Too much audio for one zip – loop a shorter part, drop some slices, or use 16-bit mono.'); } }
 
 document.querySelectorAll('#p4 input,#p4 select').forEach(el=>{ if(el.id!=='slCsv') el.addEventListener('change',readSliceUI); });
 $('slPrev').onclick=()=>tabSlice(-1); $('slNext').onclick=()=>tabSlice(1);
 $('slPlay').onclick=()=>previewSlice(S.slSel==null?0:S.slSel);
 $('slOff').onclick=()=>{ if(S.slSel==null) return toast('Select a slice first.'); toggleSlice(S.slSel); };
-$('slAll').onclick=keepAllSlices; $('slWav').onclick=saveSliceWav; $('slZip').onclick=exportSlices;
+$('slAll').onclick=keepAllSlices; $('slWav').onclick=saveSliceWav;
+$('slZip').onclick=()=>exportSliceZip(false); $('slRpp').onclick=()=>exportSliceZip(true);
 $('sliceRows').addEventListener('click',e=>{ const box=e.target.closest('input[type=checkbox]');
   if(box){ toggleSlice(+box.dataset.i); return; }
   const btn=e.target.closest('button[data-p]'); if(btn){ previewSlice(+btn.dataset.p); return; }
   const tr=e.target.closest('tr[data-i]'); if(!tr) return; const sl=S.slices[+tr.dataset.i]; if(!sl) return;
-  const len=sl.t1-sl.t0; setView(sl.t0-len*.5,sl.t1+len*.5); selectSlice(sl.i); seek(sl.t0); });
+  const len=sl.t1-sl.t0; setView(sl.t0-len*.5,sl.t1+len*.5); seek(sl.t0,true); previewSlice(sl.i); });
 
 // ---------- keyboard ----------
 addEventListener('keydown',e=>{ const el=document.activeElement, tag=el&&el.tagName, typing=tag==='TEXTAREA'||tag==='SELECT'||(tag==='INPUT'&&el.type!=='range'&&el.type!=='checkbox'&&el.type!=='radio');
