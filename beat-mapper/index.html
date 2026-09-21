@@ -152,6 +152,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
 <symbol id="i-snap" viewBox="0 0 20 20"><path d="M5 3v7a5 5 0 0 0 10 0V3h-3v7a2 2 0 0 1-4 0V3ZM5 6h3M12 6h3"/></symbol>
 <symbol id="i-tap" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.2"/><circle cx="10" cy="10" r="6.5"/></symbol>
 <symbol id="i-sens" viewBox="0 0 20 20"><path d="M2.5 16 6 8l3 5 3.5-10 3 13M2 11.5h16" /></symbol>
+<symbol id="i-odf" viewBox="0 0 20 20"><path d="M2 16c1.5 0 2-7 3.5-7S7 12 8 12s1.2-9 2.5-9 1.5 12 3 12 1.5-5 4.5-5"/></symbol>
 <symbol id="i-gap" viewBox="0 0 20 20"><path d="M5 4v12M15 4v12M7.5 10h5M9 8.5 7.5 10 9 11.5M11 8.5l1.5 1.5-1.5 1.5"/></symbol>
 <symbol id="i-stay" viewBox="0 0 20 20"><path d="M10 8v9"/><path class="f" d="M5.5 3h9v2.5L10 9 5.5 5.5Z"/></symbol>
 <symbol id="i-save" viewBox="0 0 20 20"><path d="M4 3.5h9.5L16.5 6.5v10h-12.5ZM7 3.5v4h5.5v-4M7 16.5v-5h6v5"/></symbol>
@@ -211,7 +212,9 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
         <div class="bar">
           <label class="sl" title="Sensitivity ([ ])"><svg class="ic"><use href="#i-sens"/></svg><input type="range" id="sens" min="0" max="100" value="55" aria-label="Sensitivity"><output id="sensO">55%</output></label>
           <label class="sl" title="Minimum gap between markers"><svg class="ic"><use href="#i-gap"/></svg><input type="range" id="gap" min="10" max="300" step="5" value="60" aria-label="Minimum gap"><output id="gapO">60 ms</output></label>
+          <select id="algo" title="Detection algorithm" aria-label="Detection algorithm"><option value="flux">Spectral flux</option><option value="complex">Complex domain</option><option value="gdelay">Group delay</option><option value="energy">Energy rise</option></select>
           <select id="band" title="Frequency band to detect on" aria-label="Band"><option value="full">All</option><option value="low">Lows</option><option value="high">Highs</option></select>
+          <button class="btn on" id="odfBtn" title="Show the transientness curve on the waveform (V)" aria-label="Show transientness" aria-pressed="true"><svg class="ic"><use href="#i-odf"/></svg></button>
           <span class="sep"></span>
           <button class="btn" id="prevM" title="Previous transient (Shift+Tab)" aria-label="Previous transient"><svg class="ic"><use href="#i-prev"/></svg></button>
           <button class="btn" id="nextM" title="Next transient (Tab)" aria-label="Next transient"><svg class="ic"><use href="#i-next"/></svg></button>
@@ -293,6 +296,8 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <h3>Transients</h3>
     <div><svg class="ic"><use href="#i-sens"/></svg><span>Sensitivity</span><span><kbd>[</kbd><kbd>]</kbd></span></div>
     <div><svg class="ic"><use href="#i-gap"/></svg><span>Minimum gap between markers</span><span></span></div>
+    <div><span>Algorithm</span><span>What counts as a hit: spectral flux (new energy in any bin), complex domain (also phase jumps, for soft pitched notes), group delay (each bin points at the instant its energy sits), energy rise (loudness only)</span></div>
+    <div><svg class="ic"><use href="#i-odf"/></svg><span>Show the transientness curve the markers come from</span><span><kbd>V</kbd></span></div>
     <div><svg class="ic"><use href="#i-prev"/></svg><span>Previous transient</span><span><kbd>⇧</kbd><kbd>Tab</kbd></span></div>
     <div><svg class="ic"><use href="#i-next"/></svg><span>Next transient</span><span><kbd>Tab</kbd></span></div>
     <div><svg class="ic"><use href="#i-add"/></svg><span>Add marker at playhead</span><span><kbd>A</kbd></span></div>
@@ -339,6 +344,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span><kbd>A</kbd></span><span>Add marker at playhead</span></div>
     <div><span><kbd>Del</kbd></span><span>Delete selected marker</span></div>
     <div><span><kbd>[</kbd> <kbd>]</kbd></span><span>Sensitivity down / up</span></div>
+    <div><span><kbd>V</kbd></span><span>Transientness curve on/off</span></div>
     <h3>Step 2 – Beats</h3>
     <div><span><kbd>D</kbd></span><span>Bar 1 starts at playhead</span></div>
     <div><span><kbd>B</kbd></span><span>Pin nearest grid line to playhead</span></div>
@@ -384,27 +390,64 @@ const Core = (() => {
     };
   }
 
-  // Spectral-flux onset detection function in three bands.
+  // Onset detection functions: four of them from one pass of FFTs, each in three bands (everything,
+  // below 250 Hz, above 3 kHz), at frame rate sr/hop. Frame n's value sits at (n*hop-pad+0.6N)/sr.
+  //   flux:    spectral flux. The rise in log magnitude since the previous frame, summed over bins.
+  //   complex: rectified complex-domain difference (Duxbury, Bello et al. 2003; Dixon 2006). Each bin
+  //            is predicted from the previous two frames (same magnitude, phase advancing steadily)
+  //            and the distance to what was observed is counted where the magnitude rose. Catches
+  //            soft, pitched onsets that barely change loudness.
+  //   gdelay:  group delay (Van Belle 2012). A bin's phase slope across frequency says where inside
+  //            the window its energy sits, so each bin votes for that instant, weighted by its log
+  //            magnitude. A tick collects every vote at one instant; a steady tone votes for the
+  //            window centre, which slides along and blurs into a floor.
+  //   energy:  the rise in log energy since the previous frame. The plain loudness jump.
   async function analyze(x, sr, onProgress){
-    const N = sr>60000 ? 2048 : 1024, hop = N>>2, pad = N;
+    const N = sr>60000 ? 2048 : 1024, hop = N>>2, pad = N, half=N>>1;
     const frames = Math.max(1, Math.floor((x.length+pad-N)/hop)+1);
-    const full=new Float32Array(frames), low=new Float32Array(frames), high=new Float32Array(frames);
-    const fft=makeFFT(N), re=new Float64Array(N), im=new Float64Array(N), prev=new Float32Array(N/2), win=new Float64Array(N);
+    const mk=()=>({full:new Float32Array(frames), low:new Float32Array(frames), high:new Float32Array(frames)});
+    const odfs={flux:mk(), complex:mk(), gdelay:mk(), energy:mk()}, G=odfs.gdelay, E=odfs.energy;
+    const fft=makeFFT(N), re=new Float64Array(N), im=new Float64Array(N), win=new Float64Array(N);
+    const prev=new Float32Array(half), ph1=new Float32Array(half), ph2=new Float32Array(half); let e1=0, e1l=0, e1h=0;
     for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
-    const bLow=Math.ceil(250/(sr/N)), bHigh=Math.floor(3000/(sr/N)), sc=4/N*200;
+    const bLow=Math.ceil(250/(sr/N)), bHigh=Math.floor(3000/(sr/N)), sc=4/N*200, TAU=2*Math.PI, gOff=pad-0.6*N, eps=1e-9*N*N;
     for(let n=0;n<frames;n++){
       const off=n*hop-pad;
       for(let i=0;i<N;i++){ const s=off+i; re[i]=(s>=0&&s<x.length? x[s]:0)*win[i]; im[i]=0; }
       fft(re,im);
-      let f=0,l=0,h=0;
-      for(let b=1;b<N/2;b++){
-        const L=Math.log1p(Math.sqrt(re[b]*re[b]+im[b]*im[b])*sc), d=L-prev[b]; prev[b]=L;
-        if(d>0){ f+=d; if(b<bLow) l+=d; else if(b>=bHigh) h+=d; }
+      let f=0,fl=0,fh=0, c=0,cl=0,ch=0, e=0,el=0,eh=0, pp=Math.atan2(im[0],re[0]);
+      for(let b=1;b<half;b++){
+        const r=re[b], q=im[b], m2=r*r+q*q, L=Math.log1p(Math.sqrt(m2)*sc), phase=Math.atan2(q,r), band=b<bLow?1:b>=bHigh?2:0, d=L-prev[b];
+        if(d>0){
+          f+=d; if(band===1) fl+=d; else if(band===2) fh+=d;
+          const pr=prev[b], cd=Math.sqrt(Math.max(0, L*L+pr*pr-2*L*pr*Math.cos(phase-2*ph1[b]+ph2[b])));
+          c+=cd; if(band===1) cl+=cd; else if(band===2) ch+=cd;
+        }
+        // Phase step to the previous bin, unwrapped into (-2pi, 0]: a tick at sample p of the window has
+        // phase -2pi*k*p/N, so the step is -2pi*p/N and p = -step*N/2pi.
+        let dp=phase-pp; pp=phase; while(dp>0) dp-=TAU; while(dp<=-TAU) dp+=TAU;
+        const gi=Math.round((off-dp/TAU*N+gOff)/hop);
+        if(gi>=0&&gi<frames){ G.full[gi]+=L; if(band===1) G.low[gi]+=L; else if(band===2) G.high[gi]+=L; }
+        e+=m2; if(band===1) el+=m2; else if(band===2) eh+=m2;
+        prev[b]=L; ph2[b]=ph1[b]; ph1[b]=phase;
       }
-      full[n]=f; low[n]=l; high[n]=h;
+      odfs.flux.full[n]=f; odfs.flux.low[n]=fl; odfs.flux.high[n]=fh;
+      odfs.complex.full[n]=c; odfs.complex.low[n]=cl; odfs.complex.high[n]=ch;
+      E.full[n]=Math.max(0,Math.log(e+eps)-Math.log(e1+eps)); E.low[n]=Math.max(0,Math.log(el+eps)-Math.log(e1l+eps)); E.high[n]=Math.max(0,Math.log(eh+eps)-Math.log(e1h+eps)); e1=e; e1l=el; e1h=eh;
       if((n&2047)===0 && onProgress){ onProgress(n/frames); await new Promise(r=>setTimeout(r,0)); }
     }
-    return { odf:{full,low,high}, fr:sr/hop, N, hop, pad, frames };
+    // Group-delay votes land at sample precision from four overlapping windows; a 3-tap smoothing knits them.
+    for(const k of ['full','low','high']){ const a=G[k], b=new Float32Array(frames); for(let n=0;n<frames;n++) b[n]=(2*a[n]+(n?a[n-1]:0)+(n+1<frames?a[n+1]:0))/4; G[k]=b; }
+    return { odfs, odf:odfs.flux, fr:sr/hop, N, hop, pad, frames, refs:{} };
+  }
+
+  const ALGOS=['flux','complex','gdelay','energy'];
+  function odfOf(an, algo, band){ return ((an.odfs&&an.odfs[algo])||an.odf)[band]; }
+  // Level that counts as "full" for drawing a detection function: its 99th percentile.
+  function odfRef(an, algo, band){
+    const k=algo+'/'+band; if(an.refs&&an.refs[k]) return an.refs[k];
+    const odf=odfOf(an,algo,band), s=Float32Array.from(odf).sort(), r=s[Math.min(s.length-1,Math.floor(s.length*0.99))]||1;
+    if(an.refs) an.refs[k]=r; return r;
   }
 
   function localDiff(odf, w){
@@ -484,8 +527,8 @@ const Core = (() => {
     return t;
   }
 
-  function pickCandidates(an, band, x, sr){
-    const odf=an.odf[band], fr=an.fr, d=localDiff(odf, Math.max(2,Math.round(0.1*fr))), m=Math.max(1,Math.round(0.016*fr));
+  function pickCandidates(an, band, x, sr, algo){
+    const odf=odfOf(an,algo||'flux',band), fr=an.fr, d=localDiff(odf, Math.max(2,Math.round(0.1*fr))), m=Math.max(1,Math.round(0.016*fr));
     const raw=[];
     for(let n=1;n<odf.length-1;n++){
       if(d[n]<=0) continue;
@@ -718,7 +761,7 @@ const Core = (() => {
     return { x, beats, onsets, dur };
   }
 
-  return { analyze, pickCandidates, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, planExport, wavBytes, zipFiles, zipStore, crc32, synthDemo, lowerBound, snapToZero };
+  return { analyze, pickCandidates, ALGOS, odfOf, odfRef, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, planExport, wavBytes, zipFiles, zipStore, crc32, synthDemo, lowerBound, snapToZero };
 })();
 //#endregion core
 
@@ -726,7 +769,7 @@ if (typeof document !== 'undefined') (() => {
 const $=id=>document.getElementById(id);
 const cv=$('cv'), g=cv.getContext('2d'), ov=$('ov'), og=ov.getContext('2d');
 const S={ file:null, fileName:'', buf:null, x:null, sr:44100, dur:0, name:'', peak:1, pyr:[], an:null, cands:[], manual:[], markers:[], anchors:[], bars:[],
-  baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', snap:true, click:false, tol:20, mapEvery:'beat',
+  baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', algo:'flux', showOdf:true, snap:true, click:false, tol:20, mapEvery:'beat',
   view:{t0:0,t1:1}, playhead:0, start:0, loop:null, loopOn:false, scrubMode:false, stay:false, pending:null, sel:null, hover:null, amp:1, visLevel:0 };
 const undo=[], redo=[];
 let C={}, dirty=true, barsDirty=true, waveKey='', waveCache=document.createElement('canvas'), ovCache=document.createElement('canvas'), ovKey='';
@@ -758,26 +801,27 @@ function anchorsChanged(){ S.anchors.sort((a,b)=>a.q-b.q); barsDirty=true; dirty
 function computeBars(){ S.bars=[]; if(!S.anchors.length) return; const bq=barQ(); for(let b=0;b<5000;b++){ const ts=posToTime(b*bq); if(ts>=S.dur) break; const te=posToTime((b+1)*bq); S.bars.push({b,ts,te,bpm:60*bq/(te-ts)}); } }
 
 // ---------- undo ----------
-function snapState(){ return JSON.stringify({band:S.band, off:S.cands.reduce((a,c,i)=>(c.off&&a.push(i),a),[]), manual:S.manual.map(m=>m.t), anchors:S.anchors, baseBpm:S.baseBpm, num:S.num, den:S.den}); }
+function snapState(){ return JSON.stringify({band:S.band, algo:S.algo, off:S.cands.reduce((a,c,i)=>(c.off&&a.push(i),a),[]), manual:S.manual.map(m=>m.t), anchors:S.anchors, baseBpm:S.baseBpm, num:S.num, den:S.den}); }
 function pushUndo(){ undo.push(snapState()); if(undo.length>120) undo.shift(); redo.length=0; }
-function restore(js){ const s=JSON.parse(js); if(s.band===S.band){ S.cands.forEach(c=>c.off=false); s.off.forEach(i=>{ if(S.cands[i]) S.cands[i].off=true; }); }
+function restore(js){ const s=JSON.parse(js); if(s.band===S.band&&s.algo===S.algo){ S.cands.forEach(c=>c.off=false); s.off.forEach(i=>{ if(S.cands[i]) S.cands[i].off=true; }); }
   S.manual=s.manual.map(t=>({t,s:1,manual:true})); S.anchors=s.anchors; S.baseBpm=s.baseBpm; S.num=s.num; S.den=s.den; S.sel=null; syncInputs(); recalcMarkers(); anchorsChanged(); }
 function doUndo(){ if(!undo.length) return toast('Nothing to undo'); redo.push(snapState()); restore(undo.pop()); }
 function doRedo(){ if(!redo.length) return toast('Nothing to redo'); undo.push(snapState()); restore(redo.pop()); }
 function syncInputs(){ $('num').value=S.num; $('den').value=S.den; $('bpm').value=(+S.baseBpm.toFixed(2)); }
-function syncAll(){ syncInputs(); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; $('gap').value=S.gap; $('gapO').textContent=S.gap+' ms'; $('band').value=S.band; $('grid').value=S.grid; $('mapEvery').value=S.mapEvery;
+function syncAll(){ syncInputs(); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; $('gap').value=S.gap; $('gapO').textContent=S.gap+' ms'; $('band').value=S.band; $('algo').value=S.algo; $('odfBtn').classList.toggle('on',S.showOdf); $('odfBtn').setAttribute('aria-pressed',S.showOdf); $('grid').value=S.grid; $('mapEvery').value=S.mapEvery;
   $('tol').value=S.tol; $('tolO').textContent='±'+S.tol+'%'; $('snapBtn').classList.toggle('on',S.snap); $('snapBtn').setAttribute('aria-pressed',S.snap); $('clickBtn').classList.toggle('on',S.click); $('clickBtn').setAttribute('aria-pressed',S.click); syncTransport(); }
 
 // ---------- session: metadata only, never audio ----------
 const fin=(v,d)=>Number.isFinite(+v)? +v : d;
 function sessionData(){ return { format:'beatmapper-session', version:1, audio:{name:S.name,fileName:S.fileName,duration:S.dur,sampleRate:S.sr},
-  detection:{sens:S.sens,gap:S.gap,band:S.band}, markers:{manual:S.manual.map(m=>m.t),removed:S.cands.filter(c=>c.off).map(c=>c.t)},
+  detection:{sens:S.sens,gap:S.gap,band:S.band,algo:S.algo,overlay:S.showOdf}, markers:{manual:S.manual.map(m=>m.t),removed:S.cands.filter(c=>c.off).map(c=>c.t)},
   beats:{num:S.num,den:S.den,grid:S.grid,baseBpm:S.baseBpm,mapEvery:S.mapEvery,tol:S.tol,snap:S.snap,anchors:S.anchors.map(a=>({q:a.q,t:a.t,manual:!!a.manual}))},
   transport:{loop:S.loop,loopOn:S.loopOn,start:S.start,playhead:playing?S.start:S.playhead,stay:S.stay,click:S.click}, view:S.view, step:S.step,
   export:{lead:$('lead').value,res:$('res').value,clicks:$('clicks').checked,rppAudio:$('rppAudio').checked} }; }
 function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beats||{}, tr=d.transport||{}, ex=d.export||{}, T=t=>Number.isFinite(t)&&t>=0&&t<=S.dur+1e-6;
   S.sens=clamp(fin(det.sens,55),0,100); S.gap=clamp(fin(det.gap,60),10,300);
-  if(['full','low','high'].includes(det.band)&&det.band!==S.band){ S.band=det.band; S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr); }
+  if(typeof det.overlay==='boolean') S.showOdf=det.overlay;
+  { const nb=['full','low','high'].includes(det.band)?det.band:S.band, na=Core.ALGOS.includes(det.algo)?det.algo:S.algo; if(nb!==S.band||na!==S.algo){ S.band=nb; S.algo=na; S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); } }
   S.cands.forEach(c=>c.off=false);
   for(const t of (mk.removed||[])){ if(!T(t)) continue; let best=null; for(let i=Core.lowerBound(S.cands,t-0.008); i<S.cands.length&&S.cands[i].t<=t+0.008; i++){ const c=S.cands[i]; if(!best||Math.abs(c.t-t)<Math.abs(best.t-t)) best=c; } if(best) best.off=true; }
   S.manual=(mk.manual||[]).filter(T).sort((a,b)=>a-b).map(t=>({t,s:1,manual:true}));
@@ -825,7 +869,7 @@ async function setAudio(buf,name){
   S.x=x; let pk=0; for(let i=0;i<n;i++){ const v=x[i]<0?-x[i]:x[i]; if(v>pk) pk=v; } S.peak=pk||1;
   buildPyramid();
   S.an=await Core.analyze(x,S.sr,f=>busy('Finding transients',0.1+0.88*f));
-  S.cands=Core.pickCandidates(S.an,S.band,x,S.sr); S.manual=[]; S.anchors=[]; S.sel=null; undo.length=0; redo.length=0;
+  S.cands=Core.pickCandidates(S.an,S.band,x,S.sr,S.algo); S.manual=[]; S.anchors=[]; S.sel=null; undo.length=0; redo.length=0;
   S.baseBpm=+Core.estimateTempo(S.an.odf.full,S.an.fr).toFixed(2); syncInputs();
   S.view={t0:0,t1:S.dur}; S.playhead=0; S.start=0; S.loop=null; S.loopOn=false; syncTransport(); S.amp=1; waveKey=''; ovKey='';
   $('busy').hidden=true; $('empty').hidden=true;
@@ -901,6 +945,14 @@ function draw(){
   // waveform
   const key=[v.t0,v.t1,cv.width,wh,S.amp,C.wave].join('|'); if(key!==waveKey){ renderWave(waveCache,v.t0,v.t1,cv.width,Math.round(wh*dpr),S.amp); waveKey=key; }
   g.setTransform(1,0,0,1,0,0); g.drawImage(waveCache,0,Math.round(wy*dpr)); g.setTransform(dpr,0,0,dpr,0,0);
+
+  // transientness: the detection function the markers come from, rising from the bottom of the wave area.
+  // Full height is its 99th percentile. Zoomed out, each pixel shows the loudest frame it covers.
+  if(S.showOdf&&S.an){ const an=S.an, odf=Core.odfOf(an,S.algo,S.band), ref=Core.odfRef(an,S.algo,S.band), dt=an.hop/S.sr, tf=(0.6*an.N-an.pad)/S.sr, span=v.t1-v.t0, hh=wh-4, pts=[];
+    if(span/dt>w){ for(let px=0;px<w;px++){ const a=Math.max(0,Math.ceil((v.t0+span*px/w-tf)/dt)), b=Math.min(odf.length,Math.ceil((v.t0+span*(px+1)/w-tf)/dt)); let m=0; for(let n=a;n<b;n++) if(odf[n]>m) m=odf[n]; pts.push(px,ly-Math.min(1,m/ref)*hh); } }
+    else { const n0=Math.max(0,Math.floor((v.t0-tf)/dt)-1), n1=Math.min(odf.length-1,Math.ceil((v.t1-tf)/dt)+1); for(let n=n0;n<=n1;n++) pts.push(xOf(tf+n*dt),ly-Math.min(1,odf[n]/ref)*hh); }
+    if(pts.length){ g.beginPath(); g.moveTo(pts[0],ly); for(let i=0;i<pts.length;i+=2) g.lineTo(pts[i],pts[i+1]); g.lineTo(pts[pts.length-2],ly); g.closePath(); g.fillStyle=rgba(C.mark,beatsMode?.07:.14); g.fill();
+      g.beginPath(); for(let i=0;i<pts.length;i+=2) i?g.lineTo(pts[i],pts[i+1]):g.moveTo(pts[i],pts[i+1]); g.strokeStyle=rgba(C.mark,beatsMode?.3:.6); g.lineWidth=1; g.stroke(); } }
 
   // transient markers
   const M=S.markers, i0=Core.lowerBound(M,v.t0), dense=(Core.lowerBound(M,v.t1)-i0)>w/4, ma=beatsMode?.5:1;
@@ -1134,7 +1186,11 @@ document.querySelector('.top').addEventListener('click',e=>{ const b=e.target.cl
 document.querySelectorAll('input[type=range],select').forEach(el=>el.addEventListener('change',refocus));
 $('sens').oninput=e=>{ S.sens=+e.target.value; $('sensO').textContent=S.sens+'%'; recalcMarkers(); };
 $('gap').oninput=e=>{ S.gap=+e.target.value; $('gapO').textContent=S.gap+' ms'; recalcMarkers(); };
-$('band').onchange=e=>{ S.band=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr); recalcMarkers(); } };
+$('band').onchange=e=>{ S.band=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); recalcMarkers(); } };
+const ALGO_NOTE={flux:'Spectral flux: new energy in any frequency bin', complex:'Complex domain: new energy or a phase jump, for soft pitched notes too', gdelay:'Group delay: every bin points at the instant its energy sits', energy:'Energy rise: loudness jumps only'};
+$('algo').onchange=e=>{ S.algo=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); recalcMarkers(); } toast(ALGO_NOTE[S.algo]); };
+function toggleOdf(){ S.showOdf=!S.showOdf; $('odfBtn').classList.toggle('on',S.showOdf); $('odfBtn').setAttribute('aria-pressed',S.showOdf); dirty=true; }
+$('odfBtn').onclick=toggleOdf;
 $('prevM').onclick=$('prevM2').onclick=()=>tabMarker(-1); $('nextM').onclick=$('nextM2').onclick=()=>tabMarker(1); $('addM').onclick=()=>addMarker(S.playhead);
 $('delM').onclick=()=>{ if(S.sel&&S.sel.type==='m') removeMarker(S.sel.ref); else toast('Select a marker first.'); };
 $('resetM').onclick=()=>{ if(!S.x) return; pushUndo(); S.manual=[]; S.cands.forEach(c=>c.off=false); recalcMarkers(); };
@@ -1206,7 +1262,7 @@ addEventListener('keydown',e=>{ const el=document.activeElement, tag=el&&el.tagN
     case 'Enter': if(tag==='BUTTON'||tag==='LABEL') return; playFromStart(e.shiftKey); return done();
     case 'l': toggleLoop(); return; case 'i': setLoopEdge('a'); return; case 'o': setLoopEdge('b'); return; case 'p': setStartHere(); return; case 'r': toggleScrub(); return;
     case ',': case '<': stepListen(-1,e.shiftKey); return done(); case '.': case '>': stepListen(1,e.shiftKey); return done();
-    case 'h': toggleStay(); return;
+    case 'h': toggleStay(); return; case 'v': toggleOdf(); return;
     case 'k': toggleClick(); return; case '1': setStep(1); return; case '2': setStep(2); return; case '3': setStep(3); return; case '?': openHelp(); return;
     case 'Escape': S.sel=null; dirty=true; if(el===cv) cv.blur(); return;
     case 'Delete': case 'Backspace': if(S.sel){ if(S.sel.type==='m'&&S.step===1) removeMarker(S.sel.ref); else if(S.sel.type==='a'&&S.step===2) unpin(S.sel.ref); } return done();

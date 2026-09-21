@@ -168,12 +168,18 @@ to hide it.
 
 ### What BeatMapper hears, and what it keeps
 
-`beat-mapper/` decodes the audio with the browser's own `AudioContext`, then runs a
-spectral-flux onset detector over it in three bands (everything, lows, highs).
-Each candidate hit is refined down to the sample where the signal first leaves
-the noise floor, so a marker sits on the *attack*, not the peak. Sensitivity
-and a minimum gap decide which candidates become markers; anything the detector
-missed you add or drag yourself.
+`beat-mapper/` decodes the audio with the browser's own `AudioContext`, then runs
+one pass of FFTs over it and keeps four onset detection functions from that pass,
+each in three bands (everything, lows, highs): **spectral flux** (new energy in
+any bin), **complex domain** (new energy or a phase jump, which also catches soft
+pitched notes), **group delay** (every bin points at the instant its energy sits,
+after Van Belle 2012) and **energy rise** (loudness jumps only). Pick one in
+step 1; the *transientness* curve it produces is drawn under the waveform so you
+can see what the markers come from. Each candidate hit is refined down to the
+sample where the signal first leaves the noise floor, so a marker sits on the
+*attack*, not the peak or the hat that follows it. Sensitivity and a minimum
+gap decide which candidates become markers; anything the detector missed you
+add or drag yourself.
 
 The beat grid is a list of *pins* — a position in quarter notes tied to a time
 in seconds — and the tempo between two pins is whatever makes them line up. Bar
