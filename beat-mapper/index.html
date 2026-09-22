@@ -252,7 +252,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
           <button class="btn" id="pinHere" title="Pin nearest grid line to playhead (B)" aria-label="Pin here"><svg class="ic"><use href="#i-pin"/></svg></button>
           <button class="btn" id="unpin" title="Unpin selected (Del)" aria-label="Unpin"><svg class="ic"><use href="#i-unpin"/></svg></button>
           <button class="btn" id="clearPins" title="Clear all pins except bar 1" aria-label="Clear pins"><svg class="ic"><use href="#i-clear"/></svg></button>
-          <button class="btn on" id="snapBtn" title="Snap to transients (S)" aria-label="Snap" aria-pressed="true"><svg class="ic"><use href="#i-snap"/></svg></button>
+          <span class="sl" title="Magnet: what the playhead and dragging land on (S cycles)"><svg class="ic"><use href="#i-snap"/></svg><select id="snapTo" aria-label="Snap to"><option value="markers">transients</option><option value="grid">grid</option><option value="off">nothing</option></select></span>
           <span class="sep"></span>
           <button class="btn primary" id="derive" title="Derive from loop: keep the loop, rebuild the rest (F)" aria-label="Derive from loop"><svg class="ic"><use href="#i-derive"/></svg></button>
           <input type="number" id="loopBars" min="1" max="64" placeholder="bars" title="Bars in the loop (blank = auto)" aria-label="Bars in the loop">
@@ -337,7 +337,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><svg class="ic"><use href="#i-slice"/></svg><span>Step 4 · Slice samples</span><span><kbd>4</kbd></span></div>
     <div><svg class="ic"><use href="#i-play"/></svg><span>Play from playhead / stop</span><span><kbd>Space</kbd></span></div>
     <div><svg class="ic"><use href="#i-tostart"/></svg><span>Play from first transient, or loop start</span><span><kbd>Enter</kbd></span></div>
-    <div><svg class="ic"><use href="#i-stay"/></svg><span>Stop leaves the playhead in place (magnet on: closest transient)</span><span><kbd>H</kbd></span></div>
+    <div><svg class="ic"><use href="#i-stay"/></svg><span>Stop leaves the playhead in place (on the closest transient or grid line, whichever the magnet is set to)</span><span><kbd>H</kbd></span></div>
     <div><svg class="ic"><use href="#i-loop"/></svg><span>Loop on/off</span><span><kbd>L</kbd></span></div>
     <div><svg class="ic"><use href="#i-scrub"/></svg><span>Scrub: drag the waveform to listen</span><span><kbd>R</kbd></span></div>
     <div><svg class="ic"><use href="#i-click"/></svg><span>Click on markers / beats</span><span><kbd>K</kbd></span></div>
@@ -361,7 +361,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><svg class="ic"><use href="#i-pin"/></svg><span>Pin nearest grid line to playhead</span><span><kbd>B</kbd></span></div>
     <div><svg class="ic"><use href="#i-unpin"/></svg><span>Unpin selected</span><span><kbd>Del</kbd></span></div>
     <div><svg class="ic"><use href="#i-clear"/></svg><span>Clear all pins except bar 1</span><span></span></div>
-    <div><svg class="ic"><use href="#i-snap"/></svg><span>Snap to transients</span><span><kbd>S</kbd></span></div>
+    <div><svg class="ic"><use href="#i-snap"/></svg><span>What the playhead and the loop land on: transients, or the grid at the resolution set here. Pins snap to transients but never to the grid – they are what makes it. Alt flips the magnet while you drag</span><span><kbd>S</kbd></span></div>
     <div><svg class="ic"><use href="#i-derive"/></svg><span>Derive from loop: keep the loop, rebuild the rest</span><span><kbd>F</kbd></span></div>
     <div><svg class="ic"><use href="#i-auto"/></svg><span>Auto-map from bar 1</span><span><kbd>M</kbd></span></div>
     <div><svg class="ic"><use href="#i-tol"/></svg><span>Search window around each beat</span><span></span></div>
@@ -390,7 +390,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span><kbd>R</kbd></span><span>Scrub mode: drag the waveform to listen</span></div>
     <div><span><kbd>L</kbd> <kbd>I</kbd> <kbd>O</kbd></span><span>Loop on/off, loop start / end at playhead</span></div>
     <div><span><kbd>⇧</kbd><kbd>Space</kbd></span><span>Stop the other way (stay / return)</span></div>
-    <div><span><kbd>H</kbd></span><span>Stop leaves the playhead in place; with the magnet on it sticks to the closest transient</span></div>
+    <div><span><kbd>H</kbd></span><span>Stop leaves the playhead in place; with the magnet on it sticks to the closest transient or grid line</span></div>
     <div><span><kbd>Tab</kbd> <kbd>⇧</kbd><kbd>Tab</kbd></span><span>Next / previous transient</span></div>
     <div><span><kbd>←</kbd> <kbd>→</kbd></span><span>Nudge selection 1 ms (⇧ 10 ms, Alt 0.1 ms)</span></div>
     <div><span><kbd>↑</kbd> <kbd>↓</kbd></span><span>Waveform height</span></div>
@@ -412,7 +412,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span><kbd>F</kbd></span><span>Derive the map from the loop (keep the loop, rebuild the rest)</span></div>
     <div><span><kbd>G</kbd> <kbd>⇧</kbd><kbd>G</kbd></span><span>Finer / coarser grid</span></div>
     <div><span><kbd>T</kbd></span><span>Tap tempo</span></div>
-    <div><span><kbd>S</kbd></span><span>Snap to transients on/off</span></div>
+    <div><span><kbd>S</kbd></span><span>Magnet: transients, grid, or nothing (⇧ the other way)</span></div>
     <div><span><kbd>Del</kbd></span><span>Unpin selected</span></div>
     <h3>Step 4 – Slice samples</h3>
     <div><span><kbd>Tab</kbd> <kbd>⇧</kbd><kbd>Tab</kbd></span><span>Next / previous slice, and hear it</span></div>
@@ -424,7 +424,7 @@ kbd{font:inherit;font-size:13px;color:var(--dim);border:1px solid var(--line);bo
     <div><span>Top strip</span><span>Loop: drag to draw, drag edges or middle to adjust, tap it to switch on/off, double-tap to loop a bar</span></div>
     <div><span>Bar ruler</span><span>Drag pins and bar lines (step 2)</span></div>
     <div><span>Upper half of waveform</span><span>Edit: drag markers, pins, grid lines · double-tap adds or removes</span></div>
-    <div><span>Lower half of waveform</span><span>Move only: drag to scroll, tap to place the playhead</span></div>
+    <div><span>Lower half of waveform</span><span>Move only: drag to scroll, tap to place the playhead where the magnet says</span></div>
     <div><span>Bottom time ruler</span><span>Scrub with sound · the blue flag is the start point</span></div>
     <div><span>Anywhere</span><span>Pinch or scroll wheel zooms · ⇧-drag draws a loop</span></div>
     <h3>Export</h3>
@@ -900,12 +900,12 @@ if (typeof document !== 'undefined') (() => {
 const $=id=>document.getElementById(id);
 const cv=$('cv'), g=cv.getContext('2d'), ov=$('ov'), og=ov.getContext('2d');
 const S={ file:null, fileName:'', buf:null, x:null, sr:44100, dur:0, name:'', peak:1, pyr:[], an:null, cands:[], manual:[], markers:[], anchors:[], bars:[],
-  baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', algo:'flux', showOdf:true, snap:true, click:false, tol:20, mapEvery:'beat',
+  baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', algo:'flux', showOdf:true, snapTo:'markers', click:false, tol:20, mapEvery:'beat',
   view:{t0:0,t1:1}, playhead:0, start:0, loop:null, loopOn:false, scrubMode:false, stay:false, pending:null, sel:null, hover:null, amp:1, visLevel:0,
   slices:[], slSel:null, slExcl:[], sl:{mode:'gap',len:500,tail:0,fadeIn:1,fadeOut:8,min:40,mono:false,bits:16,norm:false,target:-1,naming:'num'} };
 const undo=[], redo=[];
 let C={}, dirty=true, barsDirty=true, waveKey='', waveCache=document.createElement('canvas'), ovCache=document.createElement('canvas'), ovKey='';
-const LOOPH=20, RULH=22, RUL=LOOPH+RULH, TIME=22, EDIT=0.5;
+const LOOPH=20, RULH=22, RUL=LOOPH+RULH, TIME=22, EDIT=0.5, SNAPS=['markers','grid','off'];
 const laneH=()=>S.anchors.length?50:0;
 const icon=n=>'<svg class="ic"><use href="#i-'+n+'"/></svg>';
 
@@ -941,13 +941,13 @@ function doUndo(){ if(!undo.length) return toast('Nothing to undo'); redo.push(s
 function doRedo(){ if(!redo.length) return toast('Nothing to redo'); undo.push(snapState()); restore(redo.pop()); }
 function syncInputs(){ $('num').value=S.num; $('den').value=S.den; $('bpm').value=(+S.baseBpm.toFixed(2)); }
 function syncAll(){ syncInputs(); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; $('gap').value=S.gap; $('gapO').textContent=S.gap+' ms'; $('band').value=S.band; $('algo').value=S.algo; $('odfBtn').classList.toggle('on',S.showOdf); $('odfBtn').setAttribute('aria-pressed',S.showOdf); $('grid').value=S.grid; $('mapEvery').value=S.mapEvery;
-  $('tol').value=S.tol; $('tolO').textContent='±'+S.tol+'%'; $('snapBtn').classList.toggle('on',S.snap); $('snapBtn').setAttribute('aria-pressed',S.snap); $('clickBtn').classList.toggle('on',S.click); $('clickBtn').setAttribute('aria-pressed',S.click); syncSliceUI(); syncTransport(); }
+  $('tol').value=S.tol; $('tolO').textContent='±'+S.tol+'%'; $('snapTo').value=S.snapTo; $('clickBtn').classList.toggle('on',S.click); $('clickBtn').setAttribute('aria-pressed',S.click); syncSliceUI(); syncTransport(); }
 
 // ---------- session: metadata only, never audio ----------
 const fin=(v,d)=>Number.isFinite(+v)? +v : d;
 function sessionData(){ return { format:'beatmapper-session', version:1, audio:{name:S.name,fileName:S.fileName,duration:S.dur,sampleRate:S.sr},
   detection:{sens:S.sens,gap:S.gap,band:S.band,algo:S.algo,overlay:S.showOdf}, markers:{manual:S.manual.map(m=>m.t),removed:S.cands.filter(c=>c.off).map(c=>c.t)},
-  beats:{num:S.num,den:S.den,grid:S.grid,baseBpm:S.baseBpm,mapEvery:S.mapEvery,tol:S.tol,snap:S.snap,anchors:S.anchors.map(a=>({q:a.q,t:a.t,manual:!!a.manual}))},
+  beats:{num:S.num,den:S.den,grid:S.grid,baseBpm:S.baseBpm,mapEvery:S.mapEvery,tol:S.tol,snapTo:S.snapTo,snap:S.snapTo!=='off',anchors:S.anchors.map(a=>({q:a.q,t:a.t,manual:!!a.manual}))},
   transport:{loop:S.loop,loopOn:S.loopOn,start:S.start,playhead:playing?S.start:S.playhead,stay:S.stay,click:S.click}, view:S.view, step:S.step,
   export:{lead:$('lead').value,res:$('res').value,clicks:$('clicks').checked,rppAudio:$('rppAudio').checked},
   slicer:{...S.sl, excluded:S.slExcl, csv:$('slCsv').checked} }; }
@@ -959,7 +959,8 @@ function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beat
   for(const t of (mk.removed||[])){ if(!T(t)) continue; let best=null; for(let i=Core.lowerBound(S.cands,t-0.008); i<S.cands.length&&S.cands[i].t<=t+0.008; i++){ const c=S.cands[i]; if(!best||Math.abs(c.t-t)<Math.abs(best.t-t)) best=c; } if(best) best.off=true; }
   S.manual=(mk.manual||[]).filter(T).sort((a,b)=>a-b).map(t=>({t,s:1,manual:true}));
   S.num=clamp(Math.round(fin(bt.num,4)),1,32); S.den=[2,4,8,16].includes(+bt.den)? +bt.den : 4; S.grid=['bar','2','4','8','16','32','4t','8t','16t'].includes(String(bt.grid))? String(bt.grid) : '16';
-  S.baseBpm=clamp(fin(bt.baseBpm,S.baseBpm),20,400); S.mapEvery=bt.mapEvery==='bar'?'bar':'beat'; S.tol=clamp(fin(bt.tol,20),5,45); S.snap=bt.snap!==false;
+  S.baseBpm=clamp(fin(bt.baseBpm,S.baseBpm),20,400); S.mapEvery=bt.mapEvery==='bar'?'bar':'beat'; S.tol=clamp(fin(bt.tol,20),5,45);
+  S.snapTo=SNAPS.includes(bt.snapTo)? bt.snapTo : bt.snap===false? 'off':'markers';
   const A=[]; for(const a of (bt.anchors||[]).filter(a=>a&&Number.isFinite(a.q)&&T(a.t)).sort((p,q)=>p.q-q.q)){ const l=A[A.length-1]; if(!l||(a.q>l.q+1e-9&&a.t>l.t)) A.push({q:a.q,t:a.t,manual:!!a.manual}); } S.anchors=A;
   S.loop=tr.loop&&T(tr.loop.a)&&T(tr.loop.b)&&tr.loop.b>tr.loop.a? {a:tr.loop.a,b:tr.loop.b} : null; S.loopOn=!!tr.loopOn&&!!S.loop; S.start=T(tr.start)?tr.start:0; S.playhead=T(tr.playhead)?tr.playhead:S.start; S.stay=!!tr.stay; S.click=!!tr.click;
   if(ex.lead==='trim'||ex.lead==='full') $('lead').value=ex.lead; if(['pins','bar','beat'].includes(ex.res)) $('res').value=ex.res; if('clicks' in ex) $('clicks').checked=!!ex.clicks; if('rppAudio' in ex) $('rppAudio').checked=!!ex.rppAudio;
@@ -1232,9 +1233,16 @@ function play(from){ if(!S.buf) return; stopPreview(); const c=audioCtx(); c.res
   if(pLoop){ src.loop=true; src.loopStart=pLoop.a; src.loopEnd=pLoop.b; }
   pCtx0=c.currentTime+0.03; pPos0=from; schedE=0; src.start(pCtx0,from); playing=true; S.playhead=from; const me=src; src.onended=()=>{ if(src===me&&playing){ stop(true); S.playhead=S.dur; dirty=true; } };
   schedTimer=setInterval(schedule,25); schedule(); $('playBtn').innerHTML=icon('stop'); }
-function stop(stay){ stopPreview(); if(src){ try{src.onended=null;src.stop();}catch(e){} src=null; } if(playing){ S.playhead=stay? clamp(nowPos(),0,S.dur):S.start; if(!stay) reveal(S.start); else if(stay==='snap'&&S.snap&&S.markers.length){ const M=S.markers, i=Core.lowerBound(M,S.playhead), m=!M[i]||(M[i-1]&&S.playhead-M[i-1].t<M[i].t-S.playhead)? M[i-1]:M[i]; S.playhead=m.t; S.sel={type:'m',ref:m}; reveal(m.t); } } playing=false; clearInterval(schedTimer); $('playBtn').innerHTML=icon('play'); dirty=true; }
+function stop(stay){ stopPreview(); if(src){ try{src.onended=null;src.stop();}catch(e){} src=null; } if(playing){ S.playhead=stay? clamp(nowPos(),0,S.dur):S.start; if(!stay) reveal(S.start); else if(stay==='snap'){ const p=stopTarget(S.playhead); if(p!=null){ S.playhead=p.t; if(p.m) S.sel={type:'m',ref:p.m}; reveal(p.t); } } } playing=false; clearInterval(schedTimer); $('playBtn').innerHTML=icon('play'); dirty=true; }
 function togglePlay(shift){ playing? stop(S.stay!==!!shift? 'snap' : false) : play(S.playhead); }
-function toggleStay(){ S.stay=!S.stay; syncTransport(); toast(S.stay?'Stop: playhead stays'+(S.snap?' on the closest transient':''):'Stop: playhead returns to start'); }
+// Where the playhead lands when it stays put on stop: the closest transient, the closest grid line, or
+// exactly where it stopped.
+function stopTarget(t){
+  if(S.snapTo==='markers'&&S.markers.length){ const M=S.markers, i=Core.lowerBound(M,t), m=!M[i]||(M[i-1]&&t-M[i-1].t<M[i].t-t)? M[i-1]:M[i]; return m? {t:m.t,m} : null; }
+  if(S.snapTo==='grid'&&S.anchors.length) return {t:gridSnap(t)};
+  return null; }
+const STAY_ON={markers:' on the closest transient', grid:' on the closest grid line', off:''};
+function toggleStay(){ S.stay=!S.stay; syncTransport(); toast(S.stay?'Stop: playhead stays'+STAY_ON[S.snapTo]:'Stop: playhead returns to start'); }
 function topPoint(){ return S.loopOn&&S.loop? S.loop.a : S.markers.length? S.markers[0].t : 0; }
 function playFromStart(flag){ if(!S.x) return; const t=flag? S.start : topPoint(); reveal(t); play(t); }
 function seek(t,quiet){ S.playhead=S.start=clamp(t,0,S.dur); if(playing&&!quiet) play(S.playhead); dirty=true; if(!$('p2').hidden) barsHighlight(); }
@@ -1272,10 +1280,21 @@ function hitTest(x,y,touch){ const r=touch?14:6; if(!S.x) return null;
     const q=nearestGridQ(timeToPos(tOf(x)),S.visLevel); if(q>1e-6&&Math.abs(xOf(posToTime(q))-x)<=r) return {type:'g',q}; }
   return null; }
 const local=e=>{ const b=cv.getBoundingClientRect(); return [e.clientX-b.left,e.clientY-b.top]; };
-function snapT(x,touch,bypass){ let t=tOf(x); if(S.snap===!!bypass) return t; const r=touch?14:9, M=S.markers; let best=null,bd=r;
+// The magnet. Transients pull from a few pixels away, since dragging past the nearest hit has to stay
+// possible; the grid takes whatever is dropped on it, at the resolution the grid select is set to. Alt
+// flips the magnet: it bypasses one that is set, and reaches for the transients when none is.
+// Pins are the exception: they are what makes the grid, so grid lines would chase a pin being dragged.
+function snapMode(bypass){ return !bypass? S.snapTo : S.snapTo==='off'? 'markers':'off'; }
+function gridSnap(t){ return S.anchors.length? posToTime(nearestGridQ(timeToPos(t))) : t; }
+function snapT(x,touch,bypass,noGrid){ const t=tOf(x), mode=snapMode(!!bypass);
+  if(mode==='grid') return noGrid? t : gridSnap(t);
+  if(mode!=='markers') return t;
+  const r=touch?14:9, M=S.markers; let best=null,bd=r;
   for(let i=Core.lowerBound(M,tOf(x-r));i<M.length&&xOf(M[i].t)<=x+r;i++){ const d=Math.abs(xOf(M[i].t)-x); if(d<=bd){bd=d;best=M[i].t;} }
-  if(best==null&&S.anchors.length&&S.step>=2){ const tg=posToTime(nearestGridQ(timeToPos(t),S.visLevel)); if(Math.abs(xOf(tg)-x)<=6) best=tg; }
   return best==null? t : best; }
+// In Beats the playhead follows the magnet, so it can be dropped exactly on a beat or a transient.
+// Elsewhere a tap lands where it is aimed – in Transients that is where the next marker goes.
+function tapT(x,d,e){ return S.step===2? snapT(x,d.touch,e.altKey) : tOf(x); }
 function loopHit(x,r){ if(!S.loop) return null; const xa=xOf(S.loop.a), xb=xOf(S.loop.b); if(Math.abs(x-xa)<=r&&Math.abs(x-xa)<=Math.abs(x-xb)) return 'a'; if(Math.abs(x-xb)<=r) return 'b'; if(x>xa&&x<xb) return 'move'; return null; }
 function zoneAt(y){ const h=H(), wh=Math.max(40,h-RUL-laneH()-TIME); if(y<LOOPH) return 'loop'; if(y<RUL) return 'bars'; if(y>h-TIME) return 'time'; return S.step<3&&y<RUL+wh*EDIT? 'edit':'nav'; }
 function zoneHit(x,y,zone,touch){ if(S.scrubMode||(zone!=='edit'&&zone!=='bars')) return null; const h=hitTest(x,y,touch); return h&&zone==='bars'&&h.type==='m'? null : h; }
@@ -1307,19 +1326,19 @@ cv.addEventListener('pointermove',e=>{ const [x,y]=local(e); if(ptrs.has(e.point
     S.loop.a=clamp(S.loop.a,0,S.dur); S.loop.b=clamp(S.loop.b,0,S.dur); dirty=true; }
   else if(!h){ const dt=(x-drag.x0)/W()*(drag.v0.t1-drag.v0.t0); setView(drag.v0.t0-dt,drag.v0.t1-dt); }
   else if(h.type==='m'){ h.ref.t=clamp(tOf(x),0,S.dur); dirty=true; }
-  else { const a=h.ref, t=snapT(x,drag.touch,e.altKey), [p,n]=neighbours(a.q); if(S.anchors.length===1){ a.t=clamp(t,0,S.dur); } else a.t=clamp(t,p?p.t+0.005:0,n?n.t-0.005:S.dur); barsDirty=true; dirty=true; } });
+  else { const a=h.ref, t=snapT(x,drag.touch,e.altKey,true), [p,n]=neighbours(a.q); if(S.anchors.length===1){ a.t=clamp(t,0,S.dur); } else a.t=clamp(t,p?p.t+0.005:0,n?n.t-0.005:S.dur); barsDirty=true; dirty=true; } });
 function endPtr(e){ ptrs.delete(e.pointerId); if(pinch){ if(ptrs.size<2) pinch=null; drag=null; return; } if(!drag) return; const d=drag; drag=null; const [x,y]=local(e);
   if(d.scrub){ scrub=null; if(!$('p2').hidden) barsHighlight(); return; }
   if(d.moved&&d.loop){ if(S.loop&&S.loop.b-S.loop.a<0.01){ S.loop=d.loop.orig; } loopChanged(); return; }
   if(d.moved){ const h=d.hit; if(h&&h.type==='m'){ S.manual.sort((a,b)=>a.t-b.t); recalcMarkers(); S.sel=h; seek(h.ref.t,true); } else if(h){ anchorsChanged(); seek(h.ref.t,true); } barsDirty=true; dirty=true; return; }
   const now=performance.now(), dbl=now-lastClick.t<350&&Math.abs(x-lastClick.x)<8; lastClick={t:dbl?0:now,x};
-  if(d.zone==='loop'){ const lh=loopHit(x,d.touch?14:7); if(dbl&&!lh){ loopBarAt(tOf(x)); } else if(lh&&!dbl){ S.loopOn=!S.loopOn; loopChanged(); } else if(!lh) seek(tOf(x)); return; }
+  if(d.zone==='loop'){ const lh=loopHit(x,d.touch?14:7); if(dbl&&!lh){ loopBarAt(tOf(x)); } else if(lh&&!dbl){ S.loopOn=!S.loopOn; loopChanged(); } else if(!lh) seek(tapT(x,d,e)); return; }
   if(dbl&&(d.zone==='edit'||d.zone==='bars')&&!S.scrubMode){
     if(S.step===1&&d.zone==='edit'){ d.hit? removeMarker(d.hit.ref) : addMarker(tOf(x)); }
     else if(S.step===2){ if(d.hit&&d.hit.type==='a') unpin(d.hit.ref); else if(d.hit&&d.hit.type==='g') pinAt(posToTime(d.hit.q),d.hit.q); else if(d.zone==='edit') pinAt(tOf(x)); } return; }
   if(S.step===4&&(d.zone==='edit'||d.zone==='nav')&&!S.scrubMode){ const i=sliceAt(tOf(x));
     if(i>=0){ selectSlice(i); if(dbl){ stopPreview(); toggleSlice(i); } else { seek(S.slices[i].t0,true); previewSlice(i); } return; } }
-  if(d.hit&&d.hit.type!=='g'){ S.sel={type:d.hit.type,ref:d.hit.ref}; seek(d.hit.ref.t); } else { S.sel=null; seek(tOf(x)); } }
+  if(d.hit&&d.hit.type!=='g'){ S.sel={type:d.hit.type,ref:d.hit.ref}; seek(d.hit.ref.t); } else { S.sel=null; seek(tapT(x,d,e)); } }
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
 cv.addEventListener('pointerleave',()=>{ if(S.hover){ S.hover=null; dirty=true; } });
 cv.addEventListener('wheel',e=>{ if(!S.x) return; e.preventDefault(); const [x]=local(e), sp=S.view.t1-S.view.t0, unit=e.deltaMode===1?16:1;
@@ -1353,8 +1372,12 @@ $('bpm').onchange=e=>{ pushUndo(); S.baseBpm=clamp(+e.target.value||120,20,400);
 $('half').onclick=()=>scaleTempo(.5); $('dbl').onclick=()=>scaleTempo(2); $('tap').onclick=tap;
 $('setDown').onclick=()=>setDownbeat(S.playhead); $('pinHere').onclick=()=>pinAt(S.playhead); $('autoMap').onclick=autoMap; $('derive').onclick=deriveFromLoop;
 $('mapEvery').onchange=e=>S.mapEvery=e.target.value; $('tol').oninput=e=>{ S.tol=+e.target.value; $('tolO').textContent='±'+S.tol+'%'; };
-function toggleSnap(){ S.snap=!S.snap; $('snapBtn').classList.toggle('on',S.snap); $('snapBtn').setAttribute('aria-pressed',S.snap); toast(S.snap?'Snap to transients on (hold Alt to bypass)':'Snap off'); }
-$('snapBtn').onclick=toggleSnap; $('unpin').onclick=()=>{ if(S.sel&&S.sel.type==='a') unpin(S.sel.ref); else toast('Select a pin first.'); };
+const SNAP_NOTE={markers:'Snapping to transients (hold Alt to bypass)',
+  grid:'Snapping to the grid at the resolution set here – pins stay free, they are what makes the grid',
+  off:'Snapping off (hold Alt to reach for transients)'};
+function setSnap(to,quiet){ S.snapTo=to; $('snapTo').value=to; dirty=true; if(!quiet) toast(SNAP_NOTE[to]); }
+function cycleSnap(dir){ const i=SNAPS.indexOf(S.snapTo); setSnap(SNAPS[(i+(dir||1)+SNAPS.length)%SNAPS.length]); }
+$('snapTo').onchange=e=>setSnap(e.target.value,true); $('unpin').onclick=()=>{ if(S.sel&&S.sel.type==='a') unpin(S.sel.ref); else toast('Select a pin first.'); };
 $('clearPins').onclick=()=>{ if(S.anchors.length<2) return; pushUndo(); S.anchors=S.anchors.filter(a=>a.q===0); anchorsChanged(); };
 $('barRows').addEventListener('click',e=>{ const tr=e.target.closest('tr[data-b]'); if(!tr) return; const b=S.bars[+tr.dataset.b]; if(!b) return; const len=b.te-b.ts; setView(b.ts-len*.5,b.te+len*1.5); seek(b.ts); });
 function toggleClick(){ S.click=!S.click; $('clickBtn').classList.toggle('on',S.click); $('clickBtn').setAttribute('aria-pressed',S.click); }
@@ -1561,7 +1584,7 @@ addEventListener('keydown',e=>{ const el=document.activeElement, tag=el&&el.tagN
     case 'Delete': case 'Backspace': if(S.sel){ if(S.sel.type==='m'&&S.step===1) removeMarker(S.sel.ref); else if(S.sel.type==='a'&&S.step===2) unpin(S.sel.ref); } return done();
   }
   if(S.step===1){ if(k==='a') addMarker(S.playhead); else if(k==='['||k===']'){ S.sens=clamp(S.sens+(k===']'?2:-2),0,100); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; recalcMarkers(); } }
-  else if(S.step===2){ if(k==='d') setDownbeat(S.playhead); else if(k==='b') pinAt(S.playhead); else if(k==='m') autoMap(); else if(k==='f') deriveFromLoop(); else if(k==='g') cycleGrid(e.shiftKey?-1:1); else if(k==='t') tap(); else if(k==='s') toggleSnap(); }
+  else if(S.step===2){ if(k==='d') setDownbeat(S.playhead); else if(k==='b') pinAt(S.playhead); else if(k==='m') autoMap(); else if(k==='f') deriveFromLoop(); else if(k==='g') cycleGrid(e.shiftKey?-1:1); else if(k==='t') tap(); else if(k==='s') cycleSnap(e.shiftKey?-1:1); }
   else if(S.step===4){ if(k==='e') previewSlice(S.slSel==null?0:S.slSel); else if(k==='x'){ if(S.slSel!=null) toggleSlice(S.slSel); else toast('Select a slice first.'); } }
 });
 
