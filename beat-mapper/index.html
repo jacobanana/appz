@@ -618,14 +618,23 @@ const Core = (() => {
 
   function sensToThr(sens){ return Math.pow(1-sens/100, 3); }
 
-  function filterMarkers(cands, manual, thr, gap){
+  // Which candidates the settings let through: above the threshold, and the strongest within each gap.
+  // Deleted (off) candidates still count here, so taking one out doesn't let a weaker neighbour it was
+  // beating take its place. Only rerun when the detection settings change.
+  function detectMarkers(cands, thr, gap){
     const out=[];
     for(const c of cands){
-      if(c.off || c.s<thr) continue;
+      if(c.s<thr) continue;
       const last=out[out.length-1];
       if(last && c.t-last.t<gap){ if(c.s>last.s) out[out.length-1]=c; }
       else out.push(c);
     }
+    return out;
+  }
+
+  // The markers shown: the detected ones minus the deleted, plus the ones placed by hand.
+  function filterMarkers(detected, manual){
+    const out=detected.filter(c=>!c.off);
     if(!manual.length) return out;
     const res=out.filter(c=>!manual.some(m=>Math.abs(m.t-c.t)<0.005)).concat(manual);
     res.sort((a,b)=>a.t-b.t);
@@ -891,7 +900,7 @@ const Core = (() => {
     return { x, beats, onsets, dur };
   }
 
-  return { analyze, pickCandidates, ALGOS, odfOf, odfRef, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, buildRppSlices, planExport, wavBytes, wavEncode,
+  return { analyze, pickCandidates, ALGOS, odfOf, odfRef, detectMarkers, filterMarkers, sensToThr, estimateTempo, autoMap, trackBeats, buildExport, buildRpp, buildRppSlices, planExport, wavBytes, wavEncode,
     planSlices, renderSlice, zipFiles, zipStore, crc32, synthDemo, lowerBound, snapToZero };
 })();
 //#endregion core
@@ -899,7 +908,7 @@ const Core = (() => {
 if (typeof document !== 'undefined') (() => {
 const $=id=>document.getElementById(id);
 const cv=$('cv'), g=cv.getContext('2d'), ov=$('ov'), og=ov.getContext('2d');
-const S={ file:null, fileName:'', buf:null, x:null, sr:44100, dur:0, name:'', peak:1, pyr:[], an:null, cands:[], manual:[], markers:[], anchors:[], bars:[],
+const S={ file:null, fileName:'', buf:null, x:null, sr:44100, dur:0, name:'', peak:1, pyr:[], an:null, cands:[], detected:[], manual:[], markers:[], anchors:[], bars:[],
   baseBpm:120, num:4, den:4, grid:'16', step:1, sens:55, gap:60, band:'full', algo:'flux', showOdf:true, snapTo:'markers', click:false, tol:20, mapEvery:'beat',
   view:{t0:0,t1:1}, playhead:0, start:0, loop:null, loopOn:false, scrubMode:false, stay:false, pending:null, sel:null, hover:null, amp:1, visLevel:0,
   slices:[], slSel:null, slExcl:[], sl:{mode:'gap',len:500,tail:0,fadeIn:1,fadeOut:8,min:40,mono:false,bits:16,norm:false,target:-1,naming:'num'} };
@@ -970,7 +979,7 @@ function applySession(d){ const det=d.detection||{}, mk=d.markers||{}, bt=d.beat
     o.mono=!!sl.mono; o.bits=+sl.bits===24?24:16; o.norm=!!sl.norm; o.target=clamp(fin(sl.target,-1),-24,0); o.naming=sl.naming==='time'?'time':'num';
     S.slExcl=Array.isArray(sl.excluded)? sl.excluded.filter(T).slice(0,5000) : []; S.slSel=null;
     if('csv' in sl) $('slCsv').checked=!!sl.csv; }
-  S.sel=null; syncAll(); recalcMarkers(); anchorsChanged(); setStep([1,2,3,4].includes(d.step)?d.step:1);
+  S.sel=null; syncAll(); redetect(); anchorsChanged(); setStep([1,2,3,4].includes(d.step)?d.step:1);
   if(d.view&&T(d.view.t0)&&T(d.view.t1)&&d.view.t1>d.view.t0) setView(d.view.t0,d.view.t1); }
 const sessKey=()=>`beatmapper:s:${S.fileName||S.name}|${Math.round(S.dur*1000)}`; let lastSaved='';
 function autosave(){ if(!S.x||drag||$('busy').hidden===false) return; try{ const js=JSON.stringify(sessionData()); if(js===lastSaved) return; lastSaved=js; const k=sessKey(); localStorage.setItem(k,js);
@@ -1014,14 +1023,15 @@ async function setAudio(buf,name){
   S.view={t0:0,t1:S.dur}; S.playhead=0; S.start=0; S.loop=null; S.loopOn=false; syncTransport(); S.amp=1; waveKey=''; ovKey='';
   $('busy').hidden=true; $('empty').hidden=true;
   $('fileInfo').textContent=name; $('fileInfo').title=`${name} · ${fmtT(S.dur)} · ${(S.sr/1000).toFixed(1)} kHz`;
-  recalcMarkers(); anchorsChanged(); setStep(1); lastSaved=''; restoreFor(); cv.focus({preventScroll:true});
+  redetect(); anchorsChanged(); setStep(1); lastSaved=''; restoreFor(); cv.focus({preventScroll:true});
 }
 function buildPyramid(){ S.pyr=[]; let bin=64, src=S.x, n=Math.ceil(src.length/64), mn=new Float32Array(n), mx=new Float32Array(n);
   for(let i=0;i<n;i++){ let a=1,b=-1; for(let j=i*64,e=Math.min(src.length,j+64);j<e;j++){ const v=src[j]; if(v<a)a=v; if(v>b)b=v; } mn[i]=a; mx[i]=b; }
   S.pyr.push({bin,mn,mx});
   while(n>2000){ const pn=n, pmn=mn, pmx=mx; n=Math.ceil(pn/4); bin*=4; mn=new Float32Array(n); mx=new Float32Array(n);
     for(let i=0;i<n;i++){ let a=1,b=-1; for(let j=i*4,e=Math.min(pn,j+4);j<e;j++){ if(pmn[j]<a)a=pmn[j]; if(pmx[j]>b)b=pmx[j]; } mn[i]=a; mx[i]=b; } S.pyr.push({bin,mn,mx}); } }
-function recalcMarkers(){ S.markers=Core.filterMarkers(S.cands,S.manual,Core.sensToThr(S.sens),S.gap/1000);
+function redetect(){ S.detected=Core.detectMarkers(S.cands,Core.sensToThr(S.sens),S.gap/1000); recalcMarkers(); }
+function recalcMarkers(){ S.markers=Core.filterMarkers(S.detected,S.manual);
   if(S.sel&&S.sel.type==='m'&&!S.markers.includes(S.sel.ref)) S.sel=null;
   $('mCount').textContent=S.x? S.markers.length:''; recalcSlices(); dirty=true; }
 
@@ -1355,11 +1365,11 @@ const refocus=()=>{ if(S.x) cv.focus({preventScroll:true}); };
 $('panel').addEventListener('click',e=>{ if(e.target.closest('button')) refocus(); });
 document.querySelector('.top').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b&&b.id!=='helpBtn') refocus(); });
 document.querySelectorAll('input[type=range],select').forEach(el=>el.addEventListener('change',refocus));
-$('sens').oninput=e=>{ S.sens=+e.target.value; $('sensO').textContent=S.sens+'%'; recalcMarkers(); };
-$('gap').oninput=e=>{ S.gap=+e.target.value; $('gapO').textContent=S.gap+' ms'; recalcMarkers(); };
-$('band').onchange=e=>{ S.band=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); recalcMarkers(); } };
+$('sens').oninput=e=>{ S.sens=+e.target.value; $('sensO').textContent=S.sens+'%'; redetect(); };
+$('gap').oninput=e=>{ S.gap=+e.target.value; $('gapO').textContent=S.gap+' ms'; redetect(); };
+$('band').onchange=e=>{ S.band=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); redetect(); } };
 const ALGO_NOTE={flux:'Spectral flux: new energy in any frequency bin', complex:'Complex domain: new energy or a phase jump, for soft pitched notes too', gdelay:'Group delay: every bin points at the instant its energy sits', energy:'Energy rise: loudness jumps only'};
-$('algo').onchange=e=>{ S.algo=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); recalcMarkers(); } toast(ALGO_NOTE[S.algo]); };
+$('algo').onchange=e=>{ S.algo=e.target.value; if(S.an){ S.cands=Core.pickCandidates(S.an,S.band,S.x,S.sr,S.algo); redetect(); } toast(ALGO_NOTE[S.algo]); };
 function toggleOdf(){ S.showOdf=!S.showOdf; $('odfBtn').classList.toggle('on',S.showOdf); $('odfBtn').setAttribute('aria-pressed',S.showOdf); dirty=true; }
 $('odfBtn').onclick=toggleOdf;
 $('prevM').onclick=$('prevM2').onclick=()=>tabMarker(-1); $('nextM').onclick=$('nextM2').onclick=()=>tabMarker(1); $('addM').onclick=()=>addMarker(S.playhead);
@@ -1583,7 +1593,7 @@ addEventListener('keydown',e=>{ const el=document.activeElement, tag=el&&el.tagN
     case 'Escape': S.sel=null; dirty=true; if(el===cv) cv.blur(); return;
     case 'Delete': case 'Backspace': if(S.sel){ if(S.sel.type==='m'&&S.step===1) removeMarker(S.sel.ref); else if(S.sel.type==='a'&&S.step===2) unpin(S.sel.ref); } return done();
   }
-  if(S.step===1){ if(k==='a') addMarker(S.playhead); else if(k==='['||k===']'){ S.sens=clamp(S.sens+(k===']'?2:-2),0,100); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; recalcMarkers(); } }
+  if(S.step===1){ if(k==='a') addMarker(S.playhead); else if(k==='['||k===']'){ S.sens=clamp(S.sens+(k===']'?2:-2),0,100); $('sens').value=S.sens; $('sensO').textContent=S.sens+'%'; redetect(); } }
   else if(S.step===2){ if(k==='d') setDownbeat(S.playhead); else if(k==='b') pinAt(S.playhead); else if(k==='m') autoMap(); else if(k==='f') deriveFromLoop(); else if(k==='g') cycleGrid(e.shiftKey?-1:1); else if(k==='t') tap(); else if(k==='s') cycleSnap(e.shiftKey?-1:1); }
   else if(S.step===4){ if(k==='e') previewSlice(S.slSel==null?0:S.slSel); else if(k==='x'){ if(S.slSel!=null) toggleSlice(S.slSel); else toast('Select a slice first.'); } }
 });
