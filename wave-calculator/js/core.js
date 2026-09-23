@@ -205,7 +205,9 @@
    *
    *   WC.modes.register({
    *     id: 'compressor',            // URL hash and storage key
-   *     title: 'Compressor',         // tab label
+   *     title: 'Compressor',         // label under its icon
+   *     icon: '<path …/>',           // line glyph on a 48×48 grid; the
+   *                                  // tile sets stroke, so no styling
    *     prefs: { ... },              // its own inputs' defaults, persisted
    *     mount(root, ctx) {           // build the DOM once, into `root`
    *       return { render(t) {} };   // redraw for a WC.timing; called on
@@ -213,7 +215,7 @@
    *   });
    *
    * ctx gives it { prefs: a WC.store of its own inputs, tempo: WC.tempo }.
-   * Tabs appear in registration order, i.e. the order of the script tags.
+   * Icons appear in registration order, i.e. the order of the script tags.
    */
   const registry = [];
   WC.modes = {

@@ -10,6 +10,7 @@
   WC.modes.register({
     id: 'bars',
     title: 'Bars & time',
+    icon: '<path d="M13 40 L19.5 8 H28.5 L35 40 Z M15 32 H33 M24 32 L34 12"/>',
     // `from` is the side last typed in: it stays put when the tempo changes.
     prefs: { view: 'convert', from: 'bars', bars: 8, beats: 0, min: 0, sec: 16, fitBars: 16, fitMin: 0, fitSec: 30 },
     clean: (p, d) => {

@@ -19,6 +19,7 @@
   WC.modes.register({
     id: 'compressor',
     title: 'Compressor',
+    icon: '<path d="M8 40 L24 24 L40 17"/><path d="M24 24 L40 8" stroke-dasharray="2 3"/>',
     prefs: { hits: '1/4', attack: '1/128', release: '1/8' },
     clean: (p, d) => ({
       hits: WC.notes.allowed(p.hits, HITS) ? p.hits : d.hits,

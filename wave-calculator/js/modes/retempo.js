@@ -12,6 +12,7 @@
   WC.modes.register({
     id: 'retempo',
     title: 'Tempo change',
+    icon: '<path d="M9 34 A15 15 0 1 1 39 34"/><path d="M24 14 V17 M13.4 18.4 L15.5 20.5 M34.6 18.4 L32.5 20.5 M24 30 L32 21"/><circle cx="24" cy="30" r="2"/>',
     // `hold` is the side last typed in: it stays put when the current tempo moves.
     prefs: { target: 128, semis: 1, hold: 'target' },
     clean: (p, d) => ({

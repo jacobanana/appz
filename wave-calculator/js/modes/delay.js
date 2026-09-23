@@ -9,6 +9,7 @@
   WC.modes.register({
     id: 'delay',
     title: 'Delay',
+    icon: '<path d="M10 40 V8 M19 40 V16 M28 40 V24 M37 40 V31"/>',
     prefs: { note: '1/8d' },
     clean: (p, d) => ({ note: WC.notes.allowed(p.note, NOTE) ? p.note : d.note }),
 
