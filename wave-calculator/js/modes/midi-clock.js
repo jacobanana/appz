@@ -1,9 +1,9 @@
-/* MIDI clock — how long a clock tick is, and how many ticks to shift the clock
- * by to line up audio that arrives late. MIDI clock sends 24 ticks per quarter
+/* MIDI clock — how long a clock tick is, or how many ticks to shift the clock
+ * by to line up audio that arrives late (one at a time, from a toggle). MIDI clock sends 24 ticks per quarter
  * note, so a tick's length depends only on tempo. */
 (function (WC) {
   'use strict';
-  const { h, block, field, fields, number, select, seg, table, row, pairs } = WC.ui;
+  const { h, field, fields, number, select, seg, views, table, row, pairs } = WC.ui;
   const f = WC.fmt;
 
   const PPQN = [24, 48, 96, 480, 960];
@@ -12,13 +12,14 @@
     minus: { label: 'Delay − latency', target: (d, l) => Math.max(0, d - l) },
     plus: { label: 'Delay + latency', target: (d, l) => d + l },
   };
-  const NOTE_ROWS = ['1/32', '1/16', '1/8t', '1/8', '1/4', '1/2', '1bar'];
+  const VIEWS = ['ticks', 'delay'];
 
   WC.modes.register({
     id: 'midi-clock',
     title: 'MIDI clock',
-    prefs: { n: 1, ppqn: 24, delay: 53, lat: 3, comp: 'only' },
+    prefs: { view: 'ticks', n: 1, ppqn: 24, delay: 53, lat: 3, comp: 'only' },
     clean: (p, d) => ({
+      view: VIEWS.includes(p.view) ? p.view : d.view,
       n: +p.n >= 0 ? +p.n : d.n,
       ppqn: PPQN.includes(+p.ppqn) ? +p.ppqn : d.ppqn,
       delay: +p.delay >= 0 ? +p.delay : d.delay,
@@ -31,33 +32,29 @@
       const set = (k, cast) => (v) => prefs.set({ [k]: cast ? cast(v) : v });
 
       // --- Ticks → time
-      const len = block('Ticks to time');
       const lenOut = pairs();
-      len.append(fields(
+      const len = [fields(
         field('Ticks', number({ value: p().n, min: 0, step: 1, onChange: set('n') })),
         field('Ticks per quarter note', select({
           options: PPQN.map((v) => ({ value: v, label: v === 24 ? '24 (MIDI clock)' : String(v) })),
           value: p().ppqn, onChange: set('ppqn', Number) }))),
-      lenOut.el);
+      lenOut.el];
 
       // --- Delay → ticks
-      const shift = block('Delay to ticks');
-      shift.append(
+      const shiftTbl = table([{ label: '', width: '30%' }, 'Ticks', 'ms', 'Late (+) ms']);
+      const ruler = h('div', { class: 'ruler', role: 'img' });
+      const shift = [
         fields(
           field('Measured delay', number({ value: p().delay, min: 0, step: 0.1, onChange: set('delay') }), 'ms'),
           field('Roundtrip latency', number({ value: p().lat, min: 0, step: 0.1, onChange: set('lat') }), 'ms')),
         seg({ label: 'Compensate', value: p().comp, onChange: set('comp'),
-          options: Object.entries(COMP).map(([v, c]) => ({ value: v, label: c.label })) }).el);
-      const shiftTbl = table([{ label: '', width: '30%' }, 'Ticks', 'ms', 'Late (+) ms']);
-      const ruler = h('div', { class: 'ruler', role: 'img' });
-      shift.append(shiftTbl.el, h('div', { class: 'ruler-wrap' }, ruler));
+          options: Object.entries(COMP).map(([v, c]) => ({ value: v, label: c.label })) }).el,
+        shiftTbl.el, h('div', { class: 'ruler-wrap' }, ruler)];
 
-      // --- Note values in ticks
-      const notes = block('Note values in ticks');
-      const notesTbl = table([{ label: 'Note', width: '30%' }, 'Ticks', 'ms', 'Samples']);
-      notes.append(notesTbl.el);
-
-      root.append(len, shift, notes);
+      root.append(views(prefs, [
+        { value: 'ticks', label: 'Ticks → time', content: len },
+        { value: 'delay', label: 'Delay → ticks', content: shift },
+      ]));
 
       let lastT = null;
       prefs.subscribe(() => lastT && render(lastT));
@@ -89,12 +86,6 @@
         ]);
 
         drawRuler(s.ppqn, target, dt, nearest);
-
-        notesTbl.rows(['tick'].concat(NOTE_ROWS).map((id) => {
-          const q = id === 'tick' ? 1 / s.ppqn : WC.notes.quarters(id, t);
-          const ms = t.ms(q);
-          return row([id === 'tick' ? '1 tick' : WC.notes.label(id), f.trim(q * s.ppqn, 2), f.num(ms, 2), f.samples(t.samples(ms))]);
-        }));
       }
 
       function drawRuler(ppqn, delayMs, dt, nearest) {
@@ -116,7 +107,7 @@
         const dl = pos(Math.min(dt, total));
         html += '<div class="delay" style="left:' + dl + '"></div>';
         html += '<div class="delay-flag" style="left:' + dl + '">' + f.trim(delayMs, 2) + ' ms</div>';
-                ruler.innerHTML = html;
+        ruler.innerHTML = html;
         ruler.setAttribute('aria-label', 'Tick ruler: the delay of ' + f.num(delayMs, 2) + ' ms falls at ' + f.num(dt, 2) +
           ' ticks; the nearest whole tick is ' + nearest + '.');
       }

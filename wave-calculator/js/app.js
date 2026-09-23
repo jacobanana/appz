@@ -71,11 +71,6 @@
     sigNum.value = s.sigNum;
     sigDen.value = s.sigDen;
     rate.value = s.sampleRate;
-    const t = WC.timing(s);
-    $('readout').innerHTML =
-      '<span>Beat <b>' + f.ms(t.beatMs) + '</b> ms</span>' +
-      '<span>Bar <b>' + f.ms(t.barMs) + '</b> ms</span>' +
-      '<span>16th <b>' + f.ms(t.note('1/16')) + '</b> ms</span>';
   }
 
   // ------------------------------------------------------------ modes

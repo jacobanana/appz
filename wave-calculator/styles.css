@@ -90,12 +90,6 @@ body {
 }
 .sig { display: inline-flex; align-items: center; gap: .15rem; }
 
-.readout {
-  flex: 1 0 100%; margin: 0; display: flex; flex-wrap: wrap; gap: .1rem 1.1rem; justify-content: flex-end;
-  color: var(--bar-muted); font-size: .95rem;
-}
-.readout b { color: var(--bar-ink); font-weight: 600; }
-
 .tabs {
   max-width: 56rem; margin: 0 auto; padding: 0 1rem; display: flex; gap: .15rem;
   overflow-x: auto; scrollbar-width: none;
@@ -143,6 +137,22 @@ main { max-width: 56rem; margin: 0 auto; padding: 1.25rem 1rem 4rem; padding-bot
 .seg button:last-child { border-right: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
 .seg button:disabled { cursor: default; color: var(--muted); background: var(--well); opacity: .5; }
+
+/* Converters: two sides and what joins them, like a unit converter. */
+.conv { display: grid; grid-template-columns: 1fr auto 1fr; gap: .75rem 1rem; align-items: start; }
+.conv-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.conv-side .field { min-width: 0; flex-basis: 6rem; }
+.conv-op { align-self: start; margin-top: 1.95rem; font-size: 1.6rem; font-weight: 600; color: var(--muted); line-height: 1; padding: 0 .2rem; }
+.swap {
+  font-family: inherit; width: 2.6rem; height: 2.6rem; padding: 0; cursor: pointer; color: var(--ink);
+  background: var(--well); border: 1px solid var(--line); border-radius: 50%;
+}
+.swap:hover:not(:disabled) { border-color: var(--ink); }
+.swap:disabled { opacity: .4; cursor: default; }
+
+/* The toggle between converters sharing one card. */
+.seg.switch { margin: 0 0 1.25rem; }
+.seg.switch button { font-weight: 600; padding: .45rem 1rem; }
 
 /* Results: always a table, always in the same place under the inputs. */
 .results { margin-top: 1.25rem; overflow-x: auto; }
@@ -209,7 +219,8 @@ tr.hl td:first-child { box-shadow: inset 3px 0 0 var(--amber-fill); padding-left
   .bpm-field input { font-size: 1.8rem; width: 4.4ch; }
   .tool { min-width: 2.4rem; padding: .4rem .5rem; }
   .tap { min-width: 3.4rem; }
-  .readout { display: none; }
+  .conv { gap: .75rem .5rem; }
+  .conv-op { padding: 0; }
   .tabs { padding: 0 .75rem; }
   .block { padding: 1rem; }
   th, td { padding: .45rem .4rem; }

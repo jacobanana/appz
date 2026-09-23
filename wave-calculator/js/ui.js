@@ -63,8 +63,51 @@
     el.addEventListener('blur', () => {
       if (el.hasAttribute('aria-invalid')) { el.value = current(); el.removeAttribute('aria-invalid'); }
     });
+    /** Show a value computed elsewhere, unless the box is being typed in. */
+    el.show = (x) => {
+      if (document.activeElement === el) return;
+      el.value = Number.isFinite(x) ? String(x) : '';
+      el.removeAttribute('aria-invalid');
+    };
     return el;
   }
+
+  /** The shared tempo as a box, for converters that start from it. Mirrors
+   *  (and writes) the one in the tempo bar. */
+  function bpm(tempo) {
+    const el = number({ value: () => tempo.get().bpm, valid: WC.validBpm,
+      onChange: (x) => tempo.set({ bpm: Math.round(x * 1000) / 1000 }) });
+    tempo.subscribe((s) => { if (parseFloat(el.value) !== s.bpm) el.show(s.bpm); });
+    return el;
+  }
+
+  /**
+   * Converter layout: two sides with an operator between them (an "=" or a
+   * swap button), like a unit converter. Sides are arrays of fields.
+   */
+  function conv(left, op, right) {
+    return h('div', { class: 'conv' },
+      h('div', { class: 'conv-side' }, left),
+      typeof op === 'string' ? h('span', { class: 'conv-op', 'aria-hidden': 'true' }, op) : op,
+      h('div', { class: 'conv-side' }, right));
+  }
+
+  /**
+   * Several converters in one card, one shown at a time, picked from a toggle
+   * on top. `prefs.view` holds the pick. list: [{value, label, content}].
+   */
+  function views(prefs, list) {
+    const show = (v) => list.forEach((o) => { o.el.hidden = o.value !== v; });
+    list.forEach((o) => { o.el = h('div', { class: 'view' }, o.content); });
+    const pick = seg({ options: list, value: prefs.get().view,
+      onChange: (v) => { prefs.set({ view: v }); show(v); } });
+    pick.el.classList.add('switch');
+    show(prefs.get().view);
+    return h('section', { class: 'block', 'aria-label': 'Converter' }, pick.el, list.map((o) => o.el));
+  }
+
+  /** A number rounded to `dp` places as an input value ("128", "1.12"). */
+  const plain = (x, dp) => Math.round(x * Math.pow(10, dp)) / Math.pow(10, dp);
 
   /** <select> from [{value, label}] or plain values. */
   function select({ options, value, onChange }) {
@@ -154,5 +197,5 @@
     };
   }
 
-  WC.ui = { h, block, field, fields, number, select, seg, noteValue, table, row, pairs, nextId };
+  WC.ui = { h, block, field, fields, number, bpm, conv, views, plain, select, seg, noteValue, table, row, pairs, nextId, FEELS };
 })(window.WC);
