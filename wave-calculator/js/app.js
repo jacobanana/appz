@@ -81,7 +81,7 @@
   // ------------------------------------------------------------ modes
 
   const modes = WC.modes.all();
-  const tabs = $('tabs'), host = $('modes'), summary = $('summary');
+  const tabs = $('tabs'), host = $('modes');
   const mounted = new Map(); // id → { panel, view }
 
   modes.forEach((m) => {
@@ -113,7 +113,6 @@
     });
     const entry = mounted.get(m.id) || mount(m);
     mounted.forEach((e) => { e.panel.hidden = e !== entry; });
-    summary.textContent = m.summary || '';
     document.title = m.title + ' · Wave Calculator';
     entry.view.render(WC.timing(tempo.get()));
     app.set({ mode: m.id });

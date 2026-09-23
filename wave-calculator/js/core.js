@@ -130,6 +130,20 @@
       if (p.bars) return p.bars + (p.bars === 1 ? ' bar' : ' bars');
       return ('1/' + p.den + ' ' + FEEL_NAME[p.feel]).trim();
     },
+    /** '1/8d' → {base: '1/8', feel: 'd'}; '2bar' → {base: '2bar', feel: ''} */
+    split(id) {
+      const p = parse(id);
+      return p.bars ? { base: id, feel: '' } : { base: '1/' + p.den, feel: p.feel };
+    },
+    join: (base, feel) => (/bar$/.test(base) ? base : base + (feel || '')),
+    /** Whether `id` is one of these divisions / bars (and, if not, a straight one). */
+    allowed(id, { divisions = [], bars = [], feels = true } = {}) {
+      try {
+        const p = parse(id);
+        if (p.bars) return bars.includes(p.bars);
+        return divisions.includes(p.den) && (feels || !p.feel);
+      } catch (e) { return false; }
+    },
     /** Every id from `longest` denominator down to `shortest`, in each feel,
      *  longest first, with optional whole-bar values ahead of them. */
     list({ longest = 1, shortest = 256, feels = ['', 'd', 't'], bars = [] } = {}) {
@@ -192,7 +206,6 @@
    *   WC.modes.register({
    *     id: 'compressor',            // URL hash and storage key
    *     title: 'Compressor',         // tab label
-   *     summary: 'One line.',        // shown under the tab strip
    *     prefs: { ... },              // its own inputs' defaults, persisted
    *     mount(root, ctx) {           // build the DOM once, into `root`
    *       return { render(t) {} };   // redraw for a WC.timing; called on
