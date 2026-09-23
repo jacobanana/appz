@@ -10,8 +10,7 @@
   WC.modes.register({
     id: 'bars',
     title: 'Bars & time',
-    tint: ['#A6D855', '#378A36'],
-    icon: '<path d="M13 40 L19.5 8 H28.5 L35 40 Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M15 32 H33" stroke="#fff" stroke-width="3"/><path d="M24 32 L35 11" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="18.6" r="3.3" fill="#fff"/>',
+    icon: '<path d="M13 40 L19.5 8 H28.5 L35 40 Z M15 32 H33 M24 32 L34 12"/>',
     // `from` is the side last typed in: it stays put when the tempo changes.
     prefs: { view: 'convert', from: 'bars', bars: 8, beats: 0, min: 0, sec: 16, fitBars: 16, fitMin: 0, fitSec: 30 },
     clean: (p, d) => {

@@ -79,10 +79,9 @@
   const home = $('home'), appbar = $('appbar'), host = $('modes');
   const mounted = new Map(); // id → { panel, view }
 
-  /** A mode's app icon: its glyph on a rounded tile in its own gradient. */
+  /** A mode's app icon: its line glyph on a plain tile. */
   function icon(m, cls) {
-    const [a, b] = m.tint || ['#4A525C', '#15181B'];
-    return h('span', { class: 'icon ' + (cls || ''), style: '--a:' + a + ';--b:' + b, 'aria-hidden': 'true',
+    return h('span', { class: 'icon ' + (cls || ''), 'aria-hidden': 'true',
       html: '<svg viewBox="0 0 48 48" focusable="false">' + (m.icon || '') + '</svg>' });
   }
 

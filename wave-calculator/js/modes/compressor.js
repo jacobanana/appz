@@ -19,8 +19,7 @@
   WC.modes.register({
     id: 'compressor',
     title: 'Compressor',
-    tint: ['#1FC2A7', '#0A6874'],
-    icon: '<path d="M8 40 L22 26 Q26 22 40 18" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M22 26 L38 10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="2.5 4" opacity=".6"/><circle cx="22" cy="26" r="3.4" fill="#fff"/>',
+    icon: '<path d="M8 40 L24 24 L40 17"/><path d="M24 24 L40 8" stroke-dasharray="2 3"/>',
     prefs: { hits: '1/4', attack: '1/128', release: '1/8' },
     clean: (p, d) => ({
       hits: WC.notes.allowed(p.hits, HITS) ? p.hits : d.hits,

@@ -239,8 +239,7 @@ counts quarter notes; the time signature only decides how long a bar is.
 WC.modes.register({
   id: 'lfo',                         // URL hash (#lfo) and storage key
   title: 'LFO',                      // label under its icon
-  tint: ['#8D7BFF', '#4430B5'],      // icon gradient, top to bottom
-  icon: '<path d="…" stroke="#fff"/>', // white glyph, 48×48 viewBox
+  icon: '<path d="M8 24 Q16 8 24 24"/>', // line glyph, 48×48 viewBox, unstyled
   prefs: { shape: 'sine' },          // its own inputs, saved per mode
   mount(root, { prefs, tempo }) {    // build the DOM once
     return { render(t) { /* redraw for this tempo */ } };

@@ -11,8 +11,7 @@
   WC.modes.register({
     id: 'reverb',
     title: 'Reverb',
-    tint: ['#56B4FF', '#1F4FC4'],
-    icon: '<g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 27 A9 9 0 0 1 21 36"/><path d="M12 19 A17 17 0 0 1 29 36" opacity=".75"/><path d="M12 11 A25 25 0 0 1 37 36" opacity=".5"/></g><circle cx="12" cy="36" r="4" fill="#fff"/>',
+    icon: '<circle cx="11" cy="37" r="2"/><path d="M11 28 A9 9 0 0 1 20 37 M11 20 A17 17 0 0 1 28 37 M11 12 A25 25 0 0 1 36 37"/>',
     prefs: { length: '1/2', pre: '1/64' },
     clean: (p, d) => ({
       length: WC.notes.allowed(p.length, LENGTH) ? p.length : d.length,
