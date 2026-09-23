@@ -25,10 +25,11 @@
     return el;
   }
 
-  /** A titled card. Returns the <section>; append inputs and results to it. */
+  /** A card. The title is for screen readers only: the tab already names it.
+   *  Returns the <section>; append inputs and results to it. */
   function block(title) {
     const id = nextId('h');
-    return h('section', { class: 'block', 'aria-labelledby': id }, h('h2', { id }, title));
+    return h('section', { class: 'block', 'aria-labelledby': id }, h('h2', { id, class: 'visually-hidden' }, title));
   }
 
   /** Label + control, stacked. `unit` is shown beside the label. */
@@ -104,6 +105,16 @@
     pick.el.classList.add('switch');
     show(prefs.get().view);
     return h('section', { class: 'block', 'aria-label': 'Converter' }, pick.el, list.map((o) => o.el));
+  }
+
+  /**
+   * Minutes and seconds on one line, "[m] : [s]". Takes two number boxes and
+   * returns the row; field() labels the first.
+   */
+  function clock(min, sec) {
+    min.classList.add('clock-min');
+    sec.setAttribute('aria-label', 'Seconds');
+    return h('div', { class: 'clock' }, min, h('span', { class: 'clock-sep', 'aria-hidden': 'true' }, ':'), sec);
   }
 
   /** A number rounded to `dp` places as an input value ("128", "1.12"). */
@@ -197,5 +208,5 @@
     };
   }
 
-  WC.ui = { h, block, field, fields, number, bpm, conv, views, plain, select, seg, noteValue, table, row, pairs, nextId, FEELS };
+  WC.ui = { h, block, field, fields, number, bpm, conv, views, clock, plain, select, seg, noteValue, table, row, pairs, nextId, FEELS };
 })(window.WC);
