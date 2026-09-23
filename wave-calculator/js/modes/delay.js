@@ -26,7 +26,7 @@
       function render(t) {
         lastT = t;
         const ms = t.note(prefs.get().note);
-        out.set([['Delay', f.ms(ms) + ' ms', 'main'], ['Samples', f.samples(t.samples(ms))], ['Rate', f.hz(t.hz(ms)) + ' Hz']]);
+        out.set([['Delay', f.ms(ms) + ' ms', 'main'], ['Samples', f.samples(t.samples(ms))]]);
       }
 
       return { render };

@@ -1,40 +1,50 @@
-/* Bars & time — bars to seconds, seconds to bars, and the tempo that makes a
- * number of bars last a given time. */
+/* Bars & time — bars to time and back (type on either side), and the tempo
+ * that makes a number of bars last a given time. */
 (function (WC) {
   'use strict';
-  const { h, block, field, fields, number, pairs } = WC.ui;
+  const { h, field, fields, number, conv, views, plain, pairs } = WC.ui;
   const f = WC.fmt;
   const nonNeg = (x) => Number.isFinite(x) && x >= 0;
+  const VIEWS = ['convert', 'fit'];
 
   WC.modes.register({
     id: 'bars',
     title: 'Bars & time',
-    prefs: { bars: 8, beats: 0, min: 0, sec: 30, fitBars: 16, fitMin: 0, fitSec: 30 },
+    // `from` is the side last typed in: it stays put when the tempo changes.
+    prefs: { view: 'convert', from: 'bars', bars: 8, beats: 0, min: 0, sec: 16, fitBars: 16, fitMin: 0, fitSec: 30 },
     clean: (p, d) => {
       const out = {};
-      Object.keys(d).forEach((k) => { out[k] = nonNeg(+p[k]) ? +p[k] : d[k]; });
+      Object.keys(d).forEach((k) => { if (typeof d[k] === 'number') out[k] = nonNeg(+p[k]) ? +p[k] : d[k]; });
+      out.view = VIEWS.includes(p.view) ? p.view : d.view;
+      out.from = p.from === 'time' ? 'time' : 'bars';
       return out;
     },
 
     mount(root, { prefs, tempo }) {
       const p = () => prefs.get();
-      const num = (k, step) => number({ value: p()[k], min: 0, step, valid: nonNeg, onChange: (v) => prefs.set({ [k]: v }) });
+      const shown = {};
+      const num = (k, step, from) => number({ value: () => shown[k] ?? p()[k], min: 0, step, valid: nonNeg,
+        onChange: (v) => prefs.set(Object.assign({ [k]: v }, from && { from })) });
 
-      const toTime = block('Bars to seconds');
-      const toTimeOut = pairs();
-      toTime.append(fields(field('Bars', num('bars', 1)), field('Beats', num('beats', 1))), toTimeOut.el);
+      const box = { bars: num('bars', 1, 'bars'), beats: num('beats', 1, 'bars'), min: num('min', 1, 'time'), sec: num('sec', 0.1, 'time') };
+      const convOut = pairs();
+      const convert = [
+        conv([fields(field('Bars', box.bars), field('Beats', box.beats))], '=',
+          [fields(field('Minutes', box.min), field('Seconds', box.sec))]),
+        convOut.el,
+      ];
 
-      const toBars = block('Seconds to bars');
-      const toBarsOut = pairs();
-      toBars.append(fields(field('Minutes', num('min', 1)), field('Seconds', num('sec', 0.1))), toBarsOut.el);
-
-      const fit = block('Length to tempo');
       const fitOut = pairs();
       const use = h('div', { class: 'actions' });
-      fit.append(fields(field('Bars', num('fitBars', 1)), field('Minutes', num('fitMin', 1)), field('Seconds', num('fitSec', 0.1))),
-        fitOut.el, use);
+      const fit = [
+        fields(field('Bars', num('fitBars', 1)), field('Minutes', num('fitMin', 1)), field('Seconds', num('fitSec', 0.1))),
+        fitOut.el, use,
+      ];
 
-      root.append(toTime, toBars, fit);
+      root.append(views(prefs, [
+        { value: 'convert', label: 'Bars ⇄ time', content: convert },
+        { value: 'fit', label: 'Length → tempo', content: fit },
+      ]));
 
       let lastT = null;
       prefs.subscribe(() => lastT && render(lastT));
@@ -43,22 +53,23 @@
         lastT = t;
         const s = p();
 
-        const ms = s.bars * t.barMs + s.beats * t.beatMs;
-        toTimeOut.set([
-          ['Seconds', f.num(ms / 1000, 3) + ' s', 'main'],
-          ['Minutes', f.clock(ms)],
+        let ms;
+        if (s.from === 'bars') {
+          ms = s.bars * t.barMs + s.beats * t.beatMs;
+          let min = Math.floor(ms / 60000 + 1e-9), sec = plain((ms - min * 60000) / 1000, 3);
+          if (sec >= 60) { min += 1; sec = 0; }
+          Object.assign(shown, { bars: s.bars, beats: s.beats, min, sec });
+        } else {
+          ms = (s.min * 60 + s.sec) * 1000;
+          let bars = Math.floor(ms / t.barMs + 1e-9), beats = plain((ms - bars * t.barMs) / t.beatMs, 3);
+          if (beats >= t.sigNum) { bars += 1; beats = 0; }
+          Object.assign(shown, { bars, beats, min: s.min, sec: s.sec });
+        }
+        Object.keys(box).forEach((k) => box[k].show(shown[k]));
+        convOut.set([
+          ['Length', f.clock(ms), 'main'],
+          ['Bars', f.num(ms / t.barMs, 3)],
           ['Samples', f.samples(t.samples(ms))],
-        ]);
-
-        const dur = (s.min * 60 + s.sec) * 1000;
-        const exact = dur / t.barMs;
-        const whole = Math.floor(exact + 1e-9);
-        const beats = (dur - whole * t.barMs) / t.beatMs;
-        const wholeBeats = Math.floor(beats + 1e-9);
-        toBarsOut.set([
-          ['Bars', f.num(exact, 3), 'main'],
-          ['Bars + beats', whole + ' bars ' + wholeBeats + ' beats'],
-          ['Remainder', f.ms((beats - wholeBeats) * t.beatMs) + ' ms'],
         ]);
 
         const fitDur = (s.fitMin * 60 + s.fitSec) * 1000;
@@ -75,7 +86,7 @@
           ['Rounded', round + ' BPM'],
           ['Length when rounded', f.clock(roundDur)],
         ]);
-        const exactBpm = Math.round(bpm * 1000) / 1000;
+        const exactBpm = plain(bpm, 3);
         [exactBpm, round].filter((b, i, a) => a.indexOf(b) === i && b !== t.bpm).forEach((b) =>
           use.append(h('button', { type: 'button', class: 'btn', onclick: () => tempo.set({ bpm: b }) }, 'Set ' + f.bpm(b) + ' BPM')));
       }
