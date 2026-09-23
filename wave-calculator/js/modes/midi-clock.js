@@ -17,6 +17,8 @@
   WC.modes.register({
     id: 'midi-clock',
     title: 'MIDI clock',
+    tint: ['#FF7A8A', '#B42A57'],
+    icon: '<circle cx="24" cy="25" r="15" fill="none" stroke="#fff" stroke-width="3"/><rect x="20.5" y="36" width="7" height="5" rx="1" fill="#fff"/><g fill="#fff"><circle cx="15.5" cy="26" r="2.4"/><circle cx="18" cy="20" r="2.4"/><circle cx="24" cy="17.5" r="2.4"/><circle cx="30" cy="20" r="2.4"/><circle cx="32.5" cy="26" r="2.4"/></g>',
     prefs: { view: 'ticks', n: 1, ppqn: 24, delay: 53, lat: 3, comp: 'only' },
     clean: (p, d) => ({
       view: VIEWS.includes(p.view) ? p.view : d.view,

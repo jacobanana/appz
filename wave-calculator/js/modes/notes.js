@@ -11,6 +11,8 @@
   WC.modes.register({
     id: 'notes',
     title: 'Note lengths',
+    tint: ['#FBC04A', '#E0691A'],
+    icon: '<path d="M18.5 34 V12.5 L35.5 8.5 V30" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M18.5 11 L35.5 7 V13 L18.5 17 Z" fill="#fff"/><ellipse cx="14" cy="34.5" rx="5.8" ry="4.3" transform="rotate(-20 14 34.5)" fill="#fff"/><ellipse cx="31" cy="30.5" rx="5.8" ry="4.3" transform="rotate(-20 31 30.5)" fill="#fff"/>',
     prefs: { feel: '' },
     clean: (p, d) => ({ feel: FEELS.some((o) => o.value === p.feel) ? p.feel : d.feel }),
 

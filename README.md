@@ -217,12 +217,12 @@ means opening `index.html` from disk still works.
 
 ```
 wave-calculator/
-  index.html            # the tempo bar, the tab strip, the script tags
+  index.html            # the tempo bar, the app bar, the script tags
   styles.css
   js/core.js            # shared state + maths: WC.tempo, WC.timing, WC.notes, WC.fmt, WC.modes
   js/ui.js              # small DOM kit the modes build from (fields, selects, tables…)
   js/modes/*.js         # one calculator per file
-  js/app.js             # the shell: wires the tempo bar, builds tabs, mounts modes
+  js/app.js             # the shell: wires the tempo bar, builds the app grid, mounts modes
 ```
 
 **The tempo lives in exactly one place.** `WC.tempo` is a small observable store
@@ -233,12 +233,14 @@ with `t.note('1/8d')`, `t.samples(ms)`, `t.barMs` and friends. BPM always
 counts quarter notes; the time signature only decides how long a bar is.
 
 **Adding a calculator** is one new file in `js/modes/` and one `<script>` tag
-(tab order is script order):
+(icon order on the home grid is script order):
 
 ```js
 WC.modes.register({
   id: 'lfo',                         // URL hash (#lfo) and storage key
-  title: 'LFO',                      // tab label
+  title: 'LFO',                      // label under its icon
+  tint: ['#8D7BFF', '#4430B5'],      // icon gradient, top to bottom
+  icon: '<path d="…" stroke="#fff"/>', // white glyph, 48×48 viewBox
   prefs: { shape: 'sine' },          // its own inputs, saved per mode
   mount(root, { prefs, tempo }) {    // build the DOM once
     return { render(t) { /* redraw for this tempo */ } };
@@ -250,7 +252,6 @@ WC.modes.register({
 | --- | --- |
 | `wave-calculator:tempo` | BPM, time signature, sample rate. |
 | `wave-calculator:mode:<id>` | That calculator's own inputs. |
-| `wave-calculator:app` | Which tab was open last. |
 
 All in that browser's `localStorage`; nothing is uploaded.
 

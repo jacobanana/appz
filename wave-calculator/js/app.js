@@ -1,8 +1,8 @@
 /* Wave Calculator — the shell.
  *
- * Wires the one tempo bar to WC.tempo, builds a tab per registered mode,
- * mounts each mode the first time it is shown and re-renders the visible one
- * whenever the tempo changes. Modes never touch the bar and the bar never
+ * Wires the one tempo bar to WC.tempo, lays the registered modes out as a
+ * grid of app icons, mounts each mode the first time it is opened and
+ * re-renders the open one whenever the tempo changes. Modes never touch the bar and the bar never
  * knows what modes exist.
  */
 (function (WC) {
@@ -10,7 +10,6 @@
   const $ = (id) => document.getElementById(id);
   const f = WC.fmt;
   const tempo = WC.tempo;
-  const app = WC.store('app', { mode: '' });
 
   // ------------------------------------------------------------ tempo bar
 
@@ -75,17 +74,23 @@
 
   // ------------------------------------------------------------ modes
 
+  const { h } = WC.ui;
   const modes = WC.modes.all();
-  const tabs = $('tabs'), host = $('modes');
+  const home = $('home'), appbar = $('appbar'), host = $('modes');
   const mounted = new Map(); // id → { panel, view }
 
-  modes.forEach((m) => {
-    const a = document.createElement('a');
-    a.href = '#' + m.id;
-    a.textContent = m.title;
-    a.dataset.mode = m.id;
-    tabs.append(a);
-  });
+  /** A mode's app icon: its glyph on a rounded tile in its own gradient. */
+  function icon(m, cls) {
+    const [a, b] = m.tint || ['#4A525C', '#15181B'];
+    return h('span', { class: 'icon ' + (cls || ''), style: '--a:' + a + ';--b:' + b, 'aria-hidden': 'true',
+      html: '<svg viewBox="0 0 48 48" focusable="false">' + (m.icon || '') + '</svg>' });
+  }
+
+  const grid = h('ul', { class: 'apps' }, modes.map((m) =>
+    h('li', {}, h('a', { href: '#' + m.id, class: 'app', 'data-mode': m.id }, icon(m), h('span', { class: 'app-name' }, m.title)))));
+  home.append(h('h2', { class: 'visually-hidden' }, 'Calculators'), grid);
+
+  const barIcon = $('appIcon'), barTitle = $('appTitle');
 
   function mount(m) {
     const panel = document.createElement('div');
@@ -100,19 +105,30 @@
   }
 
   let current = null;
+  /** Open a mode by id, or the app grid for anything else. */
   function show(id) {
-    const m = WC.modes.get(id) || modes[0];
-    current = m.id;
-    tabs.querySelectorAll('a').forEach((a) => {
-      if (a.dataset.mode === m.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-    });
+    const m = WC.modes.get(id);
+    const was = current;
+    current = m ? m.id : null;
+    home.hidden = !!m;
+    appbar.hidden = !m;
+    document.body.classList.toggle('in-app', !!m);
+    if (!m) {
+      mounted.forEach((e) => { e.panel.hidden = true; });
+      document.title = 'Wave Calculator';
+      // Back on the grid, focus the app we just left so keyboard users keep their place.
+      const last = was && grid.querySelector('[data-mode="' + was + '"]');
+      if (last && document.activeElement && document.activeElement.closest('#appbar')) last.focus();
+      return;
+    }
+    barIcon.replaceChildren(icon(m, 'small'));
+    barTitle.textContent = m.title;
     const entry = mounted.get(m.id) || mount(m);
     mounted.forEach((e) => { e.panel.hidden = e !== entry; });
+    entry.panel.classList.remove('opening'); void entry.panel.offsetWidth; entry.panel.classList.add('opening');
     document.title = m.title + ' · Wave Calculator';
     entry.view.render(WC.timing(tempo.get()));
-    app.set({ mode: m.id });
-    const active = tabs.querySelector('[aria-current]');
-    if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    window.scrollTo(0, 0);
   }
 
   tempo.subscribe((s) => {
@@ -122,9 +138,12 @@
   });
 
   window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+  // Escape leaves an app for the grid, unless it's closing something inside it.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && current && !e.defaultPrevented &&
+        !e.target.closest('input,select,textarea,[contenteditable]')) location.hash = '';
+  });
 
   paintBar(tempo.get());
-  const start = location.hash.slice(1);
-  show(WC.modes.get(start) ? start : app.get().mode);
-  if (!location.hash) history.replaceState(null, '', '#' + current);
+  show(location.hash.slice(1));
 })(window.WC);

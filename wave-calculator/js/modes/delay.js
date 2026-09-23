@@ -9,6 +9,8 @@
   WC.modes.register({
     id: 'delay',
     title: 'Delay',
+    tint: ['#8D7BFF', '#4430B5'],
+    icon: '<g fill="#fff"><rect x="8" y="10" width="5" height="30" rx="2.5"/><rect x="17.5" y="18" width="5" height="22" rx="2.5" opacity=".8"/><rect x="27" y="25" width="5" height="15" rx="2.5" opacity=".6"/><rect x="36.5" y="31" width="5" height="9" rx="2.5" opacity=".4"/></g>',
     prefs: { note: '1/8d' },
     clean: (p, d) => ({ note: WC.notes.allowed(p.note, NOTE) ? p.note : d.note }),
 

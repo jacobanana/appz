@@ -37,14 +37,18 @@
       </div>
     </div>
   </div>
-  <nav class="tabs" id="tabs" aria-label="Calculators"></nav>
+  <nav class="appbar" id="appbar" aria-label="Calculator" hidden>
+    <a href="#" class="apps-btn" aria-label="All calculators"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><g fill="currentColor"><rect x="2" y="2" width="6.5" height="6.5" rx="2"/><rect x="11.5" y="2" width="6.5" height="6.5" rx="2"/><rect x="2" y="11.5" width="6.5" height="6.5" rx="2"/><rect x="11.5" y="11.5" width="6.5" height="6.5" rx="2"/></g></svg><span>Apps</span></a>
+    <span class="app-current"><span id="appIcon"></span><span id="appTitle"></span></span>
+  </nav>
 </header>
 
 <main>
+  <section id="home" class="home" aria-label="Calculators"></section>
   <div id="modes"></div>
 </main>
 
-<!-- Core first, then one file per mode (tab order = script order), then the shell. -->
+<!-- Core first, then one file per mode (icon order = script order), then the shell. -->
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/modes/compressor.js"></script>
