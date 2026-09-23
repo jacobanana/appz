@@ -71,6 +71,8 @@
     sigDen.value = s.sigDen;
     rate.value = s.sampleRate;
   }
+  // Paint now, so the bar works even if a calculator below fails to build.
+  paintBar(tempo.get());
 
   // ------------------------------------------------------------ modes
 
@@ -143,6 +145,5 @@
         !e.target.closest('input,select,textarea,[contenteditable]')) location.hash = '';
   });
 
-  paintBar(tempo.get());
   show(location.hash.slice(1));
 })(window.WC);
