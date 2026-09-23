@@ -14,7 +14,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
 | 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 📐 Headboard Bracket | [`headboard-bracket/`](headboard-bracket/) | Parametric designer for a printed saddle bracket that hangs over a headboard and carries a projector. Type your board thickness and lean and the profile redraws — side elevation, plan, and a spinnable 3D preview where the projector swings on its hinge until it fouls the wall or the bracket. Exports a watertight STL and a real STEP solid. |
-| 🥁 BeatMapper | [`beat-mapper/`](beat-mapper/) | Tempo map from a recording — drop in the audio, let it find every hit, set bar 1 and it follows the beat from there, pinning each beat to a real transient. Loop the part that feels right and it rebuilds the rest to match. Exports a MIDI tempo map (with a click track) or a REAPER project with the audio already in place, and keeps a per-file session so you can pick up where you left off. |
+| 🥁 BeatMapper | [moved to its own repo →](https://github.com/jacobanana/beat-mapper) | Tempo map from a recording — drop in the audio, let it find every hit, set bar 1 and it follows the beat from there, pinning each beat to a real transient. Loop the part that feels right and it rebuilds the rest to match. Exports a MIDI tempo map (with a click track) or a REAPER project with the audio already in place, slices the audio into samples, and keeps a per-file session so you can pick up where you left off. Now a Vite + TypeScript app at [jacobanana.github.io/beat-mapper](https://jacobanana.github.io/beat-mapper/); [`beat-mapper/`](beat-mapper/) here only redirects there. |
 | 🐷 Piggy | [moved to its own repo →](https://github.com/jacobanana/piggy) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. Now a Vite app at [jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/), with a FastAPI + Postgres backend growing beside it. |
 
 ## How it's laid out
@@ -27,7 +27,7 @@ breathing-flow-log/index.html
 sensor-readout/index.html
 tpg-pulse/index.html
 headboard-bracket/index.html
-beat-mapper/index.html
+beat-mapper/index.html  # redirect to the app's new home
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
 ```
