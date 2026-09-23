@@ -52,13 +52,13 @@ body {
 .sep { color: var(--bar-line); }
 
 .tempo { display: flex; flex-wrap: wrap; align-items: stretch; gap: .5rem .9rem; flex: 1 1 auto; justify-content: flex-end; }
-.bpm { display: flex; flex: 1 1 auto; align-items: stretch; border: 1px solid var(--bar-line); border-radius: 6px; overflow: hidden; background: var(--bar-well); }
+.bpm { display: flex; align-items: stretch; border: 1px solid var(--bar-line); border-radius: 6px; overflow: hidden; background: var(--bar-well); }
 .bpm .step {
   font: inherit; font-size: 1.5rem; line-height: 1; width: 2.6rem; border: 0; cursor: pointer;
   background: transparent; color: var(--bar-muted);
 }
 .bpm .step:hover { color: var(--bar-ink); background: var(--bar-line); }
-.bpm-field { display: flex; flex: 1 1 auto; justify-content: flex-end; align-items: baseline; gap: .3rem; padding: 0 .3rem; border-left: 1px solid var(--bar-line); border-right: 1px solid var(--bar-line); }
+.bpm-field { display: flex; align-items: baseline; gap: .3rem; padding: 0 .3rem; border-left: 1px solid var(--bar-line); border-right: 1px solid var(--bar-line); }
 .bpm-field input {
   font: inherit; font-size: 2.1rem; font-weight: 700; line-height: 1.1; letter-spacing: -.02em;
   width: 5.2ch; background: transparent; border: 0; color: var(--amber-fill); text-align: right;
@@ -225,8 +225,9 @@ tr.hl td:first-child { box-shadow: inset 3px 0 0 var(--amber-fill); padding-left
   .top-inner { padding: .5rem 1rem .3rem; gap: .45rem; }
   .brand { flex: 1 0 100%; }
   .brand h1 { font-size: 1.1rem; }
-  /* Every row of the bar spans the full width: BPM box and Time grow, Rate sits flush right. */
+  /* Every row of the bar spans the full width: BPM and Time on the left, the tools and Rate flush right. */
   .tempo { flex: 1 0 100%; gap: .45rem .4rem; }
+  .tools { margin-left: auto; }
   .bpm .step { width: 2.1rem; }
   .bpm-field input { font-size: 1.8rem; width: 4.4ch; }
   .tool { min-width: 2.5rem; padding: .35rem .5rem; }
