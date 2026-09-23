@@ -32,19 +32,24 @@
 
       const main = block('Attack and release');
       main.append(fields(
-        field('Hit interval', noteValue(Object.assign({ value: p().hits, onChange: set('hits') }, HITS)).el),
         field('Attack', noteValue(Object.assign({ value: p().attack, onChange: set('attack') }, ATTACK)).el),
         field('Release', noteValue(Object.assign({ value: p().release, onChange: set('release') }, RELEASE)).el)));
 
       const times = table([{ label: '', width: '25%' }, 'Note', 'τ ms', 'Samples']);
+
+      // The hit interval only drives the plot, so it lives on the plot.
+      const hits = noteValue(Object.assign({ value: p().hits, onChange: set('hits') }, HITS));
+      const hitSel = hits.el.querySelector('select');
+      hitSel.id = WC.ui.nextId('hits');
+      const gapOut = h('span', { class: 'plot-gap' });
       const plot = h('div', { class: 'plot', role: 'img' });
       const stats = pairs();
       main.append(times.el,
-        h('p', { class: 'note' }, 'Time constant (τ): time to cover 63% of the gain change. This is how most DAW compressors define attack and release.'),
-        h('h3', {}, 'Gain reduction'),
+        h('p', { class: 'note' }, 'τ: time to 63% of the gain change (the usual DAW convention).'),
+        h('div', { class: 'plot-head' }, h('label', { for: hitSel.id }, 'Hits'), hits.el, gapOut),
         plot,
         h('p', { class: 'caption' },
-          h('span', { class: 'key key-hit' }), 'hit (held for ¼ of the interval)',
+          h('span', { class: 'key key-hit' }), 'hit (¼ of the interval)',
           h('span', { class: 'key key-gr' }), 'gain reduction'),
         stats.el);
 
@@ -73,8 +78,8 @@
           row(['Attack', WC.notes.label(c.s.attack), f.ms(c.tauA), f.samples(t.samples(c.tauA))]),
           row(['Release', WC.notes.label(c.s.release), f.ms(c.tauR), f.samples(t.samples(c.tauR))]),
         ]);
+        gapOut.textContent = f.ms(c.gap) + ' ms';
         stats.set([
-          ['Hit interval', f.ms(c.gap) + ' ms'],
           ['Reduction reached during a hit', f.pct(c.grabbed)],
           ['Gain recovered before the next hit', f.pct(c.recovered)],
         ]);
@@ -85,8 +90,8 @@
        * simulated to steady state and drawn hanging from the top like a meter. */
       function drawPlot(t) {
         const c = calc(t);
-        const W = Math.max(280, plot.clientWidth || 600), H = 170;
-        const L = 1, R = 1, T = 6, B = 24, PH = H - T - B, PW = W - L - R;
+        const W = Math.max(280, plot.clientWidth || 600), H = W < 500 ? 110 : 150;
+        const L = 1, R = 1, T = 4, B = 20, PH = H - T - B, PW = W - L - R;
         const span = c.gap * 2 <= t.barMs ? t.barMs : c.gap * 2;
         const x = (ms) => L + (ms / span) * PW;
         const y = (e) => T + e * PH;
@@ -112,7 +117,7 @@
         for (let q = 0, i = 0; q <= t.quarters(span) + 1e-6; q += t.barQuarters / t.sigNum, i++) {
           const xx = x(t.ms(q));
           grid += '<line class="' + (i % t.sigNum === 0 ? 'p-bar' : 'p-beat') + '" x1="' + xx + '" x2="' + xx + '" y1="' + T + '" y2="' + (T + PH) + '"/>';
-          if (xx < W - 20) grid += '<text class="p-lbl" x="' + (xx + 3) + '" y="' + (H - 7) + '">' +
+          if (xx < W - 20) grid += '<text class="p-lbl" x="' + (xx + 3) + '" y="' + (H - 5) + '">' +
             (Math.floor(i / t.sigNum) + 1) + '.' + ((i % t.sigNum) + 1) + '</text>';
         }
         const line = pts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('');

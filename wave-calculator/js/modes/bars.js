@@ -2,7 +2,7 @@
  * that makes a number of bars last a given time. */
 (function (WC) {
   'use strict';
-  const { h, field, fields, number, conv, views, plain, pairs } = WC.ui;
+  const { field, number, conv, views, clock, plain, pairs } = WC.ui;
   const f = WC.fmt;
   const nonNeg = (x) => Number.isFinite(x) && x >= 0;
   const VIEWS = ['convert', 'fit'];
@@ -29,16 +29,20 @@
       const box = { bars: num('bars', 1, 'bars'), beats: num('beats', 1, 'bars'), min: num('min', 1, 'time'), sec: num('sec', 0.1, 'time') };
       const convOut = pairs();
       const convert = [
-        conv([fields(field('Bars', box.bars), field('Beats', box.beats))], '=',
-          [fields(field('Minutes', box.min), field('Seconds', box.sec))]),
+        conv([field('Bars', box.bars), field('Beats', box.beats)], '=',
+          [field('Time', clock(box.min, box.sec), 'm:s')]),
         convOut.el,
       ];
 
+      // Set-tempo buttons sit in the results, next to the tempo they set.
       const fitOut = pairs();
-      const use = h('div', { class: 'actions' });
+      fitOut.el.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-bpm]');
+        if (b) tempo.set({ bpm: +b.dataset.bpm });
+      });
       const fit = [
-        fields(field('Bars', num('fitBars', 1)), field('Minutes', num('fitMin', 1)), field('Seconds', num('fitSec', 0.1))),
-        fitOut.el, use,
+        conv([field('Bars', num('fitBars', 1))], '=', [field('Length', clock(num('fitMin', 1), num('fitSec', 0.1)), 'm:s')]),
+        fitOut.el,
       ];
 
       root.append(views(prefs, [
@@ -67,28 +71,26 @@
         }
         Object.keys(box).forEach((k) => box[k].show(shown[k]));
         convOut.set([
-          ['Length', f.clock(ms), 'main'],
-          ['Bars', f.num(ms / t.barMs, 3)],
+          ['Bars', f.num(ms / t.barMs, 3), 'main'],
+          ['Seconds', f.num(ms / 1000, 3)],
           ['Samples', f.samples(t.samples(ms))],
         ]);
 
         const fitDur = (s.fitMin * 60 + s.fitSec) * 1000;
         const bpm = s.fitBars > 0 && fitDur > 0 ? (60000 * s.fitBars * t.barQuarters) / fitDur : NaN;
-        use.replaceChildren();
         if (!WC.validBpm(bpm)) {
           fitOut.set([['Tempo', '–', 'main'], ['Rounded', '–'], ['Length when rounded', '–']]);
           return;
         }
         const round = Math.round(bpm);
         const roundDur = (60000 * s.fitBars * t.barQuarters) / round;
+        const setBtn = (b) => (b === t.bpm ? '' :
+          ' <button type="button" class="btn btn-set" data-bpm="' + b + '" aria-label="Set tempo to ' + f.bpm(b) + ' BPM">Set</button>');
         fitOut.set([
-          ['Tempo', f.trim(bpm, 3) + ' BPM', 'main'],
-          ['Rounded', round + ' BPM'],
+          ['Tempo', f.trim(bpm, 3) + ' BPM' + setBtn(plain(bpm, 3)), 'main'],
+          ['Rounded', round + ' BPM' + (round === plain(bpm, 3) ? '' : setBtn(round))],
           ['Length when rounded', f.clock(roundDur)],
         ]);
-        const exactBpm = plain(bpm, 3);
-        [exactBpm, round].filter((b, i, a) => a.indexOf(b) === i && b !== t.bpm).forEach((b) =>
-          use.append(h('button', { type: 'button', class: 'btn', onclick: () => tempo.set({ bpm: b }) }, 'Set ' + f.bpm(b) + ' BPM')));
       }
 
       return { render };
