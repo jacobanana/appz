@@ -14,7 +14,7 @@ A little shelf of tiny, self-contained single-page web apps, published with GitH
 | 📡 Sensor Readout | [`sensor-readout/`](sensor-readout/) | Live motion-sensor instrument panel — strip charts of the accelerometer, gyroscope and compass, an attitude bubble level, peak trackers, an interpreted angle view with a zero reference, and a support check of every motion API the browser exposes. |
 | 🚊 Pulse | [`tpg-pulse/`](tpg-pulse/) | Geneva's public transport, live from the [tpg open data](https://opendata.tpg.ch/). Search any stop for its whole counted history and every line that calls there, or any line to see it drawn across the network with all its stops. Underneath, the network as dots sized by monthly boardings — then switch to **Rhythm** and the map dissolves: stops re-arrange by the *shape of their year*, so the ones that breathe alike sit together no matter how far apart they are. |
 | 📐 Headboard Bracket | [`headboard-bracket/`](headboard-bracket/) | Parametric designer for a printed saddle bracket that hangs over a headboard and carries a projector. Type your board thickness and lean and the profile redraws — side elevation, plan, and a spinnable 3D preview where the projector swings on its hinge until it fouls the wall or the bracket. Exports a watertight STL and a real STEP solid. |
-| ⏱️ Tempo Desk | [`tempo-desk/`](tempo-desk/) | Tempo calculators on one shared BPM — compressor attack and release as time constants that fit the groove (with the gain-reduction curve simulated over a bar), note lengths in ms / samples / Hz with swing, delay and reverb times that end on the grid, MIDI clock ticks and delay compensation, bars ↔ time, and tempo changes as stretch or varispeed pitch. |
+| ⏱️ Wave Calculator | [`wave-calculator/`](wave-calculator/) | Tempo calculators on one shared BPM — compressor attack and release as time constants that fit the groove (with the gain-reduction curve simulated over a bar), note lengths in ms / samples / Hz with swing, delay and reverb times that end on the grid, MIDI clock ticks and delay compensation, bars ↔ time, and tempo changes as stretch or varispeed pitch. |
 | 🥁 BeatMapper | [moved to its own repo →](https://github.com/jacobanana/beat-mapper) | Tempo map from a recording — drop in the audio, let it find every hit, set bar 1 and it follows the beat from there, pinning each beat to a real transient. Loop the part that feels right and it rebuilds the rest to match. Exports a MIDI tempo map (with a click track) or a REAPER project with the audio already in place, slices the audio into samples, and keeps a per-file session so you can pick up where you left off. Now a Vite + TypeScript app at [jacobanana.github.io/beat-mapper](https://jacobanana.github.io/beat-mapper/); [`beat-mapper/`](beat-mapper/) here only redirects there. |
 | 🐷 Piggy | [moved to its own repo →](https://github.com/jacobanana/piggy) | Shared expenses for two — recurring bills, everyday extras, things booked but not yet paid, and holiday pots, split evenly, by shares or to the cent, with a receipt tallying who owes whom and an itemised log of every repayment between you. Multi-currency, with its own exchange rates. Now a Vite app at [jacobanana.github.io/piggy](https://jacobanana.github.io/piggy/), with a FastAPI + Postgres backend growing beside it. |
 
@@ -28,7 +28,7 @@ breathing-flow-log/index.html
 sensor-readout/index.html
 tpg-pulse/index.html
 headboard-bracket/index.html
-tempo-desk/              # the one multi-file app: see below
+wave-calculator/              # the one multi-file app: see below
 beat-mapper/index.html  # redirect to the app's new home
 .nojekyll               # serve files as-is (no Jekyll processing)
 .github/workflows/deploy-pages.yml
@@ -208,27 +208,27 @@ time zero, zipped with the audio file if you tick **audio**. When the audio
 starts before bar 1, both exports either open with a lead-in bar in a matching
 time signature or tell you where to trim, your choice.
 
-### How Tempo Desk is put together
+### How Wave Calculator is put together
 
-`tempo-desk/` breaks the one-file rule on purpose: it's a set of calculators
+`wave-calculator/` breaks the one-file rule on purpose: it's a set of calculators
 that share one tempo, and is meant to keep growing, so each calculator is its
 own file. Still no build step — they're plain `<script>` tags, which also
 means opening `index.html` from disk still works.
 
 ```
-tempo-desk/
+wave-calculator/
   index.html            # the tempo bar, the tab strip, the script tags
   styles.css
-  js/core.js            # shared state + maths: TD.tempo, TD.timing, TD.notes, TD.fmt, TD.modes
+  js/core.js            # shared state + maths: WC.tempo, WC.timing, WC.notes, WC.fmt, WC.modes
   js/ui.js              # small DOM kit the modes build from (fields, selects, tables…)
   js/modes/*.js         # one calculator per file
   js/app.js             # the shell: wires the tempo bar, builds tabs, mounts modes
 ```
 
-**The tempo lives in exactly one place.** `TD.tempo` is a small observable store
+**The tempo lives in exactly one place.** `WC.tempo` is a small observable store
 holding BPM, time signature and sample rate; only the bar at the top edits it
 (plus the odd "Use this BPM" button). A mode never shows its own BPM box — it
-gets a `TD.timing` object handed to `render(t)` whenever the tempo changes,
+gets a `WC.timing` object handed to `render(t)` whenever the tempo changes,
 with `t.note('1/8d')`, `t.samples(ms)`, `t.barMs` and friends. BPM always
 counts quarter notes; the time signature only decides how long a bar is.
 
@@ -236,7 +236,7 @@ counts quarter notes; the time signature only decides how long a bar is.
 (tab order is script order):
 
 ```js
-TD.modes.register({
+WC.modes.register({
   id: 'lfo',                         // URL hash (#lfo) and storage key
   title: 'LFO',                      // tab label
   summary: 'One line under the tabs.',
@@ -249,9 +249,9 @@ TD.modes.register({
 
 | It writes | What's in it |
 | --- | --- |
-| `tempo-desk:tempo` | BPM, time signature, sample rate. |
-| `tempo-desk:mode:<id>` | That calculator's own inputs. |
-| `tempo-desk:app` | Which tab was open last. |
+| `wave-calculator:tempo` | BPM, time signature, sample rate. |
+| `wave-calculator:mode:<id>` | That calculator's own inputs. |
+| `wave-calculator:app` | Which tab was open last. |
 
 All in that browser's `localStorage`; nothing is uploaded.
 

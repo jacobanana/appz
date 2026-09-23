@@ -1,14 +1,14 @@
 /* Delay & reverb — echo times on the grid, and a reverb whose pre-delay plus
  * decay ends exactly on a note value so the tail clears before the next one. */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, noteSelect, answer, table, row, verdict } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, noteSelect, answer, table, row, verdict } = WC.ui;
+  const f = WC.fmt;
 
-  const DELAY_IDS = TD.notes.list({ longest: 1, shortest: 64, bars: [1] });
+  const DELAY_IDS = WC.notes.list({ longest: 1, shortest: 64, bars: [1] });
   const COMMON = ['1/4', '1/8d', '1/8', '1/4t', '1/8t', '1/16'];
-  const TAIL_IDS = TD.notes.list({ longest: 1, shortest: 16, feels: ['', 'd'], bars: [4, 2, 1] });
-  const PRE_IDS = TD.notes.list({ longest: 16, shortest: 256, feels: ['', 't'] });
+  const TAIL_IDS = WC.notes.list({ longest: 1, shortest: 16, feels: ['', 'd'], bars: [4, 2, 1] });
+  const PRE_IDS = WC.notes.list({ longest: 16, shortest: 256, feels: ['', 't'] });
   const SIZES = [
     ['Ambience', '1/8', '1/256'],
     ['Room', '1/4', '1/128'],
@@ -17,7 +17,7 @@
     ['Big hall', '2bar', '1/32'],
   ];
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'space',
     title: 'Delay & reverb',
     summary: 'Echo times on the grid, and reverb tails that end on a note.',
@@ -70,7 +70,7 @@
         chips.replaceChildren(...COMMON.map((id) => h('button', {
           type: 'button', class: 'chip', 'aria-pressed': String(id === s.delay),
           onclick: () => prefs.set({ delay: id }),
-        }, h('b', {}, TD.notes.label(id)), ' ', f.ms(t.note(id)) + ' ms')));
+        }, h('b', {}, WC.notes.label(id)), ' ', f.ms(t.note(id)) + ' ms')));
 
         const d = t.note(s.delay);
         delayAns.set([{ value: f.ms(d), unit: 'ms' }],
@@ -84,12 +84,12 @@
           { label: 'Pre-delay', value: f.ms(pre), unit: 'ms' },
           { label: 'Decay', value: decay > 0 ? f.ms(decay) : '–', unit: 'ms' },
         ], decay > 0
-          ? 'Together they end on the ' + TD.notes.label(s.tail) + ' at <b>' + f.ms(tail) + ' ms</b>.'
+          ? 'Together they end on the ' + WC.notes.label(s.tail) + ' at <b>' + f.ms(tail) + ' ms</b>.'
           : '<span class="warn">The pre-delay is as long as the whole tail — pick a shorter one.</span>');
 
         sizes.rows(SIZES.map(([name, tl, pr]) => {
           const a = t.note(tl), b = t.note(pr);
-          return row(['<button type="button" class="link" data-tail="' + tl + '" data-pre="' + pr + '">' + name + '</button>', TD.notes.label(tl), TD.notes.label(pr) + ' · ' + f.ms(b) + ' ms', f.ms(a - b) + ' ms'],
+          return row(['<button type="button" class="link" data-tail="' + tl + '" data-pre="' + pr + '">' + name + '</button>', WC.notes.label(tl), WC.notes.label(pr) + ' · ' + f.ms(b) + ' ms', f.ms(a - b) + ' ms'],
             tl === s.tail && pr === s.pre ? 'hl' : '');
         }));
       }
@@ -97,4 +97,4 @@
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);

@@ -1,29 +1,29 @@
-/* Tempo Desk — the shell.
+/* Wave Calculator — the shell.
  *
- * Wires the one tempo bar to TD.tempo, builds a tab per registered mode,
+ * Wires the one tempo bar to WC.tempo, builds a tab per registered mode,
  * mounts each mode the first time it is shown and re-renders the visible one
  * whenever the tempo changes. Modes never touch the bar and the bar never
  * knows what modes exist.
  */
-(function (TD) {
+(function (WC) {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const f = TD.fmt;
-  const tempo = TD.tempo;
-  const app = TD.store('app', { mode: '' });
+  const f = WC.fmt;
+  const tempo = WC.tempo;
+  const app = WC.store('app', { mode: '' });
 
   // ------------------------------------------------------------ tempo bar
 
   const bpmIn = $('bpm');
   const round = (x) => Math.round(x * 1000) / 1000;
-  const setBpm = (x) => { if (TD.validBpm(x)) tempo.set({ bpm: round(x) }); };
+  const setBpm = (x) => { if (WC.validBpm(x)) tempo.set({ bpm: round(x) }); };
   const nudge = (d) => setBpm(tempo.get().bpm + d);
 
-  bpmIn.min = TD.BPM_MIN;
-  bpmIn.max = TD.BPM_MAX;
+  bpmIn.min = WC.BPM_MIN;
+  bpmIn.max = WC.BPM_MAX;
   bpmIn.addEventListener('input', () => {
     const x = parseFloat(bpmIn.value);
-    const ok = TD.validBpm(x);
+    const ok = WC.validBpm(x);
     if (ok) { bpmIn.removeAttribute('aria-invalid'); setBpm(x); } else bpmIn.setAttribute('aria-invalid', 'true');
   });
   bpmIn.addEventListener('blur', () => { bpmIn.removeAttribute('aria-invalid'); bpmIn.value = tempo.get().bpm; });
@@ -60,8 +60,8 @@
 
   const sigNum = $('sigNum'), sigDen = $('sigDen'), rate = $('rate');
   for (let n = 1; n <= 16; n++) sigNum.append(new Option(n, n));
-  TD.SIG_DENOMINATORS.forEach((d) => sigDen.append(new Option(d, d)));
-  TD.SAMPLE_RATES.forEach((r) => rate.append(new Option(f.num(r / 1000, r % 1000 ? 1 : 0) + ' kHz', r)));
+  WC.SIG_DENOMINATORS.forEach((d) => sigDen.append(new Option(d, d)));
+  WC.SAMPLE_RATES.forEach((r) => rate.append(new Option(f.num(r / 1000, r % 1000 ? 1 : 0) + ' kHz', r)));
   sigNum.addEventListener('change', () => tempo.set({ sigNum: +sigNum.value }));
   sigDen.addEventListener('change', () => tempo.set({ sigDen: +sigDen.value }));
   rate.addEventListener('change', () => tempo.set({ sampleRate: +rate.value }));
@@ -71,7 +71,7 @@
     sigNum.value = s.sigNum;
     sigDen.value = s.sigDen;
     rate.value = s.sampleRate;
-    const t = TD.timing(s);
+    const t = WC.timing(s);
     $('readout').innerHTML =
       '<span>Beat <b>' + f.ms(t.beatMs) + '</b> ms</span>' +
       '<span>Bar <b>' + f.ms(t.barMs) + '</b> ms</span>' +
@@ -80,7 +80,7 @@
 
   // ------------------------------------------------------------ modes
 
-  const modes = TD.modes.all();
+  const modes = WC.modes.all();
   const tabs = $('tabs'), host = $('modes'), summary = $('summary');
   const mounted = new Map(); // id → { panel, view }
 
@@ -97,7 +97,7 @@
     panel.className = 'mode';
     panel.id = 'mode-' + m.id;
     host.append(panel);
-    const prefs = TD.store('mode:' + m.id, m.prefs || {}, m.clean);
+    const prefs = WC.store('mode:' + m.id, m.prefs || {}, m.clean);
     const view = m.mount(panel, { prefs, tempo });
     const entry = { panel, view };
     mounted.set(m.id, entry);
@@ -106,7 +106,7 @@
 
   let current = null;
   function show(id) {
-    const m = TD.modes.get(id) || modes[0];
+    const m = WC.modes.get(id) || modes[0];
     current = m.id;
     tabs.querySelectorAll('a').forEach((a) => {
       if (a.dataset.mode === m.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
@@ -114,8 +114,8 @@
     const entry = mounted.get(m.id) || mount(m);
     mounted.forEach((e) => { e.panel.hidden = e !== entry; });
     summary.textContent = m.summary || '';
-    document.title = m.title + ' · Tempo Desk';
-    entry.view.render(TD.timing(tempo.get()));
+    document.title = m.title + ' · Wave Calculator';
+    entry.view.render(WC.timing(tempo.get()));
     app.set({ mode: m.id });
     const active = tabs.querySelector('[aria-current]');
     if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -124,13 +124,13 @@
   tempo.subscribe((s) => {
     paintBar(s);
     const entry = current && mounted.get(current);
-    if (entry) entry.view.render(TD.timing(s));
+    if (entry) entry.view.render(WC.timing(s));
   });
 
   window.addEventListener('hashchange', () => show(location.hash.slice(1)));
 
   paintBar(tempo.get());
   const start = location.hash.slice(1);
-  show(TD.modes.get(start) ? start : app.get().mode);
+  show(WC.modes.get(start) ? start : app.get().mode);
   if (!location.hash) history.replaceState(null, '', '#' + current);
-})(window.TD);
+})(window.WC);

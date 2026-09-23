@@ -5,10 +5,10 @@
  * the next 8th" means τ = (length of an 8th) ÷ (how many τ "back" takes), and
  * the number to dial is τ times whatever the knob itself is calibrated to.
  */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, noteSelect, seg, answer, table, row, verdict, number } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, noteSelect, seg, answer, table, row, verdict, number } = WC.ui;
+  const f = WC.fmt;
 
   // How many τ count as "settled".
   const SETTLE = {
@@ -25,12 +25,12 @@
   // Each hit holds the detector over threshold for this share of the gap.
   const HIT_SHARE = 0.25;
 
-  const HIT_IDS = TD.notes.list({ longest: 1, shortest: 32, bars: [1] });
-  const ATTACK_IDS = TD.notes.list({ longest: 16, shortest: 256 });
-  const RELEASE_IDS = TD.notes.list({ longest: 1, shortest: 64, bars: [2, 1] });
+  const HIT_IDS = WC.notes.list({ longest: 1, shortest: 32, bars: [1] });
+  const ATTACK_IDS = WC.notes.list({ longest: 16, shortest: 256 });
+  const RELEASE_IDS = WC.notes.list({ longest: 1, shortest: 64, bars: [2, 1] });
   const TABLE_IDS = ['1/32', '1/16t', '1/16', '1/16d', '1/8t', '1/8', '1/8d', '1/4t', '1/4', '1/4d', '1/2', '1bar'];
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'compressor',
     title: 'Compressor',
     summary: 'Attack and release that breathe with the beat.',
@@ -116,11 +116,11 @@
           { label: 'Release', value: f.ms(c.dialR), unit: 'ms', sub: f.samples(t.samples(c.dialR)) + ' samples' },
         ],
         'Time constants: attack τ <b>' + f.ms(c.tauA) + ' ms</b>, release τ <b>' + f.ms(c.tauR) + ' ms</b>.<br>' +
-        'A ' + TD.notes.label(c.s.attack) + ' is ' + f.ms(c.attackWin) + ' ms and a ' + TD.notes.label(c.s.release) +
+        'A ' + WC.notes.label(c.s.attack) + ' is ' + f.ms(c.attackWin) + ' ms and a ' + WC.notes.label(c.s.release) +
         ' is ' + f.ms(c.releaseWin) + ' ms at ' + f.bpm(t.bpm) + ' BPM' +
         (c.s.knob === 'tau' ? '.' : '; values shown as ' + knobName + '.'));
 
-        const every = TD.notes.label(c.s.hits);
+        const every = WC.notes.label(c.s.hits);
         let text;
         if (c.releaseWin > c.gap - c.body) {
           text = 'The release window is longer than the gap between hits, so it never gets there: ';
@@ -142,16 +142,16 @@
 
         const tauR = +p().check / c.knobK;
         const settleMs = tauR * c.settleK;
-        const near = TD.notes.nearest(settleMs, t, RELEASE_IDS);
+        const near = WC.notes.nearest(settleMs, t, RELEASE_IDS);
         const recAtHit = 1 - Math.exp(-(c.gap - c.body) / tauR);
         checkOut.innerHTML =
           'That is τ = <b>' + f.ms(tauR) + ' ms</b>, so it is ' + SETTLE[c.s.settle].label.split(' ')[0] + ' back after <b>' + f.ms(settleMs) + ' ms</b> — ' +
-          'closest to a <b>' + TD.notes.label(near) + '</b> (' + f.ms(t.note(near)) + ' ms). ' +
+          'closest to a <b>' + WC.notes.label(near) + '</b> (' + f.ms(t.note(near)) + ' ms). ' +
           'With hits every ' + every + ' it is <b>' + f.pct(recAtHit) + '</b> recovered when the next one lands.';
 
         tbl.rows(TABLE_IDS.map((id) => {
           const ms = t.note(id);
-          return row([TD.notes.label(id), f.ms(ms) + ' ms'].concat(
+          return row([WC.notes.label(id), f.ms(ms) + ' ms'].concat(
             [1, 3, 5].map((k) => f.ms((ms / k) * c.knobK) + ' ms')), id === c.s.release ? 'hl' : '');
         }));
       }
@@ -210,11 +210,11 @@
 
         plot.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svg + '</svg>';
         plot.setAttribute('aria-label',
-          'Gain reduction over ' + f.ms(span) + ' ms with a hit every ' + TD.notes.label(c.s.hits) +
+          'Gain reduction over ' + f.ms(span) + ' ms with a hit every ' + WC.notes.label(c.s.hits) +
           '; ' + f.pct(c.recovered) + ' recovered before each new hit.');
       }
 
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);

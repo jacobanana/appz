@@ -1,10 +1,10 @@
 /* MIDI clock — how long a clock tick is, and how many ticks to shift the clock
  * by to line up audio that arrives late. MIDI clock sends 24 ticks per quarter
  * note, so a tick's length depends only on tempo. */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, number, select, seg, answer, table, row, verdict } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, number, select, seg, answer, table, row, verdict } = WC.ui;
+  const f = WC.fmt;
 
   const PPQN = [24, 48, 96, 480, 960];
   const COMP = {
@@ -14,7 +14,7 @@
   };
   const NOTE_ROWS = ['1/32', '1/16', '1/8t', '1/8', '1/4', '1/2', '1bar'];
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'midi-clock',
     title: 'MIDI clock',
     summary: 'Tick lengths, and how many ticks line up a late signal.',
@@ -93,9 +93,9 @@
           k === nearest ? 'hl closest' : '')));
 
         notesTbl.rows(['tick'].concat(NOTE_ROWS).map((id) => {
-          const q = id === 'tick' ? 1 / s.ppqn : TD.notes.quarters(id, t);
+          const q = id === 'tick' ? 1 / s.ppqn : WC.notes.quarters(id, t);
           const ticks = q * s.ppqn, ms = t.ms(q);
-          return row([id === 'tick' ? 'One tick' : TD.notes.label(id), f.trim(ticks, 2), f.num(ms, 2), f.samples(t.samples(ms))]);
+          return row([id === 'tick' ? 'One tick' : WC.notes.label(id), f.trim(ticks, 2), f.num(ms, 2), f.samples(t.samples(ms))]);
         }));
       }
 
@@ -127,4 +127,4 @@
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);

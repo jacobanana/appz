@@ -1,10 +1,10 @@
-/* Tempo Desk — UI kit.
+/* Wave Calculator — UI kit.
  *
  * Small DOM builders the modes share, so a mode is mostly "which inputs, and
  * what to print". Each control takes a value and an onChange and hands back
  * its element (plus a setter where a mode needs to push a value in).
  */
-(function (TD) {
+(function (WC) {
   'use strict';
 
   let uid = 0;
@@ -81,10 +81,10 @@
     return el;
   }
 
-  /** A select of note values (ids from TD.notes.list). */
+  /** A select of note values (ids from WC.notes.list). */
   function noteSelect({ ids, value, onChange }) {
     const el = select({
-      options: ids.map((id) => ({ value: id, label: TD.notes.label(id) })),
+      options: ids.map((id) => ({ value: id, label: WC.notes.label(id) })),
       value: ids.includes(value) ? value : ids[0],
       onChange,
     });
@@ -144,5 +144,5 @@
     return h('p', { class: 'verdict', 'aria-live': 'polite' });
   }
 
-  TD.ui = { h, block, field, fields, number, select, noteSelect, seg, answer, table, row, verdict, nextId };
-})(window.TD);
+  WC.ui = { h, block, field, fields, number, select, noteSelect, seg, answer, table, row, verdict, nextId };
+})(window.WC);

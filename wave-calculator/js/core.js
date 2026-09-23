@@ -1,20 +1,20 @@
-/* Tempo Desk — core.
+/* Wave Calculator — core.
  *
  * Everything every mode shares and nothing that touches the page:
- *   TD.store    a tiny observable, persisted to localStorage
- *   TD.tempo    the one shared tempo (BPM, time signature, sample rate)
- *   TD.timing   turns the tempo into milliseconds, samples and hertz
- *   TD.notes    note values ('1/8', '1/8d', '1/8t', '2bar') and their lengths
- *   TD.fmt      number formatting
- *   TD.modes    the registry the modes add themselves to
+ *   WC.store    a tiny observable, persisted to localStorage
+ *   WC.tempo    the one shared tempo (BPM, time signature, sample rate)
+ *   WC.timing   turns the tempo into milliseconds, samples and hertz
+ *   WC.notes    note values ('1/8', '1/8d', '1/8t', '2bar') and their lengths
+ *   WC.fmt      number formatting
+ *   WC.modes    the registry the modes add themselves to
  */
 (function (global) {
   'use strict';
-  const TD = (global.TD = global.TD || {});
+  const WC = (global.WC = global.WC || {});
 
   // ---------------------------------------------------------------- storage
 
-  const PREFIX = 'tempo-desk:';
+  const PREFIX = 'wave-calculator:';
 
   function load(key) {
     try { return JSON.parse(localStorage.getItem(PREFIX + key) || 'null'); } catch (e) { return null; }
@@ -45,7 +45,7 @@
       subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
     };
   }
-  TD.store = store;
+  WC.store = store;
 
   // ---------------------------------------------------------------- tempo
 
@@ -53,19 +53,19 @@
   const SIG_DENOMINATORS = [2, 4, 8, 16];
   const BPM_MIN = 1, BPM_MAX = 999;
 
-  TD.SAMPLE_RATES = SAMPLE_RATES;
-  TD.SIG_DENOMINATORS = SIG_DENOMINATORS;
-  TD.BPM_MIN = BPM_MIN;
-  TD.BPM_MAX = BPM_MAX;
-  TD.validBpm = (x) => Number.isFinite(x) && x >= BPM_MIN && x <= BPM_MAX;
+  WC.SAMPLE_RATES = SAMPLE_RATES;
+  WC.SIG_DENOMINATORS = SIG_DENOMINATORS;
+  WC.BPM_MIN = BPM_MIN;
+  WC.BPM_MAX = BPM_MAX;
+  WC.validBpm = (x) => Number.isFinite(x) && x >= BPM_MIN && x <= BPM_MAX;
 
   /** The single shared tempo. Every mode reads it; only the tempo bar (and the
    *  odd "use this tempo" button) writes it. */
-  TD.tempo = store(
+  WC.tempo = store(
     'tempo',
     { bpm: 120, sigNum: 4, sigDen: 4, sampleRate: 48000 },
     (s, d) => ({
-      bpm: TD.validBpm(+s.bpm) ? Math.round(+s.bpm * 1000) / 1000 : d.bpm,
+      bpm: WC.validBpm(+s.bpm) ? Math.round(+s.bpm * 1000) / 1000 : d.bpm,
       sigNum: Number.isInteger(+s.sigNum) && +s.sigNum >= 1 && +s.sigNum <= 32 ? +s.sigNum : d.sigNum,
       sigDen: SIG_DENOMINATORS.includes(+s.sigDen) ? +s.sigDen : d.sigDen,
       sampleRate: SAMPLE_RATES.includes(+s.sampleRate) ? +s.sampleRate : d.sampleRate,
@@ -76,7 +76,7 @@
    * Derived timing for one tempo state. BPM always counts quarter notes, so a
    * bar of 6/8 is three quarters long whatever the tempo.
    */
-  TD.timing = function (s) {
+  WC.timing = function (s) {
     const quarterMs = 60000 / s.bpm;
     const barQuarters = (s.sigNum * 4) / s.sigDen;
     const t = {
@@ -92,8 +92,8 @@
       quarters: (ms) => ms / quarterMs,
       samples: (ms) => (ms * s.sampleRate) / 1000,
       hz: (ms) => 1000 / ms,
-      /** Length of a note value (see TD.notes) in ms. */
-      note: (id) => TD.notes.quarters(id, t) * quarterMs,
+      /** Length of a note value (see WC.notes) in ms. */
+      note: (id) => WC.notes.quarters(id, t) * quarterMs,
     };
     return t;
   };
@@ -116,7 +116,7 @@
     return { den: +m[1], feel: m[2] };
   }
 
-  TD.notes = {
+  WC.notes = {
     DENOMS,
     parse,
     /** Length in quarter notes. Bars need the timing for their size. */
@@ -164,7 +164,7 @@
     return x.toLocaleString('en-US', { maximumFractionDigits: dp });
   }
 
-  TD.fmt = {
+  WC.fmt = {
     num,
     trim,
     bpm: (x) => trim(x, 2),
@@ -189,21 +189,21 @@
   /*
    * A mode is one calculator. It registers itself with:
    *
-   *   TD.modes.register({
+   *   WC.modes.register({
    *     id: 'compressor',            // URL hash and storage key
    *     title: 'Compressor',         // tab label
    *     summary: 'One line.',        // shown under the tab strip
    *     prefs: { ... },              // its own inputs' defaults, persisted
    *     mount(root, ctx) {           // build the DOM once, into `root`
-   *       return { render(t) {} };   // redraw for a TD.timing; called on
+   *       return { render(t) {} };   // redraw for a WC.timing; called on
    *     },                           // every tempo change while visible
    *   });
    *
-   * ctx gives it { prefs: a TD.store of its own inputs, tempo: TD.tempo }.
+   * ctx gives it { prefs: a WC.store of its own inputs, tempo: WC.tempo }.
    * Tabs appear in registration order, i.e. the order of the script tags.
    */
   const registry = [];
-  TD.modes = {
+  WC.modes = {
     register(mode) {
       if (!mode.id || !mode.mount) throw new Error('A mode needs an id and a mount()');
       if (registry.some((m) => m.id === mode.id)) throw new Error('Duplicate mode: ' + mode.id);

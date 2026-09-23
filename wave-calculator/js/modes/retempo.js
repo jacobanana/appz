@@ -1,20 +1,20 @@
 /* Retempo — move material from the current tempo to another: how much it
  * stretches if you keep the pitch, how far the pitch moves if you just speed
  * the tape up (varispeed), and the tempo a pitch shift lands you on. */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, number, answer, verdict } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, number, answer, verdict } = WC.ui;
+  const f = WC.fmt;
 
   const signed = (x, dp) => (x > 0 ? '+' : x < 0 ? '−' : '±') + f.num(Math.abs(x), dp);
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'retempo',
     title: 'Change tempo',
     summary: 'Stretch, varispeed pitch and new tempo when moving between BPMs.',
     prefs: { target: 128, semis: 1 },
     clean: (p, d) => ({
-      target: TD.validBpm(+p.target) ? +p.target : d.target,
+      target: WC.validBpm(+p.target) ? +p.target : d.target,
       semis: Number.isFinite(+p.semis) && Math.abs(+p.semis) <= 48 ? +p.semis : d.semis,
     }),
 
@@ -24,7 +24,7 @@
       const to = block('From this tempo to another', 'The tempo bar is where you start; type where you are going.');
       const toAns = answer();
       const toNote = verdict();
-      to.append(fields(field('New tempo', number({ value: p().target, min: TD.BPM_MIN, max: TD.BPM_MAX, onChange: (v) => prefs.set({ target: v }) }), 'BPM')),
+      to.append(fields(field('New tempo', number({ value: p().target, min: WC.BPM_MIN, max: WC.BPM_MAX, onChange: (v) => prefs.set({ target: v }) }), 'BPM')),
         toAns.el, toNote);
 
       const pitch = block('Pitch it instead', 'Varispeed: shift the pitch and the tempo follows, like speeding up a tape.');
@@ -60,12 +60,12 @@
 
         const r = Math.pow(2, s.semis / 12);
         const bpm = t.bpm * r;
-        pitchAns.set([{ label: 'New tempo', value: TD.validBpm(bpm) ? f.num(bpm, 2) : '–', unit: 'BPM' }],
+        pitchAns.set([{ label: 'New tempo', value: WC.validBpm(bpm) ? f.num(bpm, 2) : '–', unit: 'BPM' }],
           'Speed ×<b>' + f.num(r, 4) + '</b>; length ' + signed((1 / r - 1) * 100, 2) + '%.');
-        pitchNote.replaceChildren(TD.validBpm(bpm) && s.semis !== 0 ? useBtn(bpm) : '');
+        pitchNote.replaceChildren(WC.validBpm(bpm) && s.semis !== 0 ? useBtn(bpm) : '');
       }
 
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);

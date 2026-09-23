@@ -1,10 +1,10 @@
 /* Note lengths — every note value at the current tempo, straight, dotted and
  * triplet, as milliseconds, samples or a rate in hertz (for LFOs and
  * tremolo). Plus where a swung off-beat lands. */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, seg, table, row, verdict, number, select } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, seg, table, row, verdict, number, select } = WC.ui;
+  const f = WC.fmt;
 
   const ROWS = ['2bar', '1bar', '1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64', '1/128'];
   const UNITS = {
@@ -13,7 +13,7 @@
     hz: { label: 'Hertz', cell: (t, ms) => f.hz(t.hz(ms)) },
   };
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'notes',
     title: 'Note lengths',
     summary: 'Every note value in ms, samples or Hz — straight, dotted and triplet.',
@@ -56,7 +56,7 @@
         const unitSuffix = s.unit === 'ms' ? ' ms' : s.unit === 'hz' ? ' Hz' : '';
         tbl.rows(ROWS.map((id) => {
           const isBar = /bar$/.test(id);
-          const cells = [TD.notes.label(id) + (id === '1/4' ? ' <span class="tag">beat</span>' : '')];
+          const cells = [WC.notes.label(id) + (id === '1/4' ? ' <span class="tag">beat</span>' : '')];
           ['', 'd', 't'].forEach((feel) => {
             if (isBar && feel) { cells.push('<span class="dim">—</span>'); return; }
             cells.push(u.cell(t, t.note(isBar ? id : id + feel)) + unitSuffix);
@@ -67,7 +67,7 @@
         const pair = t.note(s.swingGrid) * 2;
         const late = pair * (s.swing / 100 - 0.5);
         swingOut.innerHTML =
-          'At ' + f.trim(s.swing, 1) + '% the off-beat ' + TD.notes.label(s.swingGrid) + ' lands <b>' + f.ms(late) + ' ms late</b> — ' +
+          'At ' + f.trim(s.swing, 1) + '% the off-beat ' + WC.notes.label(s.swingGrid) + ' lands <b>' + f.ms(late) + ' ms late</b> — ' +
           f.ms(pair * s.swing / 100) + ' ms after the on-beat instead of ' + f.ms(pair / 2) + ' ms ' +
           '(' + f.samples(t.samples(late)) + ' samples). The on-beat note is ' + f.ms(pair * s.swing / 100) +
           ' ms long, the off-beat ' + f.ms(pair * (1 - s.swing / 100)) + ' ms.';
@@ -76,4 +76,4 @@
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);

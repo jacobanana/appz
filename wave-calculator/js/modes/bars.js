@@ -1,12 +1,12 @@
 /* Bars & time — how long a passage is, how many bars fit a duration, and the
  * tempo that makes N bars last exactly as long as you need. */
-(function (TD) {
+(function (WC) {
   'use strict';
-  const { h, block, field, fields, number, answer, verdict } = TD.ui;
-  const f = TD.fmt;
+  const { h, block, field, fields, number, answer, verdict } = WC.ui;
+  const f = WC.fmt;
   const nonNeg = (x) => Number.isFinite(x) && x >= 0;
 
-  TD.modes.register({
+  WC.modes.register({
     id: 'bars',
     title: 'Bars & time',
     summary: 'Bars to minutes and back, and the tempo that fits a length.',
@@ -65,8 +65,8 @@
         const fitDur = (s.fitMin * 60 + s.fitSec) * 1000;
         const bpm = s.fitBars > 0 && fitDur > 0 ? (60000 * s.fitBars * t.barQuarters) / fitDur : NaN;
         fitNote.replaceChildren();
-        if (!TD.validBpm(bpm)) {
-          fitAns.set([{ value: '–', unit: 'BPM' }], 'Enter a number of bars and a length that gives a tempo between ' + TD.BPM_MIN + ' and ' + TD.BPM_MAX + '.');
+        if (!WC.validBpm(bpm)) {
+          fitAns.set([{ value: '–', unit: 'BPM' }], 'Enter a number of bars and a length that gives a tempo between ' + WC.BPM_MIN + ' and ' + WC.BPM_MAX + '.');
           return;
         }
         const round = Math.round(bpm);
@@ -85,4 +85,4 @@
       return { render };
     },
   });
-})(window.TD);
+})(window.WC);
