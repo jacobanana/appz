@@ -10,6 +10,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script>
+  // Phones have no console: show the first script error on the page instead.
+  addEventListener('error', (e) => {
+    if (document.querySelector('.oops') || !e.message) return;
+    const p = document.createElement('p');
+    p.className = 'oops';
+    p.setAttribute('role', 'alert');
+    p.textContent = 'Something went wrong (' + e.message + (e.filename ? ', ' + e.filename.split('/').pop() + ':' + e.lineno : '') + '). Reloading usually fixes it.';
+    (document.querySelector('main') || document.body).prepend(p);
+  });
+</script>
 </head>
 <body>
 <header class="top">

@@ -29,6 +29,15 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      # Pages lets browsers cache files for 10 minutes, so right after a deploy a
+      # new index.html could run last deploy's scripts. Stamp every local
+      # .js/.css reference with this commit so each page gets its own files.
+      - name: Version asset links
+        run: |
+          export V="${GITHUB_SHA::7}"
+          find . -name '*.html' -not -path './.git/*' -print0 |
+            xargs -0 perl -pi -e 's/((?:src|href)="(?![a-z]+:|\/\/)[^"?#]+\.(?:js|css))"/$1?v=$ENV{V}"/g'
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
