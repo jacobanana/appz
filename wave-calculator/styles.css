@@ -262,7 +262,7 @@ tr.hl td:first-child { box-shadow: inset 3px 0 0 var(--amber-fill); padding-left
   .brand { flex: 1 0 100%; }
   .brand h1 { font-size: 1.1rem; }
   /* Every row of the bar spans the full width: BPM and Time on the left, the tools and Rate flush right. */
-  .tempo { flex: 1 0 100%; gap: .45rem .4rem; }
+  .tempo { flex: 1 0 100%; gap: .45rem .4rem; justify-content: flex-start; }
   .tools { margin-left: auto; }
   .bpm .step { width: 2.1rem; }
   .bpm-field input { font-size: 1.8rem; width: 4.4ch; }
